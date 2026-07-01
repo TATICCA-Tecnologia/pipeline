@@ -1,8 +1,9 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/shared/context/auth-context";
 import { cn, getInitials } from "@/shared/utils";
 import { Avatar, AvatarFallback } from "@/src/shared/components/ui/avatar";
@@ -12,8 +13,12 @@ import {
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/src/shared/components/ui/dropdown-menu";
+import { ClientPickerDialog } from "@/shared/components/client-picker-dialog";
 import {
   ChevronsUpDown,
   FolderKanban,
@@ -21,6 +26,7 @@ import {
   LogOut,
   PlusCircle,
   Settings,
+  Shield,
   Tag,
   User as UserIcon,
   Users,
@@ -92,7 +98,16 @@ const adminSections: NavSection[] = [
 
 export function AppSidebar() {
   const pathname = usePathname();
-  const { user, logout } = useAuth();
+  const router = useRouter();
+  const {
+    user,
+    logout,
+    isSuperAdmin,
+    viewAsAdmin,
+    viewAsDeveloper,
+    viewAsClient,
+  } = useAuth();
+  const [clientPickerOpen, setClientPickerOpen] = useState(false);
 
   const sections =
     user?.role === "admin"
@@ -209,6 +224,40 @@ export function AppSidebar() {
                 <Settings className="mr-2 h-4 w-4" />
                 Configurações
               </DropdownMenuItem>
+              {isSuperAdmin && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuSub>
+                    <DropdownMenuSubTrigger>
+                      <Shield className="mr-2 h-4 w-4" />
+                      Ver como
+                    </DropdownMenuSubTrigger>
+                    <DropdownMenuSubContent>
+                      <DropdownMenuItem
+                        onSelect={() => {
+                          viewAsAdmin();
+                          router.push("/admin");
+                        }}
+                      >
+                        Admin
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onSelect={() => {
+                          viewAsDeveloper();
+                          router.push("/desenvolvedor");
+                        }}
+                      >
+                        Desenvolvedor
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onSelect={() => setClientPickerOpen(true)}
+                      >
+                        Cliente...
+                      </DropdownMenuItem>
+                    </DropdownMenuSubContent>
+                  </DropdownMenuSub>
+                </>
+              )}
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={logout} className="text-destructive">
                 <LogOut className="mr-2 h-4 w-4" />
@@ -217,6 +266,17 @@ export function AppSidebar() {
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
+      )}
+
+      {isSuperAdmin && (
+        <ClientPickerDialog
+          open={clientPickerOpen}
+          onOpenChange={setClientPickerOpen}
+          onSelect={(client) => {
+            viewAsClient(client);
+            router.push("/cliente");
+          }}
+        />
       )}
     </aside>
   );
