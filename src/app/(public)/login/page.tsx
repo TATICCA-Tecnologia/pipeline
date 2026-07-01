@@ -38,7 +38,7 @@ export default function LoginPage() {
         createdAt: user.createdAt instanceof Date ? user.createdAt : new Date(user.createdAt),
       };
       loginWithUser(normalizedUser);
-      if (normalizedUser.role === "admin") {
+      if (normalizedUser.role === "admin" || normalizedUser.role === "super_admin") {
         router.push("/admin");
       } else if (normalizedUser.role === "developer") {
         router.push("/desenvolvedor");
