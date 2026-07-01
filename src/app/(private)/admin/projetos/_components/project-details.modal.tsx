@@ -92,6 +92,13 @@ export function ProjectDetailsModal({
             </span>
           </div>
 
+          <div className="flex items-center justify-between">
+            <span className="font-medium">Empresa</span>
+            <span className="text-xs font-medium text-[#111827]">
+              {project.companyName ?? "Sem empresa definida"}
+            </span>
+          </div>
+
           {project.developerId && (
             <div className="flex items-center justify-between">
               <span className="font-medium">Desenvolvedor (ID)</span>

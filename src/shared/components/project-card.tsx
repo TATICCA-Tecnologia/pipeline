@@ -76,6 +76,14 @@ export function ProjectCard({
               {project.projectType}
             </span>
           )}
+          {project.companyName && (
+            <span
+              className="inline-block max-w-full truncate text-[10px] text-muted-foreground"
+              title={project.companyName}
+            >
+              {project.companyName}
+            </span>
+          )}
           <Badge
             variant="outline"
             className={`text-[9px] font-semibold uppercase h-4 px-1.5 ${statusConfig.color}`}
