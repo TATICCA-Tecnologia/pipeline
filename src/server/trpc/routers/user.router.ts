@@ -1,7 +1,10 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { router, publicProcedure, protectedProcedure } from "../trpc";
+import { hashSync } from "bcryptjs";
+import { router, publicProcedure, protectedProcedure, adminProcedure } from "../trpc";
 import { toFrontendRole } from "../mappers";
+
+const PASSWORD_RESET_SALT_ROUNDS = 10;
 
 export const userRouter = router({
   me: protectedProcedure.query(async ({ ctx }) => {
@@ -158,6 +161,37 @@ export const userRouter = router({
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
       await ctx.db.user.delete({ where: { id: input.id } });
+      return { success: true };
+    }),
+
+  promoteToSuperAdmin: adminProcedure
+    .input(z.object({ userId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const user = await ctx.db.user.update({
+        where: { id: input.userId },
+        data: { role: "SUPER_ADMIN" },
+      });
+      return {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: toFrontendRole(user.role),
+      };
+    }),
+
+  resetPassword: adminProcedure
+    .input(
+      z.object({
+        userId: z.string(),
+        newPassword: z.string().min(6, "Senha deve ter pelo menos 6 caracteres"),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const hashedPassword = hashSync(input.newPassword, PASSWORD_RESET_SALT_ROUNDS);
+      await ctx.db.user.update({
+        where: { id: input.userId },
+        data: { password: hashedPassword },
+      });
       return { success: true };
     }),
 });

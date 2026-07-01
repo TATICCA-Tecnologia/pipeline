@@ -4,6 +4,8 @@ import { useState } from "react";
 import { useQueryState, parseAsString } from "nuqs";
 import { useClients } from "@/shared/context/clients-context";
 import { useProjects } from "@/shared/context/projects-context";
+import { trpc } from "@/shared/trpc/client";
+import { useToast } from "@/src/shared/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/src/shared/components/ui/card";
 import { Button } from "@/src/shared/components/ui/button";
 import { Input } from "@/src/shared/components/ui/input";
@@ -39,24 +41,70 @@ import {
   Mail,
   Building2,
   FolderKanban,
+  ShieldCheck,
+  KeyRound,
 } from "lucide-react";
 import type { User } from "@/shared/types";
 
 export default function ClientesPage() {
-  const { clients, addClient, updateClient, deleteClient } = useClients();
+  const { clients, addClient, updateClient, deleteClient, refetch } = useClients();
   const { projects } = useProjects();
+  const { toast } = useToast();
   const [search, setSearch] = useQueryState(
     "q",
     parseAsString.withDefault("").withOptions({ clearOnDefault: true })
   );
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isPromoteDialogOpen, setIsPromoteDialogOpen] = useState(false);
+  const [isResetPasswordDialogOpen, setIsResetPasswordDialogOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<User | null>(null);
   const [clientToDelete, setClientToDelete] = useState<User | null>(null);
+  const [clientToPromote, setClientToPromote] = useState<User | null>(null);
+  const [clientToResetPassword, setClientToResetPassword] = useState<User | null>(null);
+  const [newPassword, setNewPassword] = useState("");
   const [formData, setFormData] = useState({
     name: "",
     email: "",
     company: "",
+  });
+
+  const promoteMutation = trpc.user.promoteToSuperAdmin.useMutation({
+    onSuccess: (promotedUser) => {
+      toast({
+        title: "Usuário promovido",
+        description: `${promotedUser.name} agora é Super Admin.`,
+      });
+      refetch();
+      setIsPromoteDialogOpen(false);
+      setClientToPromote(null);
+    },
+    onError: (error) => {
+      toast({
+        title: "Erro ao promover",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const resetPasswordMutation = trpc.user.resetPassword.useMutation({
+    onSuccess: () => {
+      toast({
+        title: "Senha redefinida",
+        description: `A senha de ${clientToResetPassword?.name} foi atualizada.`,
+      });
+      setIsResetPasswordDialogOpen(false);
+      setClientToResetPassword(null);
+      setNewPassword("");
+    },
+    onError: (error) => {
+      toast({
+        title: "Erro ao redefinir senha",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
   });
 
   const filteredClients = clients.filter(
@@ -110,6 +158,32 @@ export default function ClientesPage() {
   const confirmDelete = (client: User) => {
     setClientToDelete(client);
     setIsDeleteDialogOpen(true);
+  };
+
+  const confirmPromote = (client: User) => {
+    setClientToPromote(client);
+    setIsPromoteDialogOpen(true);
+  };
+
+  const handlePromote = () => {
+    if (clientToPromote) {
+      promoteMutation.mutate({ userId: clientToPromote.id });
+    }
+  };
+
+  const openResetPasswordDialog = (client: User) => {
+    setClientToResetPassword(client);
+    setNewPassword("");
+    setIsResetPasswordDialogOpen(true);
+  };
+
+  const handleResetPassword = () => {
+    if (clientToResetPassword && newPassword.length >= 6) {
+      resetPasswordMutation.mutate({
+        userId: clientToResetPassword.id,
+        newPassword,
+      });
+    }
   };
 
   return (
@@ -267,6 +341,18 @@ export default function ClientesPage() {
                             Editar
                           </DropdownMenuItem>
                           <DropdownMenuItem
+                            onClick={() => openResetPasswordDialog(client)}
+                          >
+                            <KeyRound className="h-4 w-4 mr-2" />
+                            Redefinir Senha
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => confirmPromote(client)}
+                          >
+                            <ShieldCheck className="h-4 w-4 mr-2" />
+                            Promover a Super Admin
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
                             onClick={() => confirmDelete(client)}
                             className="text-destructive"
                           >
@@ -356,6 +442,71 @@ export default function ClientesPage() {
             </Button>
             <Button variant="destructive" onClick={handleDelete}>
               Excluir
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Promote to Super Admin Confirmation Dialog */}
+      <Dialog open={isPromoteDialogOpen} onOpenChange={setIsPromoteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Promover a Super Admin</DialogTitle>
+          </DialogHeader>
+          <p className="text-muted-foreground">
+            Tem certeza que deseja promover{" "}
+            <strong>{clientToPromote?.name}</strong> a Super Admin? Essa pessoa
+            passará a ter acesso total ao sistema, incluindo a capacidade de
+            visualizar e agir como qualquer outro perfil.
+          </p>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setIsPromoteDialogOpen(false)}
+            >
+              Cancelar
+            </Button>
+            <Button onClick={handlePromote} disabled={promoteMutation.isPending}>
+              {promoteMutation.isPending ? "Promovendo..." : "Promover"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reset Password Dialog */}
+      <Dialog
+        open={isResetPasswordDialogOpen}
+        onOpenChange={setIsResetPasswordDialogOpen}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Redefinir Senha</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2 py-2">
+            <label className="text-sm font-medium">
+              Nova senha para {clientToResetPassword?.name}
+            </label>
+            <Input
+              type="password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              placeholder="Mínimo 6 caracteres"
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setIsResetPasswordDialogOpen(false)}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleResetPassword}
+              disabled={newPassword.length < 6 || resetPasswordMutation.isPending}
+            >
+              {resetPasswordMutation.isPending
+                ? "Salvando..."
+                : "Redefinir Senha"}
             </Button>
           </DialogFooter>
         </DialogContent>
