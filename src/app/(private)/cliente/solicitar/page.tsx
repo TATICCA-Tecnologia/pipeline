@@ -53,6 +53,7 @@ import {
   BENEFIT_OPTIONS,
 } from "./utils/solicitar.utils";
 import { useTaxonomy } from "./utils/use-taxonomy";
+import { buildProjectPayload } from "./utils/build-project-payload";
 import { cn } from "@/shared/utils";
 
 const QUALITATIVE_RATINGS = [
@@ -333,83 +334,17 @@ export default function SolicitarProjetoPage() {
 
     setIsSubmitting(true);
     try {
-      const areaLabel =
-        data.projectArea === "outro"
-          ? data.customProjectArea.trim()
-          : PROJECT_AREAS.find((a) => a.value === data.projectArea)?.label ?? "";
-      const themeLabel =
-        data.projectTheme === "outro"
-          ? data.customProjectTheme.trim()
-          : (PROJECT_THEMES_BY_AREA[data.projectArea] ?? []).find(
-              (t) => t.value === data.projectTheme
-            )?.label ?? "";
-      const typeLabel =
-        data.projectArea === "outro" || data.projectTheme === "outro"
-          ? [areaLabel, themeLabel].filter(Boolean).join(" - ") || "Outro"
-          : buildClienteProjectTypeLabel(data.projectArea, data.projectTheme);
-
-      const platformLabel =
-        PLATFORMS.find((p) => p.value === data.platform)?.label ?? data.platform;
-      const projectTypeWithPlatform = `${typeLabel} · Plataforma: ${platformLabel}`;
-
-      const targetAudienceValue =
-        data.targetAudience === "outro"
-          ? data.customTargetAudience.trim()
-          : data.targetAudience;
-
-      const monthlyHours = data.monthlyHoursSaved
-        ? Number(data.monthlyHoursSaved)
-        : undefined;
-
-      const peopleInvolvedValue = data.peopleInvolved
-        ? Number(data.peopleInvolved)
-        : undefined;
-      const taskDurationHoursValue = data.taskDurationHours
-        ? Number(data.taskDurationHours)
-        : undefined;
-
-      const projectId = await addProject({
-        title: data.title,
-        description: data.description,
+      const payload = buildProjectPayload({
+        data,
+        features,
+        benefits,
         clientId: user.id,
         companyId: selectedCompanyId,
-        status: "backlog",
-        priority:
-          data.urgency === "urgente"
-            ? "urgent"
-            : data.urgency === "alta"
-              ? "high"
-              : data.urgency === "baixa"
-                ? "low"
-                : "medium",
-        projectType: projectTypeWithPlatform,
-        targetAudience: targetAudienceValue,
-        expectedUsers: data.expectedUsers,
-        urgency: data.urgency,
-        features,
-        estimatedDeadline: data.deadline ? new Date(data.deadline) : undefined,
-        additionalInfo: data.additionalInfo || undefined,
-        hasExistingSystem: data.hasExistingSystem || undefined,
-        existingSystemDetails: data.existingSystemDetails || undefined,
-        projectNarrative: data.projectNarrative || undefined,
-        benefits: benefits.length ? benefits : undefined,
-        benefitsDetails: data.benefitsDetails || undefined,
-        monthlyHoursSaved: Number.isFinite(monthlyHours) ? monthlyHours : undefined,
-        ratingErrorReduction: data.ratingErrorReduction ?? undefined,
-        ratingProcessCriticality: data.ratingProcessCriticality ?? undefined,
-        ratingInternalImpact: data.ratingInternalImpact ?? undefined,
-        ratingExternalImpact: data.ratingExternalImpact ?? undefined,
-        ratingCompliance: data.ratingCompliance ?? undefined,
-        peopleInvolved:
-          peopleInvolvedValue !== undefined && Number.isFinite(peopleInvolvedValue)
-            ? peopleInvolvedValue
-            : undefined,
-        taskDurationHours:
-          taskDurationHoursValue !== undefined && Number.isFinite(taskDurationHoursValue)
-            ? taskDurationHoursValue
-            : undefined,
-        processFrequency: data.processFrequency || undefined,
+        areas: PROJECT_AREAS,
+        themesByArea: PROJECT_THEMES_BY_AREA,
+        buildTypeLabel: buildClienteProjectTypeLabel,
       });
+      const projectId = await addProject(payload);
 
       if (projectId && attachedFiles.length > 0) {
         for (const file of attachedFiles) {
