@@ -41,6 +41,7 @@ import {
   Plus,
   X,
   Check,
+  Upload,
 } from "lucide-react";
 import {
   PLATFORMS,
@@ -54,6 +55,7 @@ import {
 } from "./utils/solicitar.utils";
 import { useTaxonomy } from "./utils/use-taxonomy";
 import { buildProjectPayload } from "./utils/build-project-payload";
+import { parseSolicitacaoXml } from "./utils/xml-import";
 import { cn } from "@/shared/utils";
 
 const QUALITATIVE_RATINGS = [
@@ -255,6 +257,7 @@ export default function SolicitarProjetoPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedCompanyId, setSelectedCompanyId] = useState<string | undefined>();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const xmlInputRef = useRef<HTMLInputElement>(null);
 
   const currentStep = STEPS[stepIndex];
   const isLastStep = stepIndex === STEPS.length - 1;
@@ -294,6 +297,66 @@ export default function SolicitarProjetoPage() {
     const files = e.target.files;
     if (!files) return;
     setAttachedFiles(Array.from(files));
+  }
+
+  async function handleImportXmlFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+
+    if (!user?.id) {
+      toast({
+        title: "Erro",
+        description: "Faça login para importar um XML.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const xmlText = await file.text();
+    const result = parseSolicitacaoXml(xmlText, {
+      areas: PROJECT_AREAS,
+      themesByArea: PROJECT_THEMES_BY_AREA,
+      companies: myCompanies,
+    });
+
+    if (!result.ok) {
+      toast({
+        title: "Erro ao importar XML",
+        description: result.error,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const payload = buildProjectPayload({
+        data: result.formData,
+        features: result.features,
+        benefits: result.benefits,
+        clientId: user.id,
+        companyId: result.companyId,
+        areas: PROJECT_AREAS,
+        themesByArea: PROJECT_THEMES_BY_AREA,
+        buildTypeLabel: buildClienteProjectTypeLabel,
+      });
+      await addProject(payload);
+
+      toast({
+        title: "Solicitação enviada",
+        description: "Seu processo foi criado e está no backlog.",
+      });
+      router.push("/cliente");
+    } catch {
+      toast({
+        title: "Erro ao salvar",
+        description: "Não foi possível criar o processo. Tente novamente.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   async function goNext() {
@@ -390,6 +453,39 @@ export default function SolicitarProjetoPage() {
             </p>
           </div>
         </header>
+
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-md border border-dashed border-border p-3">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => xmlInputRef.current?.click()}
+            disabled={isSubmitting}
+          >
+            <Upload className="mr-2 h-4 w-4" />
+            Importar XML
+          </Button>
+          <input
+            ref={xmlInputRef}
+            type="file"
+            accept=".xml,text/xml"
+            className="hidden"
+            onChange={handleImportXmlFile}
+          />
+          <a
+            href="/modelo-solicitacao-projeto.xml"
+            download
+            className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
+          >
+            Baixar modelo em branco
+          </a>
+          <Link
+            href="/cliente/solicitar/ajuda-xml"
+            className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
+          >
+            Ajuda com as tags do XML
+          </Link>
+        </div>
 
         {/* Stepper */}
         <div className="space-y-3">
