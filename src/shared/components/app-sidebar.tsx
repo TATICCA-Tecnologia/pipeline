@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
@@ -15,7 +14,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/src/shared/components/ui/dropdown-menu";
-import { ClientPickerDialog } from "@/shared/components/client-picker-dialog";
 import {
   ChevronsUpDown,
   FolderKanban,
@@ -104,7 +102,6 @@ export function AppSidebar() {
     viewAsDeveloper,
     viewAsClient,
   } = useAuth();
-  const [clientPickerOpen, setClientPickerOpen] = useState(false);
 
   const sections =
     user?.role === "admin"
@@ -244,8 +241,13 @@ export function AppSidebar() {
                   >
                     Desenvolvedor
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setClientPickerOpen(true)}>
-                    Cliente...
+                  <DropdownMenuItem
+                    onClick={() => {
+                      viewAsClient();
+                      router.push("/cliente");
+                    }}
+                  >
+                    Cliente
                   </DropdownMenuItem>
                 </>
               )}
@@ -257,17 +259,6 @@ export function AppSidebar() {
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
-      )}
-
-      {isSuperAdmin && (
-        <ClientPickerDialog
-          open={clientPickerOpen}
-          onOpenChange={setClientPickerOpen}
-          onSelect={(client) => {
-            viewAsClient(client);
-            router.push("/cliente");
-          }}
-        />
       )}
     </aside>
   );

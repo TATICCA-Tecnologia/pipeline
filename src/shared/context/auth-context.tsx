@@ -9,19 +9,12 @@ import {
   type ReactNode,
 } from "react";
 import type { User } from "@/shared/types";
-import { setTrpcUserId, setTrpcActingAsId } from "@/shared/trpc/auth-header";
-
-export interface PickedClient {
-  id: string;
-  name: string;
-  email: string;
-  company?: string;
-}
+import { setTrpcUserId } from "@/shared/trpc/auth-header";
 
 export type ViewState =
   | { role: "admin" }
   | { role: "developer" }
-  | { role: "client"; client: PickedClient };
+  | { role: "client" };
 
 interface AuthContextType {
   user: User | null;
@@ -36,7 +29,7 @@ interface AuthContextType {
   logout: () => void;
   viewAsAdmin: () => void;
   viewAsDeveloper: () => void;
-  viewAsClient: (client: PickedClient) => void;
+  viewAsClient: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -75,11 +68,12 @@ function readStoredViewState(): ViewState {
   if (!raw) return DEFAULT_VIEW_STATE;
   try {
     const parsed = JSON.parse(raw);
-    if (parsed?.role === "admin" || parsed?.role === "developer") {
+    if (
+      parsed?.role === "admin" ||
+      parsed?.role === "developer" ||
+      parsed?.role === "client"
+    ) {
       return { role: parsed.role };
-    }
-    if (parsed?.role === "client" && parsed?.client?.id) {
-      return { role: "client", client: parsed.client };
     }
   } catch {
     // ignora e usa o padrão
@@ -110,12 +104,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     setTrpcUserId(actualUser?.id ?? null);
-    const actingAsId =
-      actualUser?.role === "super_admin" && viewState.role === "client"
-        ? viewState.client.id
-        : null;
-    setTrpcActingAsId(actingAsId);
-  }, [actualUser, viewState]);
+  }, [actualUser]);
 
   const login = useCallback(async (email: string, _password: string) => {
     const mockUser = MOCK_USERS[email];
@@ -156,29 +145,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.setItem(VIEW_STATE_STORAGE_KEY, JSON.stringify(next));
   }, [actualUser]);
 
-  const viewAsClient = useCallback(
-    (client: PickedClient) => {
-      if (actualUser?.role !== "super_admin") return;
-      const next: ViewState = { role: "client", client };
-      setViewState(next);
-      localStorage.setItem(VIEW_STATE_STORAGE_KEY, JSON.stringify(next));
-    },
-    [actualUser]
-  );
+  const viewAsClient = useCallback(() => {
+    if (actualUser?.role !== "super_admin") return;
+    const next: ViewState = { role: "client" };
+    setViewState(next);
+    localStorage.setItem(VIEW_STATE_STORAGE_KEY, JSON.stringify(next));
+  }, [actualUser]);
 
   const user: User | null = (() => {
     if (!actualUser) return null;
     if (actualUser.role !== "super_admin") return actualUser;
-    if (viewState.role === "client") {
-      return {
-        id: viewState.client.id,
-        name: viewState.client.name,
-        email: viewState.client.email,
-        role: "client",
-        company: viewState.client.company,
-        createdAt: actualUser.createdAt,
-      };
-    }
     return { ...actualUser, role: viewState.role };
   })();
 

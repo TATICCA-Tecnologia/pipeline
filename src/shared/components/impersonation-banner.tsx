@@ -13,9 +13,7 @@ export function ImpersonationBanner() {
     viewState.role === "developer"
       ? "Visualizando como Desenvolvedor"
       : viewState.role === "client"
-        ? `Visualizando como Cliente: ${viewState.client.name}${
-            viewState.client.company ? ` (${viewState.client.company})` : ""
-          }`
+        ? "Visualizando como Cliente"
         : null;
 
   if (!label) return null;
