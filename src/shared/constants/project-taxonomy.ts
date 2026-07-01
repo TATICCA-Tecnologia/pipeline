@@ -67,6 +67,32 @@ export const URGENCY_LEVELS = [
   { value: "urgente", label: "Urgente — o mais rápido possível" },
 ];
 
+export const PROCESS_FREQUENCIES = [
+  { value: "diario", label: "Diário" },
+  { value: "duas-vezes-semana", label: "Duas vezes por semana" },
+  { value: "tres-vezes-semana", label: "Três vezes por semana" },
+  { value: "semanal", label: "Semanal" },
+  { value: "mensal", label: "Mensal" },
+  { value: "anual", label: "Anual" },
+];
+
+// Ocorrências por ano para cada periodicidade — usado para calcular
+// currentAnnualHours = taskDurationHours * PROCESS_FREQUENCY_MULTIPLIERS[processFrequency]
+export const PROCESS_FREQUENCY_MULTIPLIERS: Record<string, number> = {
+  diario: 260,
+  "duas-vezes-semana": 104,
+  "tres-vezes-semana": 156,
+  semanal: 52,
+  mensal: 12,
+  anual: 1,
+};
+
+export const COMPLEXITY_LEVELS = [
+  { value: "baixa", label: "Baixa" },
+  { value: "media", label: "Média" },
+  { value: "alta", label: "Alta" },
+];
+
 export const TARGET_AUDIENCES = [
   { value: "b2b", label: "Empresas (B2B)" },
   { value: "b2c", label: "Consumidores finais (B2C)" },

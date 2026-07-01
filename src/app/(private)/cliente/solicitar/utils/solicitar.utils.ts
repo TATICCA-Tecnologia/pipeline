@@ -7,4 +7,6 @@ export {
   URGENCY_LEVELS,
   TARGET_AUDIENCES,
   FEATURE_SUGGESTION_GROUPS,
+  PROCESS_FREQUENCIES,
+  PROCESS_FREQUENCY_MULTIPLIERS,
 } from "@/shared/constants/project-taxonomy";
