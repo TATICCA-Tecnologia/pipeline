@@ -26,12 +26,13 @@ const FRONTEND_TO_PRISMA_STATUS: Record<FrontendProjectStatus, PrismaProjectStat
   cancelled: "CANCELLED",
 };
 
-export type FrontendUserRole = "client" | "developer" | "admin";
+export type FrontendUserRole = "client" | "developer" | "admin" | "super_admin";
 
 const PRISMA_TO_FRONTEND_ROLE: Record<PrismaUserRole, FrontendUserRole> = {
   CLIENT: "client",
   DEVELOPER: "developer",
   ADMIN: "admin",
+  SUPER_ADMIN: "super_admin",
 };
 
 export function toFrontendStatus(status: PrismaProjectStatus): FrontendProjectStatus {
