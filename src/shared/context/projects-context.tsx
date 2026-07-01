@@ -44,6 +44,8 @@ function mapProject(p: {
   priority: string;
   clientId: string;
   developerId?: string | null;
+  companyId?: string | null;
+  companyName?: string | null;
   projectType: string;
   estimatedDeadline?: Date | null;
   targetAudience?: string | null;
@@ -61,6 +63,8 @@ function mapProject(p: {
     priority: p.priority as Priority,
     clientId: p.clientId,
     developerId: p.developerId ?? undefined,
+    companyId: p.companyId ?? undefined,
+    companyName: p.companyName ?? undefined,
     projectType: p.projectType,
     estimatedDeadline: p.estimatedDeadline ?? undefined,
     targetAudience: p.targetAudience ?? undefined,
