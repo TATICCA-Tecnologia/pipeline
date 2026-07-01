@@ -27,7 +27,7 @@ async function assertAdminOrAssignee(
     ctx.db.phaseTask.findUnique({ where: { id: taskId }, select: { assigneeId: true } }),
   ]);
   if (!task) throw new TRPCError({ code: "NOT_FOUND", message: "Tarefa não encontrada" });
-  const isAdmin = user?.role === "ADMIN";
+  const isAdmin = user?.role === "ADMIN" || user?.role === "SUPER_ADMIN";
   const isAssignee = task.assigneeId === ctx.userId;
   if (!isAdmin && !isAssignee) {
     throw new TRPCError({
