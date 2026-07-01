@@ -3,6 +3,7 @@ import { TRPCError } from "@trpc/server";
 import { router, publicProcedure, protectedProcedure } from "../trpc";
 import { toFrontendStatus, toPrismaStatus } from "../mappers";
 import type { FrontendProjectStatus } from "../mappers";
+import { PROCESS_FREQUENCY_MULTIPLIERS } from "@/shared/constants/project-taxonomy";
 
 const projectStatusSchema = z.enum([
   "backlog",
@@ -12,6 +13,27 @@ const projectStatusSchema = z.enum([
   "completed",
   "cancelled",
 ]);
+
+const processFrequencySchema = z.enum([
+  "diario",
+  "duas-vezes-semana",
+  "tres-vezes-semana",
+  "semanal",
+  "mensal",
+  "anual",
+]);
+
+const complexitySchema = z.enum(["baixa", "media", "alta"]);
+
+function computeCurrentAnnualHours(
+  duration: number | null | undefined,
+  frequency: string | null | undefined
+): number | null {
+  if (duration == null || frequency == null) return null;
+  const multiplier = PROCESS_FREQUENCY_MULTIPLIERS[frequency];
+  if (!multiplier) return null;
+  return duration * multiplier;
+}
 
 export const projectRouter = router({
   list: publicProcedure
@@ -63,6 +85,13 @@ export const projectRouter = router({
         expectedUsers: p.expectedUsers ?? undefined,
         urgency: p.urgency ?? undefined,
         features: p.features?.map((f) => f.name) ?? [],
+        peopleInvolved: p.peopleInvolved ?? undefined,
+        taskDurationHours: p.taskDurationHours ?? undefined,
+        processFrequency: p.processFrequency ?? undefined,
+        currentAnnualHours: p.currentAnnualHours ?? undefined,
+        complexity: p.complexity ?? undefined,
+        robotSchedule: p.robotSchedule ?? undefined,
+        estimatedAnnualSavingBRL: p.estimatedAnnualSavingBRL ?? undefined,
         createdAt: p.createdAt,
         updatedAt: p.updatedAt,
         client: p.client
@@ -112,6 +141,13 @@ export const projectRouter = router({
         targetAudience: project.targetAudience ?? undefined,
         expectedUsers: project.expectedUsers ?? undefined,
         urgency: project.urgency ?? undefined,
+        peopleInvolved: project.peopleInvolved ?? undefined,
+        taskDurationHours: project.taskDurationHours ?? undefined,
+        processFrequency: project.processFrequency ?? undefined,
+        currentAnnualHours: project.currentAnnualHours ?? undefined,
+        complexity: project.complexity ?? undefined,
+        robotSchedule: project.robotSchedule ?? undefined,
+        estimatedAnnualSavingBRL: project.estimatedAnnualSavingBRL ?? undefined,
         solutionTypes: (project.solutionTypes as string[] | null) ?? [],
         mainTool: project.mainTool ?? undefined,
         executionStrategy: project.executionStrategy ?? undefined,
@@ -162,6 +198,10 @@ export const projectRouter = router({
         ratingInternalImpact: z.number().int().min(1).max(5).optional(),
         ratingExternalImpact: z.number().int().min(1).max(5).optional(),
         ratingCompliance: z.number().int().min(1).max(5).optional(),
+        // Diagnostico de processo - operacional
+        peopleInvolved: z.number().int().min(0).optional(),
+        taskDurationHours: z.number().min(0).optional(),
+        processFrequency: processFrequencySchema.optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -213,6 +253,13 @@ export const projectRouter = router({
           ratingInternalImpact: input.ratingInternalImpact ?? null,
           ratingExternalImpact: input.ratingExternalImpact ?? null,
           ratingCompliance: input.ratingCompliance ?? null,
+          peopleInvolved: input.peopleInvolved ?? null,
+          taskDurationHours: input.taskDurationHours ?? null,
+          processFrequency: input.processFrequency ?? null,
+          currentAnnualHours: computeCurrentAnnualHours(
+            input.taskDurationHours,
+            input.processFrequency
+          ),
           features:
             input.features && input.features.length
               ? {
@@ -267,6 +314,12 @@ export const projectRouter = router({
         mainTool: z.string().nullable().optional(),
         executionStrategy: z.string().nullable().optional(),
         architectNotes: z.string().nullable().optional(),
+        peopleInvolved: z.number().int().min(0).nullable().optional(),
+        taskDurationHours: z.number().min(0).nullable().optional(),
+        processFrequency: processFrequencySchema.nullable().optional(),
+        complexity: complexitySchema.nullable().optional(),
+        robotSchedule: z.string().nullable().optional(),
+        estimatedAnnualSavingBRL: z.number().nullable().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -283,6 +336,28 @@ export const projectRouter = router({
       if (rest.mainTool !== undefined) data.mainTool = rest.mainTool;
       if (rest.executionStrategy !== undefined) data.executionStrategy = rest.executionStrategy;
       if (rest.architectNotes !== undefined) data.architectNotes = rest.architectNotes;
+      if (rest.complexity !== undefined) data.complexity = rest.complexity;
+      if (rest.robotSchedule !== undefined) data.robotSchedule = rest.robotSchedule;
+      if (rest.estimatedAnnualSavingBRL !== undefined)
+        data.estimatedAnnualSavingBRL = rest.estimatedAnnualSavingBRL;
+      if (rest.peopleInvolved !== undefined) data.peopleInvolved = rest.peopleInvolved;
+      if (rest.taskDurationHours !== undefined || rest.processFrequency !== undefined) {
+        const current = await ctx.db.project.findUnique({
+          where: { id },
+          select: { taskDurationHours: true, processFrequency: true },
+        });
+        const nextDuration =
+          rest.taskDurationHours !== undefined
+            ? rest.taskDurationHours
+            : current?.taskDurationHours ?? null;
+        const nextFrequency =
+          rest.processFrequency !== undefined
+            ? rest.processFrequency
+            : current?.processFrequency ?? null;
+        data.taskDurationHours = nextDuration;
+        data.processFrequency = nextFrequency;
+        data.currentAnnualHours = computeCurrentAnnualHours(nextDuration, nextFrequency);
+      }
 
       const project = await ctx.db.project.update({
         where: { id },
