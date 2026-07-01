@@ -10,7 +10,7 @@ export const userRouter = router({
   me: protectedProcedure.query(async ({ ctx }) => {
     const user = await ctx.db.user.findUnique({
       where: { id: ctx.userId },
-      include: { company: true },
+      include: { companies: true },
     });
     if (!user) throw new TRPCError({ code: "NOT_FOUND", message: "Usuário não encontrado" });
     return {
@@ -18,7 +18,7 @@ export const userRouter = router({
       name: user.name,
       email: user.email,
       phone: user.phone ?? "",
-      company: user.company?.name ?? "",
+      companies: user.companies.map((c) => ({ id: c.id, name: c.name })),
       createdAt: user.createdAt,
     };
   }),
@@ -26,7 +26,7 @@ export const userRouter = router({
   listClients: protectedProcedure.query(async ({ ctx }) => {
     const users = await ctx.db.user.findMany({
       where: { role: "CLIENT" },
-      include: { company: true },
+      include: { companies: true },
       orderBy: { name: "asc" },
     });
     return users.map((u) => ({
@@ -34,7 +34,7 @@ export const userRouter = router({
       name: u.name,
       email: u.email,
       role: toFrontendRole(u.role),
-      company: u.company?.name,
+      companies: u.companies.map((c) => ({ id: c.id, name: c.name })),
       createdAt: u.createdAt,
     }));
   }),
@@ -56,7 +56,7 @@ export const userRouter = router({
   byId: publicProcedure.input(z.object({ id: z.string() })).query(async ({ ctx, input }) => {
     const user = await ctx.db.user.findUnique({
       where: { id: input.id },
-      include: { company: true },
+      include: { companies: true },
     });
     if (!user) throw new TRPCError({ code: "NOT_FOUND", message: "Usuário não encontrado" });
     return {
@@ -64,7 +64,7 @@ export const userRouter = router({
       name: user.name,
       email: user.email,
       role: toFrontendRole(user.role),
-      company: user.company?.name,
+      companies: user.companies.map((c) => ({ id: c.id, name: c.name })),
       createdAt: user.createdAt,
     };
   }),
@@ -122,39 +122,64 @@ export const userRouter = router({
       z.object({
         name: z.string().min(1).optional(),
         phone: z.string().optional(),
-        companyName: z.string().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
-      let companyId: string | null = null;
-      if (input.companyName != null && input.companyName.trim() !== "") {
-        let company = await ctx.db.company.findFirst({
-          where: { name: input.companyName.trim() },
-        });
-        if (!company) {
-          company = await ctx.db.company.create({
-            data: { name: input.companyName.trim() },
-          });
-        }
-        companyId = company.id;
-      }
       const user = await ctx.db.user.update({
         where: { id: ctx.userId },
         data: {
           ...(input.name != null && { name: input.name }),
           ...(input.phone !== undefined && { phone: input.phone || null }),
-          ...(companyId !== null && { companyId }),
         },
-        include: { company: true },
+        include: { companies: true },
       });
       return {
         id: user.id,
         name: user.name,
         email: user.email,
         phone: user.phone ?? "",
-        company: user.company?.name ?? "",
+        companies: user.companies.map((c) => ({ id: c.id, name: c.name })),
         createdAt: user.createdAt,
       };
+    }),
+
+  listMyCompanies: protectedProcedure.query(async ({ ctx }) => {
+    const user = await ctx.db.user.findUnique({
+      where: { id: ctx.userId },
+      include: { companies: true },
+    });
+    return (user?.companies ?? []).map((c) => ({ id: c.id, name: c.name }));
+  }),
+
+  listCompaniesForUser: adminProcedure
+    .input(z.object({ userId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const user = await ctx.db.user.findUnique({
+        where: { id: input.userId },
+        include: { companies: true },
+      });
+      if (!user) throw new TRPCError({ code: "NOT_FOUND", message: "Usuário não encontrado" });
+      return user.companies.map((c) => ({ id: c.id, name: c.name }));
+    }),
+
+  addCompanyToUser: adminProcedure
+    .input(z.object({ userId: z.string(), companyId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      await ctx.db.user.update({
+        where: { id: input.userId },
+        data: { companies: { connect: { id: input.companyId } } },
+      });
+      return { success: true };
+    }),
+
+  removeCompanyFromUser: adminProcedure
+    .input(z.object({ userId: z.string(), companyId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      await ctx.db.user.update({
+        where: { id: input.userId },
+        data: { companies: { disconnect: { id: input.companyId } } },
+      });
+      return { success: true };
     }),
 
   delete: protectedProcedure
