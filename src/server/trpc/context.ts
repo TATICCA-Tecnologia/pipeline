@@ -15,22 +15,25 @@ export async function createContext(opts: FetchCreateContextFnOptions) {
   if (realUserId) {
     const mock = MOCK_USERS_BY_ID[realUserId];
     if (mock) {
-      await db.user.upsert({
+      // Seed the demo account once so it exists in the database. Deliberately
+      // does NOT overwrite an existing row — otherwise any later change made
+      // through the app (e.g. promoting this account to SUPER_ADMIN) would be
+      // silently reverted back to the seed defaults on the very next request.
+      const existing = await db.user.findUnique({
         where: { id: mock.id },
-        update: {
-          name: mock.name,
-          email: mock.email,
-          role: mock.role,
-          isActive: true,
-        },
-        create: {
-          id: mock.id,
-          name: mock.name,
-          email: mock.email,
-          role: mock.role,
-          isActive: true,
-        },
+        select: { id: true },
       });
+      if (!existing) {
+        await db.user.create({
+          data: {
+            id: mock.id,
+            name: mock.name,
+            email: mock.email,
+            role: mock.role,
+            isActive: true,
+          },
+        });
+      }
     }
   }
 

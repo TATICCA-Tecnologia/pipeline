@@ -6,27 +6,10 @@ import { toFrontendRole } from "../mappers";
 
 const SALT_ROUNDS = 10;
 
-const MOCK_EMAILS: Record<string, { id: string; name: string; role: "ADMIN" | "DEVELOPER" | "CLIENT" }> = {
-  "cliente@email.com": { id: "mock-1", name: "João Silva", role: "CLIENT" },
-  "dev@email.com": { id: "mock-2", name: "Maria Santos", role: "DEVELOPER" },
-  "admin@email.com": { id: "mock-3", name: "Carlos Admin", role: "ADMIN" },
-};
-
 export const authRouter = router({
   login: publicProcedure
     .input(z.object({ email: z.string().email(), password: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      const mock = MOCK_EMAILS[input.email];
-      if (mock) {
-        return {
-          id: mock.id,
-          name: mock.name,
-          email: input.email,
-          role: toFrontendRole(mock.role),
-          company: undefined,
-          createdAt: new Date(),
-        };
-      }
       const user = await ctx.db.user.findUnique({
         where: { email: input.email },
         include: { company: true },
