@@ -45,6 +45,7 @@ import {
   KeyRound,
 } from "lucide-react";
 import type { User } from "@/shared/types";
+import { ManageCompaniesDialog } from "./_components/manage-companies-dialog";
 
 export default function ClientesPage() {
   const { clients, addClient, updateClient, deleteClient, refetch } = useClients();
@@ -57,10 +58,12 @@ export default function ClientesPage() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isPromoteDialogOpen, setIsPromoteDialogOpen] = useState(false);
   const [isResetPasswordDialogOpen, setIsResetPasswordDialogOpen] = useState(false);
+  const [isManageCompaniesOpen, setIsManageCompaniesOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<User | null>(null);
   const [clientToDelete, setClientToDelete] = useState<User | null>(null);
   const [clientToPromote, setClientToPromote] = useState<User | null>(null);
   const [clientToResetPassword, setClientToResetPassword] = useState<User | null>(null);
+  const [clientForCompanies, setClientForCompanies] = useState<User | null>(null);
   const [newPassword, setNewPassword] = useState("");
   const [formData, setFormData] = useState({
     name: "",
@@ -96,7 +99,9 @@ export default function ClientesPage() {
     (client) =>
       client.name.toLowerCase().includes(search.toLowerCase()) ||
       client.email.toLowerCase().includes(search.toLowerCase()) ||
-      client.company?.toLowerCase().includes(search.toLowerCase())
+      (client.companies ?? []).some((c) =>
+        c.name.toLowerCase().includes(search.toLowerCase())
+      )
   );
 
   const getClientProjectCount = (clientId: string) => {
@@ -160,6 +165,11 @@ export default function ClientesPage() {
     setClientToResetPassword(client);
     setNewPassword("");
     setIsResetPasswordDialogOpen(true);
+  };
+
+  const openManageCompanies = (client: User) => {
+    setClientForCompanies(client);
+    setIsManageCompaniesOpen(true);
   };
 
   const handleResetPassword = () => {
@@ -294,10 +304,12 @@ export default function ClientesPage() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      {client.company ? (
+                      {client.companies && client.companies.length > 0 ? (
                         <div className="flex items-center gap-1 text-muted-foreground">
-                          <Building2 className="h-4 w-4" />
-                          {client.company}
+                          <Building2 className="h-4 w-4 shrink-0" />
+                          <span className="truncate">
+                            {client.companies.map((c) => c.name).join(", ")}
+                          </span>
                         </div>
                       ) : (
                         <span className="text-muted-foreground">-</span>
@@ -330,6 +342,12 @@ export default function ClientesPage() {
                           >
                             <KeyRound className="h-4 w-4 mr-2" />
                             Redefinir Senha
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => openManageCompanies(client)}
+                          >
+                            <Building2 className="h-4 w-4 mr-2" />
+                            Gerenciar Empresas
                           </DropdownMenuItem>
                           <DropdownMenuItem
                             onClick={() => confirmPromote(client)}
@@ -496,6 +514,12 @@ export default function ClientesPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ManageCompaniesDialog
+        client={clientForCompanies}
+        open={isManageCompaniesOpen}
+        onOpenChange={setIsManageCompaniesOpen}
+      />
     </div>
   );
 }
