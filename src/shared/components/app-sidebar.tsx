@@ -13,9 +13,6 @@ import {
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/src/shared/components/ui/dropdown-menu";
 import { ClientPickerDialog } from "@/shared/components/client-picker-dialog";
@@ -227,35 +224,29 @@ export function AppSidebar() {
               {isSuperAdmin && (
                 <>
                   <DropdownMenuSeparator />
-                  <DropdownMenuSub>
-                    <DropdownMenuSubTrigger>
-                      <Shield className="mr-2 h-4 w-4" />
-                      Ver como
-                    </DropdownMenuSubTrigger>
-                    <DropdownMenuSubContent>
-                      <DropdownMenuItem
-                        onSelect={() => {
-                          viewAsAdmin();
-                          router.push("/admin");
-                        }}
-                      >
-                        Admin
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onSelect={() => {
-                          viewAsDeveloper();
-                          router.push("/desenvolvedor");
-                        }}
-                      >
-                        Desenvolvedor
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onSelect={() => setClientPickerOpen(true)}
-                      >
-                        Cliente...
-                      </DropdownMenuItem>
-                    </DropdownMenuSubContent>
-                  </DropdownMenuSub>
+                  <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
+                    <Shield className="mr-2 inline h-3.5 w-3.5" />
+                    Ver como
+                  </DropdownMenuLabel>
+                  <DropdownMenuItem
+                    onClick={() => {
+                      viewAsAdmin();
+                      router.push("/admin");
+                    }}
+                  >
+                    Admin
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => {
+                      viewAsDeveloper();
+                      router.push("/desenvolvedor");
+                    }}
+                  >
+                    Desenvolvedor
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setClientPickerOpen(true)}>
+                    Cliente...
+                  </DropdownMenuItem>
                 </>
               )}
               <DropdownMenuSeparator />
