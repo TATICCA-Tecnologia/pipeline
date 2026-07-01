@@ -104,7 +104,7 @@ export default function RegisterPage() {
         name: user.name,
         email: user.email,
         role: user.role,
-        company: user.company,
+        companies: user.companies,
         createdAt: user.createdAt instanceof Date ? user.createdAt : new Date(user.createdAt),
       });
       router.push("/cliente");
