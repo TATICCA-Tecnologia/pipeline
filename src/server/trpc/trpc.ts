@@ -30,7 +30,7 @@ const enforceAdmin = t.middleware(async ({ ctx, next }) => {
     where: { id: ctx.userId },
     select: { role: true },
   });
-  if (user?.role !== "ADMIN") {
+  if (user?.role !== "ADMIN" && user?.role !== "SUPER_ADMIN") {
     throw new TRPCError({ code: "FORBIDDEN", message: "Acesso restrito a administradores" });
   }
   return next({ ctx: { ...ctx, userId: ctx.userId } });

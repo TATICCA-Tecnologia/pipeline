@@ -38,7 +38,7 @@ export const userRouter = router({
 
   listDevelopers: protectedProcedure.query(async ({ ctx }) => {
     const users = await ctx.db.user.findMany({
-      where: { role: "DEVELOPER", isActive: true },
+      where: { role: { in: ["DEVELOPER", "SUPER_ADMIN"] }, isActive: true },
       orderBy: { name: "asc" },
     });
     return users.map((u) => ({
