@@ -132,6 +132,7 @@ export function ProjectsProvider({ children }: { children: ReactNode }) {
         priority: project.priority === "urgent" ? "urgent" : project.priority,
         clientId: project.clientId,
         developerId: project.developerId,
+        companyId: project.companyId,
         projectType: project.projectType?.trim() || "Outro",
         estimatedDeadline: project.estimatedDeadline,
         targetAudience: project.targetAudience,

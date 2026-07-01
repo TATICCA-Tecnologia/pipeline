@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Controller, type FieldPath } from "react-hook-form";
@@ -27,6 +27,7 @@ import {
   TooltipTrigger,
 } from "@/src/shared/components/ui/tooltip";
 import { useToast } from "@/src/shared/hooks/use-toast";
+import { trpc } from "@/shared/trpc/client";
 import { useZodForm } from "@/shared/hooks/use-zod-form";
 import {
   solicitarProjetoSchema,
@@ -199,6 +200,10 @@ export default function SolicitarProjetoPage() {
   const { addFile } = useFiles();
   const router = useRouter();
   const { toast } = useToast();
+  const { data: myCompanies = [] } = trpc.user.listMyCompanies.useQuery(
+    undefined,
+    { enabled: !!user?.id }
+  );
 
   const {
     areas: PROJECT_AREAS,
@@ -255,11 +260,19 @@ export default function SolicitarProjetoPage() {
   const [benefits, setBenefits] = useState<string[]>([]);
   const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedCompanyId, setSelectedCompanyId] = useState<string | undefined>();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const currentStep = STEPS[stepIndex];
   const isLastStep = stepIndex === STEPS.length - 1;
   const isFirstStep = stepIndex === 0;
+
+  useEffect(() => {
+    if (myCompanies.length === 1 && !selectedCompanyId) {
+      setSelectedCompanyId(myCompanies[0].id);
+    }
+  }, [myCompanies, selectedCompanyId]);
+
   const progress = useMemo(
     () => ((stepIndex + 1) / STEPS.length) * 100,
     [stepIndex]
@@ -317,6 +330,15 @@ export default function SolicitarProjetoPage() {
       return;
     }
 
+    if (myCompanies.length > 1 && !selectedCompanyId) {
+      toast({
+        title: "Selecione uma empresa",
+        description: "Escolha para qual empresa este projeto é.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       const areaLabel =
@@ -351,6 +373,7 @@ export default function SolicitarProjetoPage() {
         title: data.title,
         description: data.description,
         clientId: user.id,
+        companyId: selectedCompanyId,
         status: "backlog",
         priority:
           data.urgency === "urgente"
@@ -498,6 +521,38 @@ export default function SolicitarProjetoPage() {
                     <p className="text-xs text-destructive">{errors.title.message}</p>
                   )}
                 </div>
+
+                {myCompanies.length > 0 && (
+                  <div className="space-y-2">
+                    <Label htmlFor="companyId">
+                      Empresa{" "}
+                      {myCompanies.length > 1 && (
+                        <span className="text-destructive">*</span>
+                      )}
+                    </Label>
+                    {myCompanies.length === 1 ? (
+                      <div className="rounded-md border border-border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+                        {myCompanies[0].name}
+                      </div>
+                    ) : (
+                      <Select
+                        value={selectedCompanyId}
+                        onValueChange={setSelectedCompanyId}
+                      >
+                        <SelectTrigger id="companyId">
+                          <SelectValue placeholder="Selecione a empresa" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {myCompanies.map((company) => (
+                            <SelectItem key={company.id} value={company.id}>
+                              {company.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  </div>
+                )}
 
                 <div className="grid gap-5 sm:grid-cols-2">
                   <div className="space-y-2">
