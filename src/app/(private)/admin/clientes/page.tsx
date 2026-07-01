@@ -5,7 +5,7 @@ import { useQueryState, parseAsString } from "nuqs";
 import { useClients } from "@/shared/context/clients-context";
 import { useProjects } from "@/shared/context/projects-context";
 import { trpc } from "@/shared/trpc/client";
-import { useToast } from "@/src/shared/hooks/use-toast";
+import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/src/shared/components/ui/card";
 import { Button } from "@/src/shared/components/ui/button";
 import { Input } from "@/src/shared/components/ui/input";
@@ -49,7 +49,6 @@ import type { User } from "@/shared/types";
 export default function ClientesPage() {
   const { clients, addClient, updateClient, deleteClient, refetch } = useClients();
   const { projects } = useProjects();
-  const { toast } = useToast();
   const [search, setSearch] = useQueryState(
     "q",
     parseAsString.withDefault("").withOptions({ clearOnDefault: true })
@@ -71,39 +70,25 @@ export default function ClientesPage() {
 
   const promoteMutation = trpc.user.promoteToSuperAdmin.useMutation({
     onSuccess: (promotedUser) => {
-      toast({
-        title: "Usuário promovido",
-        description: `${promotedUser.name} agora é Super Admin.`,
-      });
+      toast.success(`${promotedUser.name} agora é Super Admin.`);
       refetch();
       setIsPromoteDialogOpen(false);
       setClientToPromote(null);
     },
     onError: (error) => {
-      toast({
-        title: "Erro ao promover",
-        description: error.message,
-        variant: "destructive",
-      });
+      toast.error(`Erro ao promover: ${error.message}`);
     },
   });
 
   const resetPasswordMutation = trpc.user.resetPassword.useMutation({
     onSuccess: () => {
-      toast({
-        title: "Senha redefinida",
-        description: `A senha de ${clientToResetPassword?.name} foi atualizada.`,
-      });
+      toast.success(`Senha de ${clientToResetPassword?.name} atualizada.`);
       setIsResetPasswordDialogOpen(false);
       setClientToResetPassword(null);
       setNewPassword("");
     },
     onError: (error) => {
-      toast({
-        title: "Erro ao redefinir senha",
-        description: error.message,
-        variant: "destructive",
-      });
+      toast.error(`Erro ao redefinir senha: ${error.message}`);
     },
   });
 
