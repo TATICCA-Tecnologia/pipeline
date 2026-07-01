@@ -9,6 +9,7 @@ import { activityRouter } from "./routers/activity.router";
 import { featureRouter } from "./routers/feature.router";
 import { specificationRouter } from "./routers/specification.router";
 import { taxonomyRouter } from "./routers/taxonomy.router";
+import { companyRouter } from "./routers/company.router";
 
 export const appRouter = router({
   project: projectRouter,
@@ -21,6 +22,7 @@ export const appRouter = router({
   feature: featureRouter,
   specification: specificationRouter,
   taxonomy: taxonomyRouter,
+  company: companyRouter,
 });
 
 export type AppRouter = typeof appRouter;
