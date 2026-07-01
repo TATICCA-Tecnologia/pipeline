@@ -68,7 +68,6 @@ export function ClientsProvider({ children }: { children: ReactNode }) {
       createClientMutation.mutate({
         name: client.name,
         email: client.email,
-        company: client.company,
       });
     },
     [createClientMutation]
