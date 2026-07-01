@@ -8,17 +8,35 @@ import {
   useEffect,
   type ReactNode,
 } from "react";
-import type { User, UserRole } from "@/shared/types";
-import { setTrpcUserId } from "@/shared/trpc/auth-header";
+import type { User } from "@/shared/types";
+import { setTrpcUserId, setTrpcActingAsId } from "@/shared/trpc/auth-header";
+
+export interface PickedClient {
+  id: string;
+  name: string;
+  email: string;
+  company?: string;
+}
+
+export type ViewState =
+  | { role: "admin" }
+  | { role: "developer" }
+  | { role: "client"; client: PickedClient };
 
 interface AuthContextType {
   user: User | null;
+  actualUser: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
+  isSuperAdmin: boolean;
+  isImpersonating: boolean;
+  viewState: ViewState;
   login: (email: string, password: string) => Promise<boolean>;
   loginWithUser: (user: User) => void;
   logout: () => void;
-  switchRole: (role: UserRole) => void;
+  viewAsAdmin: () => void;
+  viewAsDeveloper: () => void;
+  viewAsClient: (client: PickedClient) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -49,17 +67,40 @@ const MOCK_USERS: Record<string, User> = {
 };
 
 const AUTH_STORAGE_KEY = "kanban_auth_user";
+const VIEW_STATE_STORAGE_KEY = "super_admin_view_state";
+const DEFAULT_VIEW_STATE: ViewState = { role: "admin" };
+
+function readStoredViewState(): ViewState {
+  const raw = localStorage.getItem(VIEW_STATE_STORAGE_KEY);
+  if (!raw) return DEFAULT_VIEW_STATE;
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed?.role === "admin" || parsed?.role === "developer") {
+      return { role: parsed.role };
+    }
+    if (parsed?.role === "client" && parsed?.client?.id) {
+      return { role: "client", client: parsed.client };
+    }
+  } catch {
+    // ignora e usa o padrão
+  }
+  return DEFAULT_VIEW_STATE;
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const [actualUser, setActualUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [viewState, setViewState] = useState<ViewState>(DEFAULT_VIEW_STATE);
 
   useEffect(() => {
     const storedUser = localStorage.getItem(AUTH_STORAGE_KEY);
     if (storedUser) {
       try {
         const parsedUser = JSON.parse(storedUser);
-        setUser(parsedUser);
+        setActualUser(parsedUser);
+        if (parsedUser.role === "super_admin") {
+          setViewState(readStoredViewState());
+        }
       } catch {
         localStorage.removeItem(AUTH_STORAGE_KEY);
       }
@@ -68,50 +109,98 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    setTrpcUserId(user?.id ?? null);
-  }, [user]);
+    setTrpcUserId(actualUser?.id ?? null);
+    const actingAsId =
+      actualUser?.role === "super_admin" && viewState.role === "client"
+        ? viewState.client.id
+        : null;
+    setTrpcActingAsId(actingAsId);
+  }, [actualUser, viewState]);
 
   const login = useCallback(async (email: string, _password: string) => {
     const mockUser = MOCK_USERS[email];
     if (mockUser) {
-      setUser(mockUser);
+      setActualUser(mockUser);
       localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(mockUser));
+      setViewState(DEFAULT_VIEW_STATE);
+      localStorage.removeItem(VIEW_STATE_STORAGE_KEY);
       return true;
     }
     return false;
   }, []);
 
-  const loginWithUser = useCallback((user: User) => {
-    setUser(user);
-    localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(user));
+  const loginWithUser = useCallback((newUser: User) => {
+    setActualUser(newUser);
+    localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(newUser));
+    setViewState(DEFAULT_VIEW_STATE);
+    localStorage.removeItem(VIEW_STATE_STORAGE_KEY);
   }, []);
 
   const logout = useCallback(() => {
-    setUser(null);
+    setActualUser(null);
     localStorage.removeItem(AUTH_STORAGE_KEY);
+    setViewState(DEFAULT_VIEW_STATE);
+    localStorage.removeItem(VIEW_STATE_STORAGE_KEY);
   }, []);
 
-  const switchRole = useCallback((role: UserRole) => {
-    setUser((prev) => {
-      if (prev) {
-        const updatedUser = { ...prev, role };
-        localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(updatedUser));
-        return updatedUser;
-      }
-      return null;
-    });
-  }, []);
+  const viewAsAdmin = useCallback(() => {
+    if (actualUser?.role !== "super_admin") return;
+    setViewState(DEFAULT_VIEW_STATE);
+    localStorage.setItem(VIEW_STATE_STORAGE_KEY, JSON.stringify(DEFAULT_VIEW_STATE));
+  }, [actualUser]);
+
+  const viewAsDeveloper = useCallback(() => {
+    if (actualUser?.role !== "super_admin") return;
+    const next: ViewState = { role: "developer" };
+    setViewState(next);
+    localStorage.setItem(VIEW_STATE_STORAGE_KEY, JSON.stringify(next));
+  }, [actualUser]);
+
+  const viewAsClient = useCallback(
+    (client: PickedClient) => {
+      if (actualUser?.role !== "super_admin") return;
+      const next: ViewState = { role: "client", client };
+      setViewState(next);
+      localStorage.setItem(VIEW_STATE_STORAGE_KEY, JSON.stringify(next));
+    },
+    [actualUser]
+  );
+
+  const user: User | null = (() => {
+    if (!actualUser) return null;
+    if (actualUser.role !== "super_admin") return actualUser;
+    if (viewState.role === "client") {
+      return {
+        id: viewState.client.id,
+        name: viewState.client.name,
+        email: viewState.client.email,
+        role: "client",
+        company: viewState.client.company,
+        createdAt: actualUser.createdAt,
+      };
+    }
+    return { ...actualUser, role: viewState.role };
+  })();
+
+  const isSuperAdmin = actualUser?.role === "super_admin";
+  const isImpersonating = isSuperAdmin && viewState.role !== "admin";
 
   return (
     <AuthContext.Provider
       value={{
         user,
-        isAuthenticated: !!user,
+        actualUser,
+        isAuthenticated: !!actualUser,
         isLoading,
+        isSuperAdmin,
+        isImpersonating,
+        viewState,
         login,
         loginWithUser,
         logout,
-        switchRole,
+        viewAsAdmin,
+        viewAsDeveloper,
+        viewAsClient,
       }}
     >
       {children}
