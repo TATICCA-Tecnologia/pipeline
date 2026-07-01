@@ -89,7 +89,11 @@ export function ArchitectureTab({ projectId }: ArchitectureTabProps) {
   };
 
   const handleSaveArchitecture = () => {
-    const parsedSaving = parseFloat(estimatedAnnualSavingBRL);
+    const normalizedSaving = estimatedAnnualSavingBRL
+      .trim()
+      .replace(/\.(?=\d{3}(\D|$))/g, "")
+      .replace(",", ".");
+    const parsedSaving = parseFloat(normalizedSaving);
     updateProject.mutate({
       id: projectId,
       solutionTypes,
@@ -98,7 +102,8 @@ export function ArchitectureTab({ projectId }: ArchitectureTabProps) {
       architectNotes: architectNotes || null,
       complexity: (complexity || null) as "baixa" | "media" | "alta" | null,
       robotSchedule: robotSchedule || null,
-      estimatedAnnualSavingBRL: Number.isNaN(parsedSaving) ? null : parsedSaving,
+      estimatedAnnualSavingBRL:
+        !Number.isNaN(parsedSaving) && parsedSaving >= 0 ? parsedSaving : null,
     });
   };
 
