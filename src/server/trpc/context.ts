@@ -11,9 +11,9 @@ const MOCK_USERS_BY_ID: Record<
 };
 
 export async function createContext(opts: FetchCreateContextFnOptions) {
-  const userId = opts.req.headers.get("x-user-id") ?? null;
-  if (userId) {
-    const mock = MOCK_USERS_BY_ID[userId];
+  const realUserId = opts.req.headers.get("x-user-id") ?? null;
+  if (realUserId) {
+    const mock = MOCK_USERS_BY_ID[realUserId];
     if (mock) {
       await db.user.upsert({
         where: { id: mock.id },
@@ -33,9 +33,28 @@ export async function createContext(opts: FetchCreateContextFnOptions) {
       });
     }
   }
+
+  // Super admins may send "x-acting-as-id" to make requests on behalf of another
+  // user (used by the profile switcher to impersonate a client). Only honored
+  // when the real, authenticated user is SUPER_ADMIN in the database — this is
+  // the one server-side check standing between this header and full spoofing,
+  // since the rest of this app already trusts "x-user-id" without a real session.
+  const actingAsId = opts.req.headers.get("x-acting-as-id") ?? null;
+  let userId = realUserId;
+  if (actingAsId && realUserId) {
+    const realUser = await db.user.findUnique({
+      where: { id: realUserId },
+      select: { role: true },
+    });
+    if (realUser?.role === "SUPER_ADMIN") {
+      userId = actingAsId;
+    }
+  }
+
   return {
     db,
     userId,
+    realUserId,
   };
 }
 
