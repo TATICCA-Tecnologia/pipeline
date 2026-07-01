@@ -88,6 +88,7 @@ enum UserRole {
   ADMIN
   DEVELOPER
   CLIENT
+  SUPER_ADMIN
 }
 
 // ==========================================
