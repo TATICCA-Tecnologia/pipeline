@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<solicitacaoDeProjeto>
+  <empresa></empresa>
+  <titulo></titulo>
+  <area></area>
+  <tema></tema>
+  <plataforma></plataforma>
+  <descricao></descricao>
+  <publicoAlvo></publicoAlvo>
+  <numeroUsuarios></numeroUsuarios>
+  <processoExistente></processoExistente>
+  <detalhesProcessoAtual></detalhesProcessoAtual>
+  <colaboradoresEnvolvidos></colaboradoresEnvolvidos>
+  <duracaoPorExecucao></duracaoPorExecucao>
+  <periodicidade></periodicidade>
+  <narrativaDoProcesso></narrativaDoProcesso>
+  <funcionalidades>
+    <!-- <funcionalidade>Exemplo de funcionalidade</funcionalidade> -->
+  </funcionalidades>
+  <beneficios>
+    <!-- <beneficio>Redução de trabalho operacional (tarefas manuais, planilhas, retrabalho)</beneficio> -->
+  </beneficios>
+  <detalhesBeneficios></detalhesBeneficios>
+  <horasEconomizadasPorMes></horasEconomizadasPorMes>
+  <avaliacaoReducaoErros></avaliacaoReducaoErros>
+  <avaliacaoCriticidadeProcesso></avaliacaoCriticidadeProcesso>
+  <avaliacaoImpactoInterno></avaliacaoImpactoInterno>
+  <avaliacaoImpactoExterno></avaliacaoImpactoExterno>
+  <avaliacaoAtendimentoPoliticas></avaliacaoAtendimentoPoliticas>
+  <urgencia></urgencia>
+  <prazoLimite></prazoLimite>
+  <informacoesAdicionais></informacoesAdicionais>
+</solicitacaoDeProjeto>
