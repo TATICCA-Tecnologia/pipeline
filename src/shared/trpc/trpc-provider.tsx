@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { httpBatchLink } from "@trpc/client";
 import superjson from "superjson";
 import { trpc } from "./client";
-import { getTrpcUserId } from "./auth-header";
+import { getTrpcUserId, getTrpcActingAsId } from "./auth-header";
 
 function getBaseUrl() {
   if (typeof window !== "undefined") return "";
@@ -30,9 +30,14 @@ export function TRPCProvider({ children }: { children: React.ReactNode }) {
           url: `${getBaseUrl()}/api/trpc`,
           transformer: superjson,
           headers() {
-            return {
+            const headers: Record<string, string> = {
               "x-user-id": getTrpcUserId(),
             };
+            const actingAsId = getTrpcActingAsId();
+            if (actingAsId) {
+              headers["x-acting-as-id"] = actingAsId;
+            }
+            return headers;
           },
         }),
       ],
