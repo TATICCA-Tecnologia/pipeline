@@ -27,7 +27,7 @@ function mapUser(u: {
   name: string;
   email: string;
   role: string;
-  company?: string;
+  companies?: { id: string; name: string }[];
   createdAt: Date;
 }): User {
   return {
@@ -35,7 +35,7 @@ function mapUser(u: {
     name: u.name,
     email: u.email,
     role: u.role as User["role"],
-    company: u.company,
+    companies: u.companies ?? [],
     createdAt: u.createdAt instanceof Date ? u.createdAt : new Date(u.createdAt),
   };
 }
