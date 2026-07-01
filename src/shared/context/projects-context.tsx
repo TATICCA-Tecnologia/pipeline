@@ -52,6 +52,13 @@ function mapProject(p: {
   expectedUsers?: string | null;
   urgency?: string | null;
   features?: string[] | null;
+  peopleInvolved?: number | null;
+  taskDurationHours?: number | null;
+  processFrequency?: string | null;
+  currentAnnualHours?: number | null;
+  complexity?: string | null;
+  robotSchedule?: string | null;
+  estimatedAnnualSavingBRL?: number | null;
   createdAt: Date;
   updatedAt: Date;
 }): Project {
@@ -71,6 +78,13 @@ function mapProject(p: {
     expectedUsers: p.expectedUsers ?? undefined,
     urgency: p.urgency ?? undefined,
     features: p.features ?? [],
+    peopleInvolved: p.peopleInvolved ?? undefined,
+    taskDurationHours: p.taskDurationHours ?? undefined,
+    processFrequency: p.processFrequency ?? undefined,
+    currentAnnualHours: p.currentAnnualHours ?? undefined,
+    complexity: p.complexity ?? undefined,
+    robotSchedule: p.robotSchedule ?? undefined,
+    estimatedAnnualSavingBRL: p.estimatedAnnualSavingBRL ?? undefined,
     createdAt: p.createdAt,
     updatedAt: p.updatedAt,
   };
@@ -155,6 +169,9 @@ export function ProjectsProvider({ children }: { children: ReactNode }) {
         ratingInternalImpact: project.ratingInternalImpact,
         ratingExternalImpact: project.ratingExternalImpact,
         ratingCompliance: project.ratingCompliance,
+        peopleInvolved: project.peopleInvolved,
+        taskDurationHours: project.taskDurationHours,
+        processFrequency: project.processFrequency as "diario" | "duas-vezes-semana" | "tres-vezes-semana" | "semanal" | "mensal" | "anual" | undefined,
       });
       return created.id as string;
     },
