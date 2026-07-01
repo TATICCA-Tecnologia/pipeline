@@ -12,7 +12,7 @@ export const authRouter = router({
     .mutation(async ({ ctx, input }) => {
       const user = await ctx.db.user.findUnique({
         where: { email: input.email },
-        include: { company: true },
+        include: { companies: true },
       });
       if (!user || !user.isActive) {
         throw new TRPCError({ code: "UNAUTHORIZED", message: "Email ou senha inválidos" });
@@ -25,7 +25,7 @@ export const authRouter = router({
         name: user.name,
         email: user.email,
         role: toFrontendRole(user.role),
-        company: user.company?.name,
+        companies: user.companies.map((c) => ({ id: c.id, name: c.name })),
         createdAt: user.createdAt,
       };
     }),
@@ -66,17 +66,17 @@ export const authRouter = router({
           email: input.email.trim().toLowerCase(),
           password: hashedPassword,
           role: "CLIENT",
-          companyId,
           phone: input.phone?.trim() || null,
+          companies: companyId ? { connect: { id: companyId } } : undefined,
         },
-        include: { company: true },
+        include: { companies: true },
       });
       return {
         id: user.id,
         name: user.name,
         email: user.email,
         role: toFrontendRole(user.role),
-        company: user.company?.name,
+        companies: user.companies.map((c) => ({ id: c.id, name: c.name })),
         createdAt: user.createdAt,
       };
     }),
