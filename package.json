@@ -10,7 +10,8 @@
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",
-    "db:seed": "prisma db seed"
+    "db:seed": "prisma db seed",
+    "db:create-super-admin": "tsx prisma/create-super-admin.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
