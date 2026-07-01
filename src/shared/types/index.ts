@@ -58,6 +58,15 @@ export interface Project {
   ratingInternalImpact?: number;
   ratingExternalImpact?: number;
   ratingCompliance?: number;
+  // Diagnostico de processo - operacional (cliente)
+  peopleInvolved?: number;
+  taskDurationHours?: number;
+  processFrequency?: string;
+  currentAnnualHours?: number;
+  // Diagnostico de processo - tecnico/financeiro (admin/arquiteto, nunca exposto ao cliente)
+  complexity?: string;
+  robotSchedule?: string;
+  estimatedAnnualSavingBRL?: number;
   createdAt: Date;
   updatedAt: Date;
 }
