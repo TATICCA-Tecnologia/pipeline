@@ -31,7 +31,6 @@ export default function ClienteConfiguracoes() {
   const [profileData, setProfileData] = useState({
     name: "",
     email: "",
-    company: "",
     phone: "",
   });
 
@@ -40,14 +39,12 @@ export default function ClienteConfiguracoes() {
       setProfileData({
         name: profile.name,
         email: profile.email,
-        company: profile.company,
         phone: profile.phone,
       });
     } else if (user) {
       setProfileData({
         name: user.name ?? "",
         email: user.email ?? "",
-        company: user.company ?? "",
         phone: "",
       });
     }
@@ -74,7 +71,6 @@ export default function ClienteConfiguracoes() {
       await updateProfileMutation.mutateAsync({
         name: profileData.name,
         phone: profileData.phone || undefined,
-        companyName: profileData.company || undefined,
       });
       toast({
         title: "Perfil atualizado",
@@ -178,20 +174,16 @@ export default function ClienteConfiguracoes() {
               </Field>
 
               <Field>
-                <FieldLabel>Empresa</FieldLabel>
-                <div className="relative">
-                  <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    value={profileData.company}
-                    onChange={(e) =>
-                      setProfileData({
-                        ...profileData,
-                        company: e.target.value,
-                      })
-                    }
-                    placeholder="Nome da empresa"
-                    className="pl-10"
-                  />
+                <FieldLabel>Empresas vinculadas</FieldLabel>
+                <div className="flex items-start gap-2 rounded-md border border-border bg-muted/40 px-3 py-2 text-sm">
+                  <Building2 className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                  {profile && profile.companies.length > 0 ? (
+                    <span>{profile.companies.map((c) => c.name).join(", ")}</span>
+                  ) : (
+                    <span className="text-muted-foreground">
+                      Nenhuma empresa vinculada — fale com o administrador.
+                    </span>
+                  )}
                 </div>
               </Field>
 
