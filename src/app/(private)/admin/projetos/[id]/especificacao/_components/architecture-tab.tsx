@@ -22,6 +22,7 @@ import {
   MAIN_TOOLS,
   EXECUTION_STRATEGIES,
 } from "../_constants/architecture";
+import { COMPLEXITY_LEVELS } from "@/shared/constants/project-taxonomy";
 
 const UNASSIGNED = "__unassigned__";
 
@@ -60,6 +61,9 @@ export function ArchitectureTab({ projectId }: ArchitectureTabProps) {
   const [mainTool, setMainTool] = useState<string>("");
   const [executionStrategy, setExecutionStrategy] = useState<string>("");
   const [architectNotes, setArchitectNotes] = useState<string>("");
+  const [complexity, setComplexity] = useState<string>("");
+  const [robotSchedule, setRobotSchedule] = useState<string>("");
+  const [estimatedAnnualSavingBRL, setEstimatedAnnualSavingBRL] = useState<string>("");
 
   useEffect(() => {
     if (project) {
@@ -67,6 +71,13 @@ export function ArchitectureTab({ projectId }: ArchitectureTabProps) {
       setMainTool(project.mainTool ?? "");
       setExecutionStrategy(project.executionStrategy ?? "");
       setArchitectNotes(project.architectNotes ?? "");
+      setComplexity(project.complexity ?? "");
+      setRobotSchedule(project.robotSchedule ?? "");
+      setEstimatedAnnualSavingBRL(
+        project.estimatedAnnualSavingBRL != null
+          ? String(project.estimatedAnnualSavingBRL)
+          : ""
+      );
     }
   }, [project]);
 
@@ -78,12 +89,16 @@ export function ArchitectureTab({ projectId }: ArchitectureTabProps) {
   };
 
   const handleSaveArchitecture = () => {
+    const parsedSaving = parseFloat(estimatedAnnualSavingBRL);
     updateProject.mutate({
       id: projectId,
       solutionTypes,
       mainTool: mainTool || null,
       executionStrategy: executionStrategy || null,
       architectNotes: architectNotes || null,
+      complexity: (complexity || null) as "baixa" | "media" | "alta" | null,
+      robotSchedule: robotSchedule || null,
+      estimatedAnnualSavingBRL: Number.isNaN(parsedSaving) ? null : parsedSaving,
     });
   };
 
@@ -159,6 +174,48 @@ export function ArchitectureTab({ projectId }: ArchitectureTabProps) {
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+          </div>
+
+          <div className="grid gap-5 sm:grid-cols-3">
+            <div className="space-y-2">
+              <Label>Complexidade</Label>
+              <Select value={complexity} onValueChange={setComplexity}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione" />
+                </SelectTrigger>
+                <SelectContent>
+                  {COMPLEXITY_LEVELS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Agendamento do robô</Label>
+              <Input
+                value={robotSchedule}
+                onChange={(e) => setRobotSchedule(e.target.value)}
+                placeholder="Ex.: Hora fixa, uma vez por dia"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Saving estimado anual (R$)</Label>
+              <Input
+                type="number"
+                min={0}
+                step="any"
+                value={estimatedAnnualSavingBRL}
+                onChange={(e) => setEstimatedAnnualSavingBRL(e.target.value)}
+                placeholder="Ex.: 12480"
+              />
+              <p className="text-xs text-muted-foreground">
+                Só aparece nesta tela de administração — nunca é exibido ao cliente.
+              </p>
             </div>
           </div>
 
