@@ -29,8 +29,7 @@ model User {
   updatedAt     DateTime  @updatedAt
 
   // Relacionamentos
-  company          Company?       @relation(fields: [companyId], references: [id])
-  companyId        String?
+  companies        Company[]      @relation("UserCompanies")
   projects         Project[]      @relation("ProjectClient")
   assignedProjects Project[]      @relation("ProjectDeveloper")
   comments         Comment[]
@@ -111,7 +110,7 @@ model Company {
   updatedAt DateTime @updatedAt
 
   // Relacionamentos
-  users    User[]
+  users    User[]    @relation("UserCompanies")
   projects Project[]
 
   @@map("companies")
