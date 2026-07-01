@@ -39,6 +39,7 @@ import {
   ProjectAddFeatureModal,
   ProjectFeatureStatusModal,
   ProjectAssignDeveloperModal,
+  ProjectAssignCompanyModal,
 } from "./_components/project-modals";
 import { useProjectActions } from "./hooks/project.action";
 import { useProject } from "./hooks/project.hook";
@@ -462,25 +463,49 @@ export default function ProjetoPage({ params }: ProjetoPageProps) {
                   <User className="h-4 w-4" />
                   Equipe
                 </span>
-                {user?.role === "admin" && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      openModal(
-                        `project-assign-dev-${project.id}`,
-                        ProjectAssignDeveloperModal,
-                        { projectId: project.id },
-                        { size: "md", position: "center" }
-                      );
-                    }}
-                  >
-                    Definir responsável
-                  </Button>
-                )}
+                <div className="flex gap-2">
+                  {user?.role === "admin" && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        openModal(
+                          `project-assign-company-${project.id}`,
+                          ProjectAssignCompanyModal,
+                          { projectId: project.id, clientId: project.clientId },
+                          { size: "md", position: "center" }
+                        );
+                      }}
+                    >
+                      Definir empresa
+                    </Button>
+                  )}
+                  {user?.role === "admin" && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        openModal(
+                          `project-assign-dev-${project.id}`,
+                          ProjectAssignDeveloperModal,
+                          { projectId: project.id },
+                          { size: "md", position: "center" }
+                        );
+                      }}
+                    >
+                      Definir responsável
+                    </Button>
+                  )}
+                </div>
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
+              <div className="flex items-center gap-2 rounded-lg bg-secondary/30 p-2 text-sm">
+                <Building className="h-4 w-4 text-muted-foreground" />
+                <span>
+                  {(projectDetails as any)?.companyName ?? "Sem empresa definida"}
+                </span>
+              </div>
               {project.developerId ? (
                 <div className="flex items-center gap-3 p-2 rounded-lg bg-secondary/50">
                   <div className="h-8 w-8 rounded-full bg-blue-500/20 flex items-center justify-center">
