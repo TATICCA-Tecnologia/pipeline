@@ -49,6 +49,8 @@ import {
   DEFAULT_PLATFORM_VALUE,
   PROCESS_FREQUENCIES,
   PROCESS_FREQUENCY_MULTIPLIERS,
+  HAS_EXISTING_SYSTEM_OPTIONS,
+  BENEFIT_OPTIONS,
 } from "./utils/solicitar.utils";
 import { useTaxonomy } from "./utils/use-taxonomy";
 import { cn } from "@/shared/utils";
@@ -68,30 +70,6 @@ const QUALITATIVE_RATINGS = [
     label: "Impacto externo (clientes/fornecedores)",
   },
   { name: "ratingCompliance" as const, label: "Atendimento a políticas e leis" },
-];
-
-const BENEFIT_OPTIONS = [
-  {
-    key: "reducao-trabalho-operacional",
-    label: "Redução de trabalho operacional (tarefas manuais, planilhas, retrabalho)",
-  },
-  {
-    key: "melhor-relacionamento-cliente",
-    label: "Melhor relacionamento com o cliente (experiência, atendimento, rapidez)",
-  },
-  {
-    key: "melhor-relacionamento-fornecedor-parceiro",
-    label: "Melhor relacionamento com fornecedores ou parceiros",
-  },
-  {
-    key: "reducao-multas-infracoes",
-    label: "Redução de multas, riscos ou infrações (fiscais, regulatórias, contratuais)",
-  },
-  {
-    key: "melhoria-qualidade-trabalho",
-    label: "Melhoria da qualidade do trabalho (padronização, menos erros, mais visibilidade)",
-  },
-  { key: "outro", label: "Outro" },
 ];
 
 type StepKey = "basico" | "envolvidos" | "funcionalidades" | "beneficios" | "prazo";
@@ -845,16 +823,11 @@ export default function SolicitarProjetoPage() {
                           <SelectValue placeholder="Selecione" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="nao">Não, projeto do zero</SelectItem>
-                          <SelectItem value="sim-substituir">
-                            Sim, quero substituir
-                          </SelectItem>
-                          <SelectItem value="sim-integrar">
-                            Sim, quero integrar/migrar dados
-                          </SelectItem>
-                          <SelectItem value="sim-melhorar">
-                            Sim, quero melhorar o existente
-                          </SelectItem>
+                          {HAS_EXISTING_SYSTEM_OPTIONS.map((option) => (
+                            <SelectItem key={option.value} value={option.value}>
+                              {option.label}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     )}

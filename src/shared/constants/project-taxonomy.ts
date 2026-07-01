@@ -107,6 +107,37 @@ export const TARGET_AUDIENCES = [
   { value: "outro", label: "Outros" },
 ];
 
+export const HAS_EXISTING_SYSTEM_OPTIONS = [
+  { value: "nao", label: "Não, projeto do zero" },
+  { value: "sim-substituir", label: "Sim, quero substituir" },
+  { value: "sim-integrar", label: "Sim, quero integrar/migrar dados" },
+  { value: "sim-melhorar", label: "Sim, quero melhorar o existente" },
+];
+
+export const BENEFIT_OPTIONS = [
+  {
+    key: "reducao-trabalho-operacional",
+    label: "Redução de trabalho operacional (tarefas manuais, planilhas, retrabalho)",
+  },
+  {
+    key: "melhor-relacionamento-cliente",
+    label: "Melhor relacionamento com o cliente (experiência, atendimento, rapidez)",
+  },
+  {
+    key: "melhor-relacionamento-fornecedor-parceiro",
+    label: "Melhor relacionamento com fornecedores ou parceiros",
+  },
+  {
+    key: "reducao-multas-infracoes",
+    label: "Redução de multas, riscos ou infrações (fiscais, regulatórias, contratuais)",
+  },
+  {
+    key: "melhoria-qualidade-trabalho",
+    label: "Melhoria da qualidade do trabalho (padronização, menos erros, mais visibilidade)",
+  },
+  { key: "outro", label: "Outro" },
+];
+
 export const FEATURE_SUGGESTION_GROUPS: { category: string; items: string[] }[] =
   [
     {
