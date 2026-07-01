@@ -39,6 +39,9 @@ export const projectRouter = router({
           developer: {
             select: { id: true, name: true, email: true },
           },
+          company: {
+            select: { id: true, name: true },
+          },
           features: true,
         },
         orderBy: { updatedAt: "desc" },
@@ -52,6 +55,8 @@ export const projectRouter = router({
         priority: p.priority.toLowerCase() as "low" | "medium" | "high" | "urgent",
         clientId: p.clientId,
         developerId: p.developerId ?? undefined,
+        companyId: p.companyId ?? undefined,
+        companyName: p.company?.name,
         projectType: p.platform ?? p.type,
         estimatedDeadline: p.deadline ?? undefined,
         targetAudience: p.targetAudience ?? undefined,
@@ -82,6 +87,7 @@ export const projectRouter = router({
         include: {
           client: { select: { id: true, name: true, email: true, role: true } },
           developer: { select: { id: true, name: true, email: true } },
+          company: { select: { id: true, name: true } },
           tasks: true,
           features: true,
         },
@@ -97,6 +103,8 @@ export const projectRouter = router({
         priority: project.priority.toLowerCase() as "low" | "medium" | "high" | "urgent",
         clientId: project.clientId,
         developerId: project.developerId ?? undefined,
+        companyId: project.companyId ?? undefined,
+        companyName: project.company?.name,
         projectType: project.platform ?? project.type,
         estimatedDeadline: project.deadline ?? undefined,
         createdAt: project.createdAt,
@@ -134,6 +142,7 @@ export const projectRouter = router({
         priority: z.enum(["low", "medium", "high", "urgent"]).default("medium"),
         clientId: z.string(),
         developerId: z.string().optional(),
+        companyId: z.string().optional(),
         projectType: z.string(),
         estimatedDeadline: z.date().optional(),
         targetAudience: z.string().optional(),
@@ -186,6 +195,7 @@ export const projectRouter = router({
           priority: input.priority.toUpperCase() as "LOW" | "MEDIUM" | "HIGH" | "URGENT",
           clientId: input.clientId,
           developerId: input.developerId ?? null,
+          companyId: input.companyId ?? null,
           platform: input.projectType,
           deadline: input.estimatedDeadline ?? null,
           targetAudience: input.targetAudience ?? null,
@@ -251,6 +261,7 @@ export const projectRouter = router({
         status: projectStatusSchema.optional(),
         priority: z.enum(["low", "medium", "high", "urgent"]).optional(),
         developerId: z.string().nullable().optional(),
+        companyId: z.string().nullable().optional(),
         estimatedDeadline: z.date().nullable().optional(),
         solutionTypes: z.array(z.string()).optional(),
         mainTool: z.string().nullable().optional(),
@@ -266,6 +277,7 @@ export const projectRouter = router({
       if (rest.status != null) data.status = toPrismaStatus(rest.status as FrontendProjectStatus);
       if (rest.priority != null) data.priority = rest.priority.toUpperCase();
       if (rest.developerId !== undefined) data.developerId = rest.developerId;
+      if (rest.companyId !== undefined) data.companyId = rest.companyId;
       if (rest.estimatedDeadline !== undefined) data.deadline = rest.estimatedDeadline;
       if (rest.solutionTypes !== undefined) data.solutionTypes = rest.solutionTypes;
       if (rest.mainTool !== undefined) data.mainTool = rest.mainTool;
