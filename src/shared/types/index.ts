@@ -1,13 +1,18 @@
 // Tipos de usuário
 export type UserRole = "client" | "developer" | "admin" | "super_admin";
 
+export interface Company {
+  id: string;
+  name: string;
+}
+
 export interface User {
   id: string;
   name: string;
   email: string;
   role: UserRole;
   avatar?: string;
-  company?: string;
+  companies?: Company[];
   createdAt: Date;
 }
 
@@ -31,6 +36,8 @@ export interface Project {
   priority: Priority;
   clientId: string;
   developerId?: string;
+  companyId?: string;
+  companyName?: string;
   estimatedDeadline?: Date;
   estimatedBudget?: number;
   projectType: string;
