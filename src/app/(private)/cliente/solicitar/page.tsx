@@ -47,6 +47,8 @@ import {
   TARGET_AUDIENCES,
   URGENCY_LEVELS,
   DEFAULT_PLATFORM_VALUE,
+  PROCESS_FREQUENCIES,
+  PROCESS_FREQUENCY_MULTIPLIERS,
 } from "./utils/solicitar.utils";
 import { useTaxonomy } from "./utils/use-taxonomy";
 import { cn } from "@/shared/utils";
@@ -226,6 +228,9 @@ export default function SolicitarProjetoPage() {
       expectedUsers: "",
       hasExistingSystem: "",
       existingSystemDetails: "",
+      peopleInvolved: "",
+      taskDurationHours: "",
+      processFrequency: "",
       benefitsDetails: "",
       monthlyHoursSaved: "",
       ratingErrorReduction: null,
@@ -253,6 +258,15 @@ export default function SolicitarProjetoPage() {
   const projectArea = watch("projectArea");
   const projectTheme = watch("projectTheme");
   const targetAudience = watch("targetAudience");
+  const taskDurationHours = watch("taskDurationHours");
+  const processFrequency = watch("processFrequency");
+
+  const previewAnnualHours = useMemo(() => {
+    const duration = Number(taskDurationHours);
+    const multiplier = PROCESS_FREQUENCY_MULTIPLIERS[processFrequency];
+    if (!Number.isFinite(duration) || duration <= 0 || !multiplier) return null;
+    return duration * multiplier;
+  }, [taskDurationHours, processFrequency]);
 
   const [stepIndex, setStepIndex] = useState(0);
   const [features, setFeatures] = useState<string[]>([]);
@@ -369,6 +383,13 @@ export default function SolicitarProjetoPage() {
         ? Number(data.monthlyHoursSaved)
         : undefined;
 
+      const peopleInvolvedValue = data.peopleInvolved
+        ? Number(data.peopleInvolved)
+        : undefined;
+      const taskDurationHoursValue = data.taskDurationHours
+        ? Number(data.taskDurationHours)
+        : undefined;
+
       const projectId = await addProject({
         title: data.title,
         description: data.description,
@@ -401,6 +422,15 @@ export default function SolicitarProjetoPage() {
         ratingInternalImpact: data.ratingInternalImpact ?? undefined,
         ratingExternalImpact: data.ratingExternalImpact ?? undefined,
         ratingCompliance: data.ratingCompliance ?? undefined,
+        peopleInvolved:
+          peopleInvolvedValue !== undefined && Number.isFinite(peopleInvolvedValue)
+            ? peopleInvolvedValue
+            : undefined,
+        taskDurationHours:
+          taskDurationHoursValue !== undefined && Number.isFinite(taskDurationHoursValue)
+            ? taskDurationHoursValue
+            : undefined,
+        processFrequency: data.processFrequency || undefined,
       });
 
       if (projectId && attachedFiles.length > 0) {
@@ -841,6 +871,77 @@ export default function SolicitarProjetoPage() {
                     placeholder="Como funciona hoje? O que costuma dar errado?"
                     rows={4}
                   />
+                </div>
+
+                <div className="space-y-2 border-t border-border pt-5">
+                  <Label className="text-xs uppercase tracking-wider text-muted-foreground">
+                    Como esse processo funciona hoje (opcional)
+                  </Label>
+                  <div className="grid gap-5 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="peopleInvolved">Colaboradores envolvidos</Label>
+                      <Input
+                        id="peopleInvolved"
+                        type="number"
+                        min={0}
+                        step="1"
+                        {...register("peopleInvolved")}
+                        placeholder="Ex.: 2"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Label htmlFor="taskDurationHours">
+                          Duração total por execução (horas)
+                        </Label>
+                        <Tooltip>
+                          <TooltipTrigger>
+                            <HelpCircle className="h-4 w-4 text-muted-foreground" />
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            Some o tempo de todos os envolvidos, não só de uma pessoa.
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
+                      <Input
+                        id="taskDurationHours"
+                        type="number"
+                        min={0}
+                        step="any"
+                        {...register("taskDurationHours")}
+                        placeholder="Ex.: 4"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="processFrequency">Periodicidade do processo</Label>
+                    <Controller
+                      control={control}
+                      name="processFrequency"
+                      render={({ field }) => (
+                        <Select value={field.value} onValueChange={field.onChange}>
+                          <SelectTrigger id="processFrequency">
+                            <SelectValue placeholder="Selecione" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {PROCESS_FREQUENCIES.map((freq) => (
+                              <SelectItem key={freq.value} value={freq.value}>
+                                {freq.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )}
+                    />
+                  </div>
+
+                  {previewAnnualHours !== null && (
+                    <p className="text-xs text-muted-foreground">
+                      Tempo gasto hoje: <strong>{previewAnnualHours.toLocaleString("pt-BR")} h/ano</strong>
+                    </p>
+                  )}
                 </div>
               </div>
             )}
