@@ -40,7 +40,7 @@ const MOCK_USERS: Record<string, User> = {
     name: "João Silva",
     email: "cliente@email.com",
     role: "client",
-    company: "Tech Corp",
+    companies: [{ id: "mock-company-1", name: "Tech Corp" }],
     createdAt: new Date(),
   },
   "dev@email.com": {
