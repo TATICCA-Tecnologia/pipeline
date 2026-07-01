@@ -153,6 +153,12 @@ model Project {
   benefitsDetails   String?
   monthlyHoursSaved Float?
 
+  // Diagnostico de processo - operacional (preenchido pelo cliente, opcional)
+  peopleInvolved     Int?    // colaboradores envolvidos na execução manual hoje
+  taskDurationHours  Float?  // duração total de cada execução (somando todos os envolvidos), em horas
+  processFrequency   String? // "diario" | "duas-vezes-semana" | "tres-vezes-semana" | "semanal" | "mensal" | "anual"
+  currentAnnualHours Float?  // calculado: taskDurationHours * multiplicador(processFrequency) - horas gastas HOJE no processo manual
+
   // Avaliacao qualitativa (1-5)
   ratingErrorReduction     Int?
   ratingProcessCriticality Int?
@@ -165,6 +171,11 @@ model Project {
   mainTool           String? // python, rocketbot, automation-anywhere, power-automate, power-apps, outro
   executionStrategy  String? // agendada, manual, trigger-email, trigger-api, tempo-real
   architectNotes     String?
+
+  // Diagnostico de processo - tecnico/financeiro (preenchido pelo arquiteto, nunca exposto ao cliente)
+  complexity               String? // "baixa" | "media" | "alta"
+  robotSchedule            String? // texto livre curto, ex.: "Hora fixa, uma vez por dia"
+  estimatedAnnualSavingBRL Float?  // saving estimado anual em reais
 
   // Relacionamentos
   client       User             @relation("ProjectClient", fields: [clientId], references: [id])
