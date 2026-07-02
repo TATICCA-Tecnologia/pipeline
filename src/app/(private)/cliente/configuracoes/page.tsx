@@ -15,12 +15,17 @@ import {
 import { User, Building2, Lock, Bell, Shield } from "lucide-react";
 
 export default function ClienteConfiguracoes() {
-  const { user } = useAuth();
+  const { user, isSuperAdmin } = useAuth();
   const { toast } = useToast();
   const { data: profile, isLoading: profileLoading } = trpc.user.me.useQuery(
     undefined,
     { enabled: !!user?.id }
   );
+  const { data: allCompanies = [], isLoading: allCompaniesLoading } =
+    trpc.company.list.useQuery(undefined, { enabled: !!user?.id && isSuperAdmin });
+  // Super admin não tem empresas vinculadas à própria conta — vê todas as empresas ativas
+  const companiesForTab = isSuperAdmin ? allCompanies : (profile?.companies ?? []);
+  const companiesTabLoading = isSuperAdmin ? allCompaniesLoading : profileLoading;
   const utils = trpc.useUtils();
   const updateProfileMutation = trpc.user.updateProfile.useMutation({
     onSuccess: () => {
@@ -214,6 +219,33 @@ export default function ClienteConfiguracoes() {
             </Button>
           </div>
         </form>
+      ),
+    },
+    {
+      id: "empresas",
+      label: "Minhas Empresas",
+      description: isSuperAdmin
+        ? "Como super admin, você tem acesso a todas as empresas ativas no sistema"
+        : "Empresas vinculadas à sua conta",
+      icon: Building2,
+      content: companiesTabLoading ? (
+        <p className="text-sm text-muted-foreground py-4">Carregando empresas...</p>
+      ) : companiesForTab.length > 0 ? (
+        <ul className="space-y-2">
+          {companiesForTab.map((c) => (
+            <li
+              key={c.id}
+              className="flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm"
+            >
+              <Building2 className="h-4 w-4 shrink-0 text-muted-foreground" />
+              <span>{c.name}</span>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="text-sm text-muted-foreground">
+          Nenhuma empresa {isSuperAdmin ? "cadastrada" : "vinculada"} — fale com o administrador.
+        </p>
       ),
     },
     {

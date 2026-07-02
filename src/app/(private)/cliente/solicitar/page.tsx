@@ -195,16 +195,17 @@ export default function SolicitarProjetoPage() {
   const { addFile } = useFiles();
   const router = useRouter();
   const { toast } = useToast();
-  const { data: myCompanies = [] } = trpc.user.listMyCompanies.useQuery(
+  const { data: myCompanies = [], isLoading: myCompaniesLoading } = trpc.user.listMyCompanies.useQuery(
     undefined,
     { enabled: !!user?.id && !isSuperAdmin }
   );
-  const { data: allCompanies = [] } = trpc.company.list.useQuery(
+  const { data: allCompanies = [], isLoading: allCompaniesLoading } = trpc.company.list.useQuery(
     undefined,
     { enabled: !!user?.id && isSuperAdmin }
   );
   // Super admin (mesmo "visualizando como cliente") pode escolher/importar para qualquer empresa
   const companyOptions = isSuperAdmin ? allCompanies : myCompanies;
+  const companyOptionsLoading = !!user?.id && (isSuperAdmin ? allCompaniesLoading : myCompaniesLoading);
 
   const {
     areas: PROJECT_AREAS,
@@ -332,6 +333,15 @@ export default function SolicitarProjetoPage() {
       toast({
         title: "Erro",
         description: "Faça login para importar um XML.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (companyOptionsLoading) {
+      toast({
+        title: "Aguarde",
+        description: "A lista de empresas ainda está carregando. Tente novamente em instantes.",
         variant: "destructive",
       });
       return;
@@ -484,10 +494,10 @@ export default function SolicitarProjetoPage() {
             variant="outline"
             size="sm"
             onClick={() => xmlInputRef.current?.click()}
-            disabled={isSubmitting}
+            disabled={isSubmitting || companyOptionsLoading}
           >
             <Upload className="mr-2 h-4 w-4" />
-            Importar XML
+            {companyOptionsLoading ? "Carregando empresas..." : "Importar XML"}
           </Button>
           <input
             ref={xmlInputRef}
