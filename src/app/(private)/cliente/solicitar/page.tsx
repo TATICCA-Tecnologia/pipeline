@@ -114,6 +114,7 @@ const STEPS: StepDef[] = [
       "projectTheme",
       "customProjectTheme",
       "platform",
+      "customPlatform",
       "description",
     ],
   },
@@ -126,8 +127,10 @@ const STEPS: StepDef[] = [
       "customTargetAudience",
       "expectedUsers",
       "hasExistingSystem",
+      "customHasExistingSystem",
       "existingSystemDetails",
       "hasCurrentApplication",
+      "customHasCurrentApplication",
       "currentApplicationDetails",
     ],
   },
@@ -155,7 +158,7 @@ const STEPS: StepDef[] = [
     key: "prazo",
     label: "Prazo",
     description: "Quando você precisa pronto",
-    fieldsToValidate: ["urgency", "deadline", "additionalInfo"],
+    fieldsToValidate: ["urgency", "customUrgency", "deadline", "additionalInfo"],
   },
 ];
 
@@ -230,17 +233,21 @@ export default function SolicitarProjetoPage() {
       projectTheme: "",
       customProjectTheme: "",
       platform: DEFAULT_PLATFORM_VALUE,
+      customPlatform: "",
       description: "",
       targetAudience: "",
       customTargetAudience: "",
       expectedUsers: "",
       hasExistingSystem: "",
+      customHasExistingSystem: "",
       existingSystemDetails: "",
       hasCurrentApplication: "",
+      customHasCurrentApplication: "",
       currentApplicationDetails: "",
       peopleInvolved: "",
       taskDurationHours: "",
       processFrequency: "",
+      customProcessFrequency: "",
       benefitsDetails: "",
       monthlyHoursSaved: "",
       ratingErrorReduction: null,
@@ -250,6 +257,7 @@ export default function SolicitarProjetoPage() {
       ratingCompliance: null,
       projectNarrative: "",
       urgency: "",
+      customUrgency: "",
       deadline: "",
       additionalInfo: "",
     },
@@ -267,10 +275,13 @@ export default function SolicitarProjetoPage() {
 
   const projectArea = watch("projectArea");
   const projectTheme = watch("projectTheme");
+  const platform = watch("platform");
   const targetAudience = watch("targetAudience");
+  const hasExistingSystem = watch("hasExistingSystem");
   const hasCurrentApplication = watch("hasCurrentApplication");
   const taskDurationHours = watch("taskDurationHours");
   const processFrequency = watch("processFrequency");
+  const urgency = watch("urgency");
 
   const previewAnnualHours = useMemo(() => {
     const duration = Number(taskDurationHours);
@@ -793,24 +804,46 @@ export default function SolicitarProjetoPage() {
 
                 <div className="space-y-2">
                   <Label htmlFor="platform">Plataforma</Label>
-                  <Controller
-                    control={control}
-                    name="platform"
-                    render={({ field }) => (
-                      <Select value={field.value} onValueChange={field.onChange}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Onde vai funcionar?" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {PLATFORMS.map((platform) => (
-                            <SelectItem key={platform.value} value={platform.value}>
-                              {platform.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                  <div className="flex gap-2">
+                    <Controller
+                      control={control}
+                      name="platform"
+                      render={({ field }) => (
+                        <Select
+                          value={field.value}
+                          onValueChange={(value) => {
+                            field.onChange(value);
+                            if (value !== "outro") setValue("customPlatform", "");
+                          }}
+                        >
+                          <SelectTrigger
+                            id="platform"
+                            className={platform === "outro" ? "w-32 shrink-0" : "w-full"}
+                          >
+                            <SelectValue placeholder="Onde vai funcionar?" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {PLATFORMS.map((option) => (
+                              <SelectItem key={option.value} value={option.value}>
+                                {option.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )}
+                    />
+                    {platform === "outro" && (
+                      <Input
+                        id="customPlatform"
+                        {...register("customPlatform")}
+                        placeholder="Qual plataforma?"
+                        className="flex-1"
+                      />
                     )}
-                  />
+                  </div>
+                  {errors.customPlatform && (
+                    <p className="text-xs text-destructive">{errors.customPlatform.message}</p>
+                  )}
                 </div>
 
                 <div className="space-y-2">
@@ -926,24 +959,49 @@ export default function SolicitarProjetoPage() {
 
                 <div className="space-y-2">
                   <Label>Já existe um processo/sistema atual?</Label>
-                  <Controller
-                    control={control}
-                    name="hasExistingSystem"
-                    render={({ field }) => (
-                      <Select value={field.value} onValueChange={field.onChange}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {HAS_EXISTING_SYSTEM_OPTIONS.map((option) => (
-                            <SelectItem key={option.value} value={option.value}>
-                              {option.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                  <div className="flex gap-2">
+                    <Controller
+                      control={control}
+                      name="hasExistingSystem"
+                      render={({ field }) => (
+                        <Select
+                          value={field.value}
+                          onValueChange={(value) => {
+                            field.onChange(value);
+                            if (value !== "outro") setValue("customHasExistingSystem", "");
+                          }}
+                        >
+                          <SelectTrigger
+                            className={
+                              hasExistingSystem === "outro" ? "w-32 shrink-0" : "w-full"
+                            }
+                          >
+                            <SelectValue placeholder="Selecione" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {HAS_EXISTING_SYSTEM_OPTIONS.map((option) => (
+                              <SelectItem key={option.value} value={option.value}>
+                                {option.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )}
+                    />
+                    {hasExistingSystem === "outro" && (
+                      <Input
+                        id="customHasExistingSystem"
+                        {...register("customHasExistingSystem")}
+                        placeholder="Descreva a situação"
+                        className="flex-1"
+                      />
                     )}
-                  />
+                  </div>
+                  {errors.customHasExistingSystem && (
+                    <p className="text-xs text-destructive">
+                      {errors.customHasExistingSystem.message}
+                    </p>
+                  )}
                 </div>
 
                 <div className="space-y-2">
@@ -960,24 +1018,49 @@ export default function SolicitarProjetoPage() {
 
                 <div className="space-y-2">
                   <Label>Já existe uma aplicação (app/sistema) para esse processo hoje?</Label>
-                  <Controller
-                    control={control}
-                    name="hasCurrentApplication"
-                    render={({ field }) => (
-                      <Select value={field.value} onValueChange={field.onChange}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {HAS_CURRENT_APPLICATION_OPTIONS.map((option) => (
-                            <SelectItem key={option.value} value={option.value}>
-                              {option.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                  <div className="flex gap-2">
+                    <Controller
+                      control={control}
+                      name="hasCurrentApplication"
+                      render={({ field }) => (
+                        <Select
+                          value={field.value}
+                          onValueChange={(value) => {
+                            field.onChange(value);
+                            if (value !== "outro") setValue("customHasCurrentApplication", "");
+                          }}
+                        >
+                          <SelectTrigger
+                            className={
+                              hasCurrentApplication === "outro" ? "w-32 shrink-0" : "w-full"
+                            }
+                          >
+                            <SelectValue placeholder="Selecione" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {HAS_CURRENT_APPLICATION_OPTIONS.map((option) => (
+                              <SelectItem key={option.value} value={option.value}>
+                                {option.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )}
+                    />
+                    {hasCurrentApplication === "outro" && (
+                      <Input
+                        id="customHasCurrentApplication"
+                        {...register("customHasCurrentApplication")}
+                        placeholder="Descreva a situação"
+                        className="flex-1"
+                      />
                     )}
-                  />
+                  </div>
+                  {errors.customHasCurrentApplication && (
+                    <p className="text-xs text-destructive">
+                      {errors.customHasCurrentApplication.message}
+                    </p>
+                  )}
                 </div>
 
                 {hasCurrentApplication === "sim" && (
@@ -1038,24 +1121,50 @@ export default function SolicitarProjetoPage() {
 
                   <div className="space-y-2">
                     <Label htmlFor="processFrequency">Periodicidade do processo</Label>
-                    <Controller
-                      control={control}
-                      name="processFrequency"
-                      render={({ field }) => (
-                        <Select value={field.value} onValueChange={field.onChange}>
-                          <SelectTrigger id="processFrequency">
-                            <SelectValue placeholder="Selecione" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {PROCESS_FREQUENCIES.map((freq) => (
-                              <SelectItem key={freq.value} value={freq.value}>
-                                {freq.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                    <div className="flex gap-2">
+                      <Controller
+                        control={control}
+                        name="processFrequency"
+                        render={({ field }) => (
+                          <Select
+                            value={field.value}
+                            onValueChange={(value) => {
+                              field.onChange(value);
+                              if (value !== "outro") setValue("customProcessFrequency", "");
+                            }}
+                          >
+                            <SelectTrigger
+                              id="processFrequency"
+                              className={
+                                processFrequency === "outro" ? "w-32 shrink-0" : "w-full"
+                              }
+                            >
+                              <SelectValue placeholder="Selecione" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {PROCESS_FREQUENCIES.map((freq) => (
+                                <SelectItem key={freq.value} value={freq.value}>
+                                  {freq.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        )}
+                      />
+                      {processFrequency === "outro" && (
+                        <Input
+                          id="customProcessFrequency"
+                          {...register("customProcessFrequency")}
+                          placeholder="Qual periodicidade?"
+                          className="flex-1"
+                        />
                       )}
-                    />
+                    </div>
+                    {errors.customProcessFrequency && (
+                      <p className="text-xs text-destructive">
+                        {errors.customProcessFrequency.message}
+                      </p>
+                    )}
                   </div>
 
                   {previewAnnualHours !== null && (
@@ -1249,24 +1358,45 @@ export default function SolicitarProjetoPage() {
                 <div className="grid gap-5 sm:grid-cols-2">
                   <div className="space-y-2">
                     <Label htmlFor="urgency">Nível de urgência</Label>
-                    <Controller
-                      control={control}
-                      name="urgency"
-                      render={({ field }) => (
-                        <Select value={field.value} onValueChange={field.onChange}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Selecione" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {URGENCY_LEVELS.map((level) => (
-                              <SelectItem key={level.value} value={level.value}>
-                                {level.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                    <div className="flex gap-2">
+                      <Controller
+                        control={control}
+                        name="urgency"
+                        render={({ field }) => (
+                          <Select
+                            value={field.value}
+                            onValueChange={(value) => {
+                              field.onChange(value);
+                              if (value !== "outro") setValue("customUrgency", "");
+                            }}
+                          >
+                            <SelectTrigger
+                              className={urgency === "outro" ? "w-32 shrink-0" : "w-full"}
+                            >
+                              <SelectValue placeholder="Selecione" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {URGENCY_LEVELS.map((level) => (
+                                <SelectItem key={level.value} value={level.value}>
+                                  {level.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        )}
+                      />
+                      {urgency === "outro" && (
+                        <Input
+                          id="customUrgency"
+                          {...register("customUrgency")}
+                          placeholder="Qual urgência?"
+                          className="flex-1"
+                        />
                       )}
-                    />
+                    </div>
+                    {errors.customUrgency && (
+                      <p className="text-xs text-destructive">{errors.customUrgency.message}</p>
+                    )}
                   </div>
 
                   <div className="space-y-2">

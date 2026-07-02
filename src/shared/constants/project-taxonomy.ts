@@ -58,6 +58,7 @@ export const PLATFORMS = [
   { value: "android", label: "Android" },
   { value: "ambos-mobile", label: "iOS e Android" },
   { value: "todas", label: "Todas as plataformas" },
+  { value: "outro", label: "Outro" },
 ];
 
 export const URGENCY_LEVELS = [
@@ -65,6 +66,7 @@ export const URGENCY_LEVELS = [
   { value: "media", label: "Média — próximos 2 a 3 meses" },
   { value: "alta", label: "Alta — próximo mês" },
   { value: "urgente", label: "Urgente — o mais rápido possível" },
+  { value: "outro", label: "Outro" },
 ];
 
 export const PROCESS_FREQUENCIES = [
@@ -74,6 +76,7 @@ export const PROCESS_FREQUENCIES = [
   { value: "semanal", label: "Semanal" },
   { value: "mensal", label: "Mensal" },
   { value: "anual", label: "Anual" },
+  { value: "outro", label: "Outro" },
 ];
 
 // Ocorrências por ano para cada periodicidade — usado para calcular
@@ -112,11 +115,13 @@ export const HAS_EXISTING_SYSTEM_OPTIONS = [
   { value: "sim-substituir", label: "Sim, quero substituir" },
   { value: "sim-integrar", label: "Sim, quero integrar/migrar dados" },
   { value: "sim-melhorar", label: "Sim, quero melhorar o existente" },
+  { value: "outro", label: "Outro" },
 ];
 
 export const HAS_CURRENT_APPLICATION_OPTIONS = [
   { value: "sim", label: "Sim" },
   { value: "nao", label: "Não" },
+  { value: "outro", label: "Outro" },
 ];
 
 export const BENEFIT_OPTIONS = [

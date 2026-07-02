@@ -54,7 +54,7 @@ export default function AjudaXmlPage() {
       tag: "plataforma",
       required: false,
       description:
-        "Onde o processo vai funcionar. Um valor não reconhecido gera erro (não existe opção Outro para este campo). Se vazio, usa o padrão (Desktop).",
+        'Onde o processo vai funcionar (não confundir com sistemas que ele integra, como ERPs). Se não corresponder a nenhuma opção conhecida, é tratado como "Outro". Se vazio, usa o padrão (Desktop).',
       acceptedValues: PLATFORMS.map((p) => p.label),
     },
     { tag: "descricao", required: true, description: "Objetivo principal e problema que o processo resolve." },
@@ -73,7 +73,7 @@ export default function AjudaXmlPage() {
       tag: "processoExistente",
       required: false,
       description:
-        "Se já existe um processo ou sistema atual. Um valor não reconhecido gera erro (não existe opção Outro para este campo).",
+        'Se já existe um processo ou sistema atual. Se não corresponder a nenhuma opção conhecida, é tratado como "Outro".',
       acceptedValues: HAS_EXISTING_SYSTEM_OPTIONS.map((o) => o.label),
     },
     {
@@ -85,7 +85,7 @@ export default function AjudaXmlPage() {
       tag: "aplicacaoExistenteHoje",
       required: false,
       description:
-        "Se já existe uma aplicação (app/sistema) para esse processo hoje. Um valor não reconhecido gera erro (não existe opção Outro para este campo).",
+        'Se já existe uma aplicação (app/sistema) para esse processo hoje. Se não corresponder a nenhuma opção conhecida, é tratado como "Outro".',
       acceptedValues: HAS_CURRENT_APPLICATION_OPTIONS.map((o) => o.label),
     },
     {
@@ -109,7 +109,7 @@ export default function AjudaXmlPage() {
       tag: "periodicidade",
       required: false,
       description:
-        "Frequência com que o processo acontece. Um valor não reconhecido gera erro (não existe opção Outro para este campo).",
+        'Frequência com que o processo acontece. Se não corresponder a nenhuma opção conhecida, é tratado como "Outro".',
       acceptedValues: PROCESS_FREQUENCIES.map((p) => p.label),
     },
     {
@@ -169,7 +169,7 @@ export default function AjudaXmlPage() {
       tag: "urgencia",
       required: false,
       description:
-        "Nível de urgência. Um valor não reconhecido gera erro (não existe opção Outro para este campo).",
+        'Nível de urgência. Se não corresponder a nenhuma opção conhecida, é tratado como "Outro".',
       acceptedValues: URGENCY_LEVELS.map((u) => u.label),
     },
     { tag: "prazoLimite", required: false, description: "Data limite desejada, no formato AAAA-MM-DD." },

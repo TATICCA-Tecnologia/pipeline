@@ -31,11 +31,28 @@ export function buildProjectPayload(params: {
       ? [areaLabel, themeLabel].filter(Boolean).join(" - ") || "Outro"
       : buildTypeLabel(data.projectArea, data.projectTheme);
 
-  const platformLabel = PLATFORMS.find((p) => p.value === data.platform)?.label ?? data.platform;
+  const platformLabel =
+    data.platform === "outro"
+      ? data.customPlatform.trim()
+      : PLATFORMS.find((p) => p.value === data.platform)?.label ?? data.platform;
   const projectTypeWithPlatform = `${typeLabel} · Plataforma: ${platformLabel}`;
 
   const targetAudienceValue =
     data.targetAudience === "outro" ? data.customTargetAudience.trim() : data.targetAudience;
+
+  const hasExistingSystemValue =
+    data.hasExistingSystem === "outro"
+      ? data.customHasExistingSystem.trim()
+      : data.hasExistingSystem;
+  const hasCurrentApplicationValue =
+    data.hasCurrentApplication === "outro"
+      ? data.customHasCurrentApplication.trim()
+      : data.hasCurrentApplication;
+  const processFrequencyValue =
+    data.processFrequency === "outro"
+      ? data.customProcessFrequency.trim()
+      : data.processFrequency;
+  const urgencyValue = data.urgency === "outro" ? data.customUrgency.trim() : data.urgency;
 
   const monthlyHours = data.monthlyHoursSaved ? Number(data.monthlyHoursSaved) : undefined;
   const peopleInvolvedValue = data.peopleInvolved ? Number(data.peopleInvolved) : undefined;
@@ -60,13 +77,13 @@ export function buildProjectPayload(params: {
     projectType: projectTypeWithPlatform,
     targetAudience: targetAudienceValue,
     expectedUsers: data.expectedUsers,
-    urgency: data.urgency,
+    urgency: urgencyValue,
     features,
     estimatedDeadline: data.deadline ? new Date(data.deadline) : undefined,
     additionalInfo: data.additionalInfo || undefined,
-    hasExistingSystem: data.hasExistingSystem || undefined,
+    hasExistingSystem: hasExistingSystemValue || undefined,
     existingSystemDetails: data.existingSystemDetails || undefined,
-    hasCurrentApplication: data.hasCurrentApplication || undefined,
+    hasCurrentApplication: hasCurrentApplicationValue || undefined,
     currentApplicationDetails: data.currentApplicationDetails || undefined,
     projectNarrative: data.projectNarrative || undefined,
     benefits: benefits.length ? benefits : undefined,
@@ -85,6 +102,6 @@ export function buildProjectPayload(params: {
       taskDurationHoursValue !== undefined && Number.isFinite(taskDurationHoursValue)
         ? taskDurationHoursValue
         : undefined,
-    processFrequency: data.processFrequency || undefined,
+    processFrequency: processFrequencyValue || undefined,
   };
 }

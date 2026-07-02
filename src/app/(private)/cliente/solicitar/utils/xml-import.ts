@@ -124,18 +124,14 @@ export function parseSolicitacaoXml(
   const projectTheme = temaMatch ? temaMatch.value : "outro";
   const customProjectTheme = temaMatch ? "" : temaTag;
 
-  // <plataforma> — sem fallback "Outro"
+  // <plataforma> — com fallback "Outro"
   const plataformaTag = getDirectChildText(root, "plataforma");
   let platform = DEFAULT_PLATFORM_VALUE as string;
+  let customPlatform = "";
   if (plataformaTag) {
     const platformMatch = matchByLabel(plataformaTag, PLATFORMS);
-    if (!platformMatch) {
-      return {
-        ok: false,
-        error: `A tag <plataforma> tem o valor '${plataformaTag}', que não é reconhecido. Valores aceitos: ${PLATFORMS.map((p) => p.label).join(", ")}.`,
-      };
-    }
-    platform = platformMatch.value;
+    platform = platformMatch ? platformMatch.value : "outro";
+    customPlatform = platformMatch ? "" : plataformaTag;
   }
 
   // <publicoAlvo> — com fallback "Outro"
@@ -154,34 +150,26 @@ export function parseSolicitacaoXml(
 
   const numeroUsuarios = getDirectChildText(root, "numeroUsuarios");
 
-  // <processoExistente> — sem fallback "Outro"
+  // <processoExistente> — com fallback "Outro"
   const processoExistenteTag = getDirectChildText(root, "processoExistente");
   let hasExistingSystem = "";
+  let customHasExistingSystem = "";
   if (processoExistenteTag) {
     const match = matchByLabel(processoExistenteTag, HAS_EXISTING_SYSTEM_OPTIONS);
-    if (!match) {
-      return {
-        ok: false,
-        error: `A tag <processoExistente> tem o valor '${processoExistenteTag}', que não é reconhecido. Valores aceitos: ${HAS_EXISTING_SYSTEM_OPTIONS.map((o) => o.label).join(", ")}.`,
-      };
-    }
-    hasExistingSystem = match.value;
+    hasExistingSystem = match ? match.value : "outro";
+    customHasExistingSystem = match ? "" : processoExistenteTag;
   }
 
   const existingSystemDetails = getDirectChildText(root, "detalhesProcessoAtual");
 
-  // <aplicacaoExistenteHoje> — sem fallback "Outro"
+  // <aplicacaoExistenteHoje> — com fallback "Outro"
   const aplicacaoExistenteTag = getDirectChildText(root, "aplicacaoExistenteHoje");
   let hasCurrentApplication = "";
+  let customHasCurrentApplication = "";
   if (aplicacaoExistenteTag) {
     const match = matchByLabel(aplicacaoExistenteTag, HAS_CURRENT_APPLICATION_OPTIONS);
-    if (!match) {
-      return {
-        ok: false,
-        error: `A tag <aplicacaoExistenteHoje> tem o valor '${aplicacaoExistenteTag}', que não é reconhecido. Valores aceitos: ${HAS_CURRENT_APPLICATION_OPTIONS.map((o) => o.label).join(", ")}.`,
-      };
-    }
-    hasCurrentApplication = match.value;
+    hasCurrentApplication = match ? match.value : "outro";
+    customHasCurrentApplication = match ? "" : aplicacaoExistenteTag;
   }
 
   const currentApplicationDetails = getDirectChildText(root, "detalhesAplicacaoExistente");
@@ -214,18 +202,14 @@ export function parseSolicitacaoXml(
     taskDurationHours = String(n);
   }
 
-  // <periodicidade> — sem fallback "Outro"
+  // <periodicidade> — com fallback "Outro"
   const periodicidadeTag = getDirectChildText(root, "periodicidade");
   let processFrequency = "";
+  let customProcessFrequency = "";
   if (periodicidadeTag) {
     const match = matchByLabel(periodicidadeTag, PROCESS_FREQUENCIES);
-    if (!match) {
-      return {
-        ok: false,
-        error: `A tag <periodicidade> tem o valor '${periodicidadeTag}', que não é reconhecido. Valores aceitos: ${PROCESS_FREQUENCIES.map((p) => p.label).join(", ")}.`,
-      };
-    }
-    processFrequency = match.value;
+    processFrequency = match ? match.value : "outro";
+    customProcessFrequency = match ? "" : periodicidadeTag;
   }
 
   const projectNarrative = getDirectChildText(root, "narrativaDoProcesso");
@@ -295,18 +279,14 @@ export function parseSolicitacaoXml(
     return { ok: false, error: ratingComplianceResult.error };
   }
 
-  // <urgencia> — sem fallback "Outro"
+  // <urgencia> — com fallback "Outro"
   const urgenciaTag = getDirectChildText(root, "urgencia");
   let urgency = "";
+  let customUrgency = "";
   if (urgenciaTag) {
     const match = matchByLabel(urgenciaTag, URGENCY_LEVELS);
-    if (!match) {
-      return {
-        ok: false,
-        error: `A tag <urgencia> tem o valor '${urgenciaTag}', que não é reconhecido. Valores aceitos: ${URGENCY_LEVELS.map((u) => u.label).join(", ")}.`,
-      };
-    }
-    urgency = match.value;
+    urgency = match ? match.value : "outro";
+    customUrgency = match ? "" : urgenciaTag;
   }
 
   // <prazoLimite>
@@ -331,17 +311,21 @@ export function parseSolicitacaoXml(
     projectTheme,
     customProjectTheme,
     platform,
+    customPlatform,
     description: descricao,
     targetAudience,
     customTargetAudience,
     expectedUsers: numeroUsuarios,
     hasExistingSystem,
+    customHasExistingSystem,
     existingSystemDetails,
     hasCurrentApplication,
+    customHasCurrentApplication,
     currentApplicationDetails,
     peopleInvolved,
     taskDurationHours,
     processFrequency,
+    customProcessFrequency,
     benefitsDetails,
     monthlyHoursSaved,
     ratingErrorReduction: ratingErrorReductionResult.value,
@@ -351,6 +335,7 @@ export function parseSolicitacaoXml(
     ratingCompliance: ratingComplianceResult.value,
     projectNarrative,
     urgency,
+    customUrgency,
     deadline,
     additionalInfo,
   };
