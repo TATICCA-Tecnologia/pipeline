@@ -386,7 +386,8 @@ export default function SolicitarProjetoPage() {
         title: "Solicitação enviada",
         message: `O processo "${parsed.formData.title}" foi criado e está no backlog.${warningsNote}`,
       });
-    } catch {
+    } catch (error) {
+      console.error("Erro ao criar processo a partir do XML:", error);
       setXmlImportOutcome({
         ok: false,
         title: "Erro ao salvar",
@@ -534,7 +535,8 @@ export default function SolicitarProjetoPage() {
         description: "Seu processo foi criado e está no backlog.",
       });
       router.push("/cliente");
-    } catch {
+    } catch (error) {
+      console.error("Erro ao criar processo:", error);
       toast({
         title: "Erro ao salvar",
         description: "Não foi possível criar o processo. Tente novamente.",

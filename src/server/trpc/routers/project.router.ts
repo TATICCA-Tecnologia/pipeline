@@ -14,15 +14,6 @@ const projectStatusSchema = z.enum([
   "cancelled",
 ]);
 
-const processFrequencySchema = z.enum([
-  "diario",
-  "duas-vezes-semana",
-  "tres-vezes-semana",
-  "semanal",
-  "mensal",
-  "anual",
-]);
-
 const complexitySchema = z.enum(["baixa", "media", "alta"]);
 
 function computeCurrentAnnualHours(
@@ -220,7 +211,8 @@ export const projectRouter = router({
         peopleInvolved: z.number().int().min(0).optional(),
         peopleInvolvedDetails: z.string().optional(),
         taskDurationHours: z.number().min(0).optional(),
-        processFrequency: processFrequencySchema.optional(),
+        // string livre: pode ser um dos valores conhecidos ou o texto de "Outro"
+        processFrequency: z.string().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -338,7 +330,7 @@ export const projectRouter = router({
         architectNotes: z.string().nullable().optional(),
         peopleInvolved: z.number().int().min(0).nullable().optional(),
         taskDurationHours: z.number().min(0).nullable().optional(),
-        processFrequency: processFrequencySchema.nullable().optional(),
+        processFrequency: z.string().nullable().optional(),
         complexity: complexitySchema.nullable().optional(),
         robotSchedule: z.string().nullable().optional(),
         estimatedAnnualSavingBRL: z.number().nullable().optional(),

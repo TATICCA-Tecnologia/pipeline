@@ -174,7 +174,7 @@ export function ProjectsProvider({ children }: { children: ReactNode }) {
         peopleInvolved: project.peopleInvolved,
         peopleInvolvedDetails: project.peopleInvolvedDetails,
         taskDurationHours: project.taskDurationHours,
-        processFrequency: project.processFrequency as "diario" | "duas-vezes-semana" | "tres-vezes-semana" | "semanal" | "mensal" | "anual" | undefined,
+        processFrequency: project.processFrequency,
       });
       return created.id as string;
     },
