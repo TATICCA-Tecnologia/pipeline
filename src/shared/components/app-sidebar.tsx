@@ -15,6 +15,7 @@ import {
   DropdownMenuTrigger,
 } from "@/src/shared/components/ui/dropdown-menu";
 import {
+  Building2,
   ChevronsUpDown,
   FolderKanban,
   LayoutDashboard,
@@ -80,6 +81,7 @@ const adminSections: NavSection[] = [
     items: [
       { href: "/admin/projetos", label: "Projetos", icon: FolderKanban },
       { href: "/admin/clientes", label: "Clientes", icon: Users },
+      { href: "/admin/empresas", label: "Empresas", icon: Building2 },
       { href: "/admin/configuracoes/categorias", label: "Categorias", icon: Tag },
     ],
   },
