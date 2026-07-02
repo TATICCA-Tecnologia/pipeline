@@ -70,6 +70,10 @@ export interface Project {
   complexity?: string;
   robotSchedule?: string;
   estimatedAnnualSavingBRL?: number;
+  solutionTypes?: string[];
+  mainTool?: string;
+  executionStrategy?: string;
+  architectNotes?: string;
   createdAt: Date;
   updatedAt: Date;
 }
