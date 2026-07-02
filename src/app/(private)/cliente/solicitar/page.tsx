@@ -190,15 +190,21 @@ function RatingRow({
 }
 
 export default function SolicitarProjetoPage() {
-  const { user } = useAuth();
+  const { user, isSuperAdmin } = useAuth();
   const { addProject } = useProjects();
   const { addFile } = useFiles();
   const router = useRouter();
   const { toast } = useToast();
   const { data: myCompanies = [] } = trpc.user.listMyCompanies.useQuery(
     undefined,
-    { enabled: !!user?.id }
+    { enabled: !!user?.id && !isSuperAdmin }
   );
+  const { data: allCompanies = [] } = trpc.company.list.useQuery(
+    undefined,
+    { enabled: !!user?.id && isSuperAdmin }
+  );
+  // Super admin (mesmo "visualizando como cliente") pode escolher/importar para qualquer empresa
+  const companyOptions = isSuperAdmin ? allCompanies : myCompanies;
 
   const {
     areas: PROJECT_AREAS,
@@ -282,10 +288,10 @@ export default function SolicitarProjetoPage() {
   const isFirstStep = stepIndex === 0;
 
   useEffect(() => {
-    if (myCompanies.length === 1 && !selectedCompanyId) {
-      setSelectedCompanyId(myCompanies[0].id);
+    if (companyOptions.length === 1 && !selectedCompanyId) {
+      setSelectedCompanyId(companyOptions[0].id);
     }
-  }, [myCompanies, selectedCompanyId]);
+  }, [companyOptions, selectedCompanyId]);
 
   const progress = useMemo(
     () => ((stepIndex + 1) / STEPS.length) * 100,
@@ -335,7 +341,7 @@ export default function SolicitarProjetoPage() {
     const result = parseSolicitacaoXml(xmlText, {
       areas: PROJECT_AREAS,
       themesByArea: PROJECT_THEMES_BY_AREA,
-      companies: myCompanies,
+      companies: companyOptions,
     });
 
     if (!result.ok) {
@@ -404,7 +410,7 @@ export default function SolicitarProjetoPage() {
       return;
     }
 
-    if (myCompanies.length > 1 && !selectedCompanyId) {
+    if (companyOptions.length > 1 && !selectedCompanyId) {
       toast({
         title: "Selecione uma empresa",
         description: "Escolha para qual empresa este projeto é.",
@@ -579,17 +585,17 @@ export default function SolicitarProjetoPage() {
                   )}
                 </div>
 
-                {myCompanies.length > 0 && (
+                {companyOptions.length > 0 && (
                   <div className="space-y-2">
                     <Label htmlFor="companyId">
                       Empresa{" "}
-                      {myCompanies.length > 1 && (
+                      {companyOptions.length > 1 && (
                         <span className="text-destructive">*</span>
                       )}
                     </Label>
-                    {myCompanies.length === 1 ? (
+                    {companyOptions.length === 1 ? (
                       <div className="rounded-md border border-border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
-                        {myCompanies[0].name}
+                        {companyOptions[0].name}
                       </div>
                     ) : (
                       <Select
@@ -600,7 +606,7 @@ export default function SolicitarProjetoPage() {
                           <SelectValue placeholder="Selecione a empresa" />
                         </SelectTrigger>
                         <SelectContent>
-                          {myCompanies.map((company) => (
+                          {companyOptions.map((company) => (
                             <SelectItem key={company.id} value={company.id}>
                               {company.name}
                             </SelectItem>
