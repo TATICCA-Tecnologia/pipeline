@@ -63,6 +63,7 @@ export function ProjectCard({
       {canSeeSlide && (
         <button
           type="button"
+          onPointerDown={(e) => e.stopPropagation()}
           onClick={(e) => {
             e.stopPropagation();
             openModal(
