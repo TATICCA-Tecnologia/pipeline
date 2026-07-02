@@ -18,10 +18,12 @@ import { Badge } from "@/src/shared/components/ui/badge";
 import { Button } from "@/src/shared/components/ui/button";
 import { ScrollArea } from "@/src/shared/components/ui/scroll-area";
 import { Separator } from "@/src/shared/components/ui/separator";
-import { Calendar, FileText, Clock, AlertTriangle, LayoutList, MessageSquare } from "lucide-react";
+import { Calendar, FileText, Clock, AlertTriangle, LayoutList, MessageSquare, Presentation } from "lucide-react";
 import Link from "next/link";
 import { ExternalLink } from "lucide-react";
 import { toast } from "sonner";
+import { useModal } from "@/shared/context/modal-context";
+import { ProjectExecutiveSlideModal } from "../admin/projetos/_components/project-executive-slide.modal";
 import {
   CompanyFilter,
   filterProjectsByCompany,
@@ -38,6 +40,7 @@ const DEVELOPER_COLUMNS: ProjectStatus[] = [
 export default function DesenvolvedorDashboard() {
   const { user } = useAuth();
   const { projects, moveProject } = useProjects();
+  const { openModal } = useModal();
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [companyFilter, setCompanyFilter] = useState(ALL_COMPANIES_VALUE);
 
@@ -228,6 +231,23 @@ export default function DesenvolvedorDashboard() {
                       <ExternalLink className="h-3 w-3 ml-auto" />
                     </Button>
                   </Link>
+                  <Button
+                    variant="outline"
+                    className="w-full gap-2"
+                    onClick={() => {
+                      const project = selectedProject;
+                      setSelectedProject(null);
+                      openModal(
+                        `project-executive-slide-${project.id}`,
+                        ProjectExecutiveSlideModal,
+                        { project },
+                        { size: "full", position: "center" }
+                      );
+                    }}
+                  >
+                    <Presentation className="h-4 w-4" />
+                    Slide Executivo
+                  </Button>
                 </div>
 
                 <Separator />
