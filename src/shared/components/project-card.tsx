@@ -5,7 +5,10 @@ import { Badge } from "@/src/shared/components/ui/badge";
 import type { Project } from "@/shared/types";
 import { STATUS_CONFIG, PRIORITY_CONFIG } from "@/shared/types";
 import { formatDate } from "@/shared/utils";
-import { Calendar, ArrowRight } from "lucide-react";
+import { Calendar, ArrowRight, Presentation } from "lucide-react";
+import { useAuth } from "@/shared/context/auth-context";
+import { useModal } from "@/shared/context/modal-context";
+import { ProjectExecutiveSlideModal } from "@/src/app/(private)/admin/projetos/_components/project-executive-slide.modal";
 
 interface ProjectCardProps {
   project: Project;
@@ -31,6 +34,10 @@ export function ProjectCard({
 }: ProjectCardProps) {
   const priorityConfig = PRIORITY_CONFIG[project.priority];
   const statusConfig = STATUS_CONFIG[project.status];
+  const { user } = useAuth();
+  const { openModal } = useModal();
+  const canSeeSlide =
+    user?.role === "admin" || user?.role === "developer" || user?.role === "super_admin";
 
   return (
     <Card
@@ -52,6 +59,25 @@ export function ProjectCard({
           "opacity-0 group-hover:opacity-100",
         ].join(" ")}
       />
+
+      {canSeeSlide && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            openModal(
+              `project-executive-slide-${project.id}`,
+              ProjectExecutiveSlideModal,
+              { project },
+              { size: "full", position: "center" }
+            );
+          }}
+          className="absolute top-1.5 right-1.5 z-10 rounded-md bg-background/80 p-1 text-muted-foreground opacity-0 backdrop-blur-sm transition-opacity duration-200 hover:text-primary group-hover:opacity-100"
+          title="Slide Executivo"
+        >
+          <Presentation className="h-3.5 w-3.5" />
+        </button>
+      )}
 
       <CardContent className="space-y-1.5 p-2.5">
         {/* Título + descrição */}
