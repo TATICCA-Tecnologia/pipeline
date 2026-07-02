@@ -234,3 +234,11 @@ export function buildLandingProjectTypeLabel(
   if (!theme?.label) return area.label;
   return `${area.label} - ${theme.label}`;
 }
+
+export function resolveLabel(
+  value: string | null | undefined,
+  options: readonly { value: string; label: string }[]
+): string | undefined {
+  if (!value) return undefined;
+  return options.find((o) => o.value === value)?.label ?? value;
+}
