@@ -1,16 +1,23 @@
 "use client";
 
+import { useState } from "react";
 import { useProjects } from "@/shared/context/projects-context";
 import { KanbanBoard } from "@/shared/components";
 import type { Project, ProjectStatus } from "@/shared/types";
 import { useModal } from "@/shared/context/modal-context";
 import { ProjectDetailsModal } from "../admin/projetos/_components/project-details.modal";
+import {
+  CompanyFilter,
+  filterProjectsByCompany,
+  ALL_COMPANIES_VALUE,
+} from "@/shared/components/company-filter";
 
 export default function ClienteDashboard() {
   const { projects } = useProjects();
   const { openModal } = useModal();
+  const [companyFilter, setCompanyFilter] = useState(ALL_COMPANIES_VALUE);
 
-  const clientProjects = projects;
+  const clientProjects = filterProjectsByCompany(projects, companyFilter);
 
   const visibleColumns: ProjectStatus[] = ["backlog", "in-progress", "completed"];
 
@@ -46,11 +53,18 @@ export default function ClienteDashboard() {
 
   return (
     <div className="space-y-8">
-      <header>
-        <h1 className="text-2xl font-semibold tracking-tight">Meus Projetos</h1>
-        <p className="text-sm text-muted-foreground">
-          Acompanhe o andamento dos seus projetos
-        </p>
+      <header className="flex flex-wrap items-end justify-between gap-2">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Meus Projetos</h1>
+          <p className="text-sm text-muted-foreground">
+            Acompanhe o andamento dos seus projetos
+          </p>
+        </div>
+        <CompanyFilter
+          projects={projects}
+          value={companyFilter}
+          onChange={setCompanyFilter}
+        />
       </header>
 
       <dl className="flex flex-wrap items-end gap-x-10 gap-y-4 border-y border-border/60 py-4">
