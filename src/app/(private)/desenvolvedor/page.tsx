@@ -22,6 +22,11 @@ import { Calendar, FileText, Clock, AlertTriangle, LayoutList, MessageSquare } f
 import Link from "next/link";
 import { ExternalLink } from "lucide-react";
 import { toast } from "sonner";
+import {
+  CompanyFilter,
+  filterProjectsByCompany,
+  ALL_COMPANIES_VALUE,
+} from "@/shared/components/company-filter";
 
 const DEVELOPER_COLUMNS: ProjectStatus[] = [
   "todo",
@@ -34,8 +39,11 @@ export default function DesenvolvedorDashboard() {
   const { user } = useAuth();
   const { projects, moveProject } = useProjects();
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+  const [companyFilter, setCompanyFilter] = useState(ALL_COMPANIES_VALUE);
 
-  const assignedBacklog = projects.filter(
+  const scopedProjects = filterProjectsByCompany(projects, companyFilter);
+
+  const assignedBacklog = scopedProjects.filter(
     (p) =>
       p.status === "backlog" &&
       user?.id != null &&
@@ -49,21 +57,21 @@ export default function DesenvolvedorDashboard() {
 
   const devProjects = [
     ...assignedBacklog,
-    ...projects.filter((p) => p.status !== "backlog"),
+    ...scopedProjects.filter((p) => p.status !== "backlog"),
   ];
 
   const stats = {
-    assigned: projects.filter((p) => p.developerId === user?.id).length,
-    inProgress: projects.filter(
+    assigned: scopedProjects.filter((p) => p.developerId === user?.id).length,
+    inProgress: scopedProjects.filter(
       (p) => p.developerId === user?.id && p.status === "in-progress"
     ).length,
-    review: projects.filter(
+    review: scopedProjects.filter(
       (p) => p.developerId === user?.id && p.status === "review"
     ).length,
   };
 
   const handleMoveProject = (projectId: string, newStatus: ProjectStatus) => {
-    const project = projects.find((p) => p.id === projectId);
+    const project = scopedProjects.find((p) => p.id === projectId);
 
     // Desenvolvedor não pode mover para/de backlog
     if (project?.status === "backlog" || newStatus === "backlog") {
@@ -87,11 +95,18 @@ export default function DesenvolvedorDashboard() {
 
   return (
     <div className="space-y-8">
-      <header>
-        <h1 className="text-2xl font-semibold tracking-tight">Projetos</h1>
-        <p className="text-sm text-muted-foreground">
-          Gerencie e atualize o status dos projetos
-        </p>
+      <header className="flex flex-wrap items-end justify-between gap-2">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Projetos</h1>
+          <p className="text-sm text-muted-foreground">
+            Gerencie e atualize o status dos projetos
+          </p>
+        </div>
+        <CompanyFilter
+          projects={projects}
+          value={companyFilter}
+          onChange={setCompanyFilter}
+        />
       </header>
 
       <dl className="flex flex-wrap items-end gap-x-10 gap-y-4 border-y border-border/60 py-4">
