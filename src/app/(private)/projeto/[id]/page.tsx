@@ -69,6 +69,8 @@ export default function ProjetoPage({ params }: ProjetoPageProps) {
     });
   };
 
+  // features flattened to names here for ProjectDetailSections; the interactive
+  // checklist below reads projectDetails.features directly for id/completedAt.
   const projectFromDetails: Project | undefined = projectDetails
     ? {
         ...(projectDetails as unknown as Project),
