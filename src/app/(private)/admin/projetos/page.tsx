@@ -121,7 +121,7 @@ export default function AdminProjetosPage() {
       ProjectDetailsModal,
       { project },
       {
-        size: "md",
+        size: "full",
         position: "center",
       }
     );

@@ -27,7 +27,7 @@ export default function ClienteDashboard() {
       ProjectDetailsModal,
       { project },
       {
-        size: "md",
+        size: "full",
         position: "center",
       }
     );
