@@ -3,27 +3,23 @@
 import { use, useState } from "react";
 import { useProjects } from "@/shared/context/projects-context";
 import { useAuth } from "@/shared/context/auth-context";
+import type { Project } from "@/shared/types";
+import { ProjectDetailSections } from "@/shared/components/project-detail-sections";
 import { ProjectChat } from "@/shared/components/project-chat";
 import { ProjectFiles } from "@/shared/components/project-files";
 import { Card, CardContent, CardHeader, CardTitle } from "@/src/shared/components/ui/card";
 import { Badge } from "@/src/shared/components/ui/badge";
 import { Button } from "@/src/shared/components/ui/button";
 import { Progress } from "@/src/shared/components/ui/progress";
-import { Separator } from "@/src/shared/components/ui/separator";
 import { ScrollArea } from "@/src/shared/components/ui/scroll-area";
 import { STATUS_CONFIG, PRIORITY_CONFIG } from "@/shared/types";
 import { trpc } from "@/shared/trpc/client";
 import {
   ArrowLeft,
-  Calendar,
-  DollarSign,
   User,
   Building,
   Clock,
   FileText,
-  Target,
-  Users,
-  AlertTriangle,
   CheckSquare,
   Square,
   ChevronDown,
@@ -73,7 +69,14 @@ export default function ProjetoPage({ params }: ProjetoPageProps) {
     });
   };
 
-  const project = projects.find((p) => p.id === id) ?? (projectDetails as any);
+  const projectFromDetails: Project | undefined = projectDetails
+    ? {
+        ...(projectDetails as unknown as Project),
+        features: projectDetails.features?.map((f) => f.name) ?? [],
+      }
+    : undefined;
+  const project: Project | undefined =
+    projectFromDetails ?? projects.find((p) => p.id === id);
 
   if (!project) {
     return (
@@ -124,7 +127,13 @@ export default function ProjetoPage({ params }: ProjetoPageProps) {
           </Button>
         </Link>
         <div>
-          <h1 className="text-2xl font-bold text-foreground">{project.title}</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold text-foreground">{project.title}</h1>
+            <Badge className={statusConfig.color}>{statusConfig.label}</Badge>
+            <Badge variant="outline" className={priorityConfig.color}>
+              {priorityConfig.label}
+            </Badge>
+          </div>
           <p className="text-muted-foreground">Detalhes do projeto</p>
         </div>
       </div>
@@ -132,185 +141,85 @@ export default function ProjetoPage({ params }: ProjetoPageProps) {
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Coluna Principal */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Informações do Projeto */}
+          <ProjectDetailSections project={project} viewerRole={user?.role} />
+
+          {/* Funcionalidades */}
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center justify-between">
+              <CardTitle className="flex items-center justify-between text-base">
                 <span className="flex items-center gap-2">
-                  <FileText className="h-5 w-5" />
-                  Informações
+                  <FileText className="h-4 w-4" />
+                  Funcionalidades
                 </span>
-                <div className="flex gap-2">
-                  <Badge className={statusConfig.color}>{statusConfig.label}</Badge>
-                  <Badge variant="outline" className={priorityConfig.color}>
-                    {priorityConfig.label}
-                  </Badge>
-                </div>
+                {user?.role === "admin" && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      openModal(
+                        `project-add-feature-${project.id}`,
+                        ProjectAddFeatureModal,
+                        { projectId: project.id },
+                        { size: "md", position: "center" }
+                      )
+                    }
+                  >
+                    Adicionar
+                  </Button>
+                )}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div>
-                <h4 className="text-sm font-medium text-muted-foreground mb-1">Descrição</h4>
-                <p className="text-foreground">{project.description}</p>
-              </div>
-
-              <Separator />
-
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="flex items-center gap-2">
-                  <Building className="h-4 w-4 text-muted-foreground" />
-                  <div>
-                    <p className="text-xs text-muted-foreground">Tipo</p>
-                    <p className="text-sm font-medium">{project.projectType}</p>
-                  </div>
-                </div>
-                {project.estimatedDeadline && (
-                  <div className="flex items-center gap-2">
-                    <Calendar className="h-4 w-4 text-muted-foreground" />
-                    <div>
-                      <p className="text-xs text-muted-foreground">Prazo Estimado</p>
-                      <p className="text-sm font-medium">
-                        {new Date(project.estimatedDeadline).toLocaleDateString("pt-BR")}
-                      </p>
-                    </div>
-                  </div>
-                )}
-                {project.estimatedBudget && (
-                  <div className="flex items-center gap-2">
-                    <DollarSign className="h-4 w-4 text-muted-foreground" />
-                    <div>
-                      <p className="text-xs text-muted-foreground">Orçamento</p>
-                      <p className="text-sm font-medium">
-                        R$ {project.estimatedBudget.toLocaleString("pt-BR")}
-                      </p>
-                    </div>
-                  </div>
-                )}
-                <div className="flex items-center gap-2">
-                  <Clock className="h-4 w-4 text-muted-foreground" />
-                  <div>
-                    <p className="text-xs text-muted-foreground">Criado em</p>
-                    <p className="text-sm font-medium">
-                      {new Date(project.createdAt).toLocaleDateString("pt-BR")}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Público, usuários e urgência */}
-              {(project.targetAudience || project.expectedUsers || project.urgency) && (
-                <>
-                  <Separator />
-                  <div className="grid gap-4 sm:grid-cols-3">
-                    {project.targetAudience && (
-                      <div className="flex items-start gap-2">
-                        <Target className="h-4 w-4 text-muted-foreground mt-1" />
-                        <div>
-                          <p className="text-xs text-muted-foreground">Público-alvo</p>
-                          <p className="text-sm font-medium">{project.targetAudience}</p>
-                        </div>
-                      </div>
-                    )}
-                    {project.expectedUsers && (
-                      <div className="flex items-start gap-2">
-                        <Users className="h-4 w-4 text-muted-foreground mt-1" />
-                        <div>
-                          <p className="text-xs text-muted-foreground">Usuários esperados</p>
-                          <p className="text-sm font-medium">{project.expectedUsers}</p>
-                        </div>
-                      </div>
-                    )}
-                    {project.urgency && (
-                      <div className="flex items-start gap-2">
-                        <AlertTriangle className="h-4 w-4 text-muted-foreground mt-1" />
-                        <div>
-                          <p className="text-xs text-muted-foreground">Urgência</p>
-                          <p className="text-sm font-medium capitalize">{project.urgency}</p>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </>
-              )}
-
-              {/* Funcionalidades / Features */}
               {Array.isArray((projectDetails as any)?.features) &&
-                (projectDetails as any).features.length > 0 && (
-                  <>
-                    <Separator />
-                    <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <h4 className="text-sm font-medium text-muted-foreground">
-                          Funcionalidades principais
-                        </h4>
-                        {user?.role === "admin" && (
+              (projectDetails as any).features.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {(projectDetails as any).features.map(
+                    (feature: {
+                      id: string;
+                      name: string;
+                      completedAt?: string | Date;
+                    }) => (
+                      <div
+                        key={feature.id}
+                        className="flex items-center gap-2 rounded-full bg-secondary px-3 py-1"
+                      >
+                        <span className="text-xs font-medium">{feature.name}</span>
+                        {(user?.role === "admin" || user?.role === "developer") && (
                           <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() =>
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6"
+                            onClick={() => {
+                              setSelectedFeature(feature);
                               openModal(
-                                `project-add-feature-${project.id}`,
-                                ProjectAddFeatureModal,
-                                { projectId: project.id },
-                                { size: "md", position: "center" }
-                              )
-                            }
+                                `project-feature-status-${feature.id}`,
+                                ProjectFeatureStatusModal,
+                                {
+                                  projectId: project.id,
+                                  featureId: feature.id,
+                                  featureName: feature.name,
+                                  completedAt: feature.completedAt,
+                                },
+                                { size: "sm", position: "center" }
+                              );
+                            }}
                           >
-                            Adicionar
+                            {feature.completedAt ? (
+                              <CheckSquare className="h-3 w-3 text-emerald-500" />
+                            ) : (
+                              <Square className="h-3 w-3 text-muted-foreground" />
+                            )}
                           </Button>
                         )}
                       </div>
-                      <div className="flex flex-wrap gap-2">
-                        {(projectDetails as any).features.map(
-                          (feature: {
-                            id: string;
-                            name: string;
-                            completedAt?: string | Date;
-                          }) => (
-                            <div
-                              key={feature.id}
-                              className="flex items-center gap-2 rounded-full bg-secondary px-3 py-1"
-                            >
-                              <span className="text-xs font-medium">
-                                {feature.name}
-                              </span>
-                              {(user?.role === "admin" ||
-                                user?.role === "developer") && (
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-6 w-6"
-                                  onClick={() => {
-                                    setSelectedFeature(feature);
-                                    openModal(
-                                      `project-feature-status-${feature.id}`,
-                                      ProjectFeatureStatusModal,
-                                      {
-                                        projectId: project.id,
-                                        featureId: feature.id,
-                                        featureName: feature.name,
-                                        completedAt: feature.completedAt,
-                                      },
-                                      { size: "sm", position: "center" }
-                                    );
-                                  }}
-                                >
-                                  {feature.completedAt ? (
-                                    <CheckSquare className="h-3 w-3 text-emerald-500" />
-                                  ) : (
-                                    <Square className="h-3 w-3 text-muted-foreground" />
-                                  )}
-                                </Button>
-                              )}
-                            </div>
-                          )
-                        )}
-                      </div>
-                    </div>
-                  </>
-                )}
-
-              <Separator />
+                    )
+                  )}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Nenhuma funcionalidade cadastrada ainda.
+                </p>
+              )}
 
               <div>
                 <div className="flex items-center justify-between mb-1">
