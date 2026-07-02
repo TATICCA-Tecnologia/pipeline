@@ -6,8 +6,10 @@ import type { Project } from "@/shared/types";
 import { Button } from "@/src/shared/components/ui/button";
 import { ProjectDetailSections } from "@/shared/components/project-detail-sections";
 import { useAuth } from "@/shared/context/auth-context";
+import { useModal } from "@/shared/context/modal-context";
 import { trpc } from "@/shared/trpc/client";
-import { Loader2 } from "lucide-react";
+import { Loader2, Presentation } from "lucide-react";
+import { ProjectExecutiveSlideModal } from "./project-executive-slide.modal";
 
 interface ProjectDetailsModalData {
   project: Project;
@@ -18,6 +20,7 @@ export function ProjectDetailsModal({
   onClose,
 }: ModalProps<ProjectDetailsModalData>) {
   const { user } = useAuth();
+  const { openModal } = useModal();
   const { data: fullProject, isLoading } = trpc.project.byId.useQuery(
     { id: data?.project.id ?? "" },
     { enabled: !!data?.project.id }
@@ -61,6 +64,26 @@ export function ProjectDetailsModal({
           Fechar
         </Button>
         <div className="flex gap-2">
+          {(user?.role === "admin" ||
+            user?.role === "developer" ||
+            user?.role === "super_admin") && (
+            <Button
+              variant="outline"
+              className="cursor-pointer"
+              onClick={() => {
+                onClose();
+                openModal(
+                  `project-executive-slide-${project.id}`,
+                  ProjectExecutiveSlideModal,
+                  { project },
+                  { size: "full", position: "center" }
+                );
+              }}
+            >
+              <Presentation className="mr-1.5 h-4 w-4" />
+              Slide Executivo
+            </Button>
+          )}
           <Button variant="outline" className="cursor-pointer" onClick={() => onClose()}>
             <Link href={`/admin/projetos/${project.id}/especificacao`}>Especificação</Link>
           </Button>
