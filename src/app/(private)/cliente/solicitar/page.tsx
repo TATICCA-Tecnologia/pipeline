@@ -51,6 +51,7 @@ import {
   PROCESS_FREQUENCIES,
   PROCESS_FREQUENCY_MULTIPLIERS,
   HAS_EXISTING_SYSTEM_OPTIONS,
+  HAS_CURRENT_APPLICATION_OPTIONS,
   BENEFIT_OPTIONS,
 } from "./utils/solicitar.utils";
 import { useTaxonomy } from "./utils/use-taxonomy";
@@ -109,6 +110,8 @@ const STEPS: StepDef[] = [
       "expectedUsers",
       "hasExistingSystem",
       "existingSystemDetails",
+      "hasCurrentApplication",
+      "currentApplicationDetails",
     ],
   },
   {
@@ -209,6 +212,8 @@ export default function SolicitarProjetoPage() {
       expectedUsers: "",
       hasExistingSystem: "",
       existingSystemDetails: "",
+      hasCurrentApplication: "",
+      currentApplicationDetails: "",
       peopleInvolved: "",
       taskDurationHours: "",
       processFrequency: "",
@@ -239,6 +244,7 @@ export default function SolicitarProjetoPage() {
   const projectArea = watch("projectArea");
   const projectTheme = watch("projectTheme");
   const targetAudience = watch("targetAudience");
+  const hasCurrentApplication = watch("hasCurrentApplication");
   const taskDurationHours = watch("taskDurationHours");
   const processFrequency = watch("processFrequency");
 
@@ -876,6 +882,42 @@ export default function SolicitarProjetoPage() {
                     rows={4}
                   />
                 </div>
+
+                <div className="space-y-2">
+                  <Label>Já existe uma aplicação (app/sistema) para esse processo hoje?</Label>
+                  <Controller
+                    control={control}
+                    name="hasCurrentApplication"
+                    render={({ field }) => (
+                      <Select value={field.value} onValueChange={field.onChange}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {HAS_CURRENT_APPLICATION_OPTIONS.map((option) => (
+                            <SelectItem key={option.value} value={option.value}>
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
+                </div>
+
+                {hasCurrentApplication === "sim" && (
+                  <div className="space-y-2">
+                    <Label htmlFor="currentApplicationDetails">
+                      Detalhes da aplicação existente
+                    </Label>
+                    <Textarea
+                      id="currentApplicationDetails"
+                      {...register("currentApplicationDetails")}
+                      placeholder="Qual plataforma, quem desenvolveu, desde quando está em uso..."
+                      rows={4}
+                    />
+                  </div>
+                )}
 
                 <div className="space-y-2 border-t border-border pt-5">
                   <Label className="text-xs uppercase tracking-wider text-muted-foreground">

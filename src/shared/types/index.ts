@@ -49,6 +49,8 @@ export interface Project {
   additionalInfo?: string;
   hasExistingSystem?: string;
   existingSystemDetails?: string;
+  hasCurrentApplication?: string;
+  currentApplicationDetails?: string;
   projectNarrative?: string;
   benefits?: string[];
   benefitsDetails?: string;

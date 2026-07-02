@@ -22,6 +22,8 @@ export const solicitarProjetoSchema = z
     expectedUsers: z.string().optional().default(""),
     hasExistingSystem: z.string().optional().default(""),
     existingSystemDetails: z.string().optional().default(""),
+    hasCurrentApplication: z.string().optional().default(""),
+    currentApplicationDetails: z.string().optional().default(""),
     peopleInvolved: z.string().optional().default(""),
     taskDurationHours: z.string().optional().default(""),
     processFrequency: z.string().optional().default(""),

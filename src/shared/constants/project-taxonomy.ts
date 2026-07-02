@@ -114,6 +114,11 @@ export const HAS_EXISTING_SYSTEM_OPTIONS = [
   { value: "sim-melhorar", label: "Sim, quero melhorar o existente" },
 ];
 
+export const HAS_CURRENT_APPLICATION_OPTIONS = [
+  { value: "sim", label: "Sim" },
+  { value: "nao", label: "Não" },
+];
+
 export const BENEFIT_OPTIONS = [
   {
     key: "reducao-trabalho-operacional",

@@ -9,6 +9,7 @@ import {
   URGENCY_LEVELS,
   PROCESS_FREQUENCIES,
   HAS_EXISTING_SYSTEM_OPTIONS,
+  HAS_CURRENT_APPLICATION_OPTIONS,
   BENEFIT_OPTIONS,
 } from "../utils/solicitar.utils";
 import { useTaxonomy } from "../utils/use-taxonomy";
@@ -79,6 +80,19 @@ export default function AjudaXmlPage() {
       tag: "detalhesProcessoAtual",
       required: false,
       description: "Como o processo funciona hoje e o que costuma dar errado.",
+    },
+    {
+      tag: "aplicacaoExistenteHoje",
+      required: false,
+      description:
+        "Se já existe uma aplicação (app/sistema) para esse processo hoje. Um valor não reconhecido gera erro (não existe opção Outro para este campo).",
+      acceptedValues: HAS_CURRENT_APPLICATION_OPTIONS.map((o) => o.label),
+    },
+    {
+      tag: "detalhesAplicacaoExistente",
+      required: false,
+      description:
+        "Detalhes da aplicação existente: plataforma usada, quem desenvolveu, desde quando está em uso, etc. Preencha só se aplicacaoExistenteHoje for Sim.",
     },
     {
       tag: "colaboradoresEnvolvidos",

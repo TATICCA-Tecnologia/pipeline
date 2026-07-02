@@ -66,6 +66,8 @@ export function buildProjectPayload(params: {
     additionalInfo: data.additionalInfo || undefined,
     hasExistingSystem: data.hasExistingSystem || undefined,
     existingSystemDetails: data.existingSystemDetails || undefined,
+    hasCurrentApplication: data.hasCurrentApplication || undefined,
+    currentApplicationDetails: data.currentApplicationDetails || undefined,
     projectNarrative: data.projectNarrative || undefined,
     benefits: benefits.length ? benefits : undefined,
     benefitsDetails: data.benefitsDetails || undefined,

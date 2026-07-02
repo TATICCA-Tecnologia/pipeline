@@ -146,6 +146,8 @@ model Project {
   additionalInfo        String?
   hasExistingSystem     String? // "nao" | "sim-substituir" | "sim-integrar" | "sim-melhorar"
   existingSystemDetails String?
+  hasCurrentApplication     String? // "sim" | "nao" - já existe uma aplicação/app para o processo hoje
+  currentApplicationDetails String?
   projectNarrative      String?
 
   // Beneficios e impacto esperado

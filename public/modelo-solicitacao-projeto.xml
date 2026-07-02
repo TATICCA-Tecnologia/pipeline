@@ -10,6 +10,8 @@
   <numeroUsuarios></numeroUsuarios>
   <processoExistente></processoExistente>
   <detalhesProcessoAtual></detalhesProcessoAtual>
+  <aplicacaoExistenteHoje></aplicacaoExistenteHoje>
+  <detalhesAplicacaoExistente></detalhesAplicacaoExistente>
   <colaboradoresEnvolvidos></colaboradoresEnvolvidos>
   <duracaoPorExecucao></duracaoPorExecucao>
   <periodicidade></periodicidade>

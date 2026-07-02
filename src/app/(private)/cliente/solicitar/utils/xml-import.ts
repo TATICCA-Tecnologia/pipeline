@@ -6,6 +6,7 @@ import {
   DEFAULT_PLATFORM_VALUE,
   PROCESS_FREQUENCIES,
   HAS_EXISTING_SYSTEM_OPTIONS,
+  HAS_CURRENT_APPLICATION_OPTIONS,
   BENEFIT_OPTIONS,
 } from "./solicitar.utils";
 
@@ -170,6 +171,22 @@ export function parseSolicitacaoXml(
 
   const existingSystemDetails = getDirectChildText(root, "detalhesProcessoAtual");
 
+  // <aplicacaoExistenteHoje> — sem fallback "Outro"
+  const aplicacaoExistenteTag = getDirectChildText(root, "aplicacaoExistenteHoje");
+  let hasCurrentApplication = "";
+  if (aplicacaoExistenteTag) {
+    const match = matchByLabel(aplicacaoExistenteTag, HAS_CURRENT_APPLICATION_OPTIONS);
+    if (!match) {
+      return {
+        ok: false,
+        error: `A tag <aplicacaoExistenteHoje> tem o valor '${aplicacaoExistenteTag}', que não é reconhecido. Valores aceitos: ${HAS_CURRENT_APPLICATION_OPTIONS.map((o) => o.label).join(", ")}.`,
+      };
+    }
+    hasCurrentApplication = match.value;
+  }
+
+  const currentApplicationDetails = getDirectChildText(root, "detalhesAplicacaoExistente");
+
   // <colaboradoresEnvolvidos>
   const colaboradoresTag = getDirectChildText(root, "colaboradoresEnvolvidos");
   let peopleInvolved = "";
@@ -321,6 +338,8 @@ export function parseSolicitacaoXml(
     expectedUsers: numeroUsuarios,
     hasExistingSystem,
     existingSystemDetails,
+    hasCurrentApplication,
+    currentApplicationDetails,
     peopleInvolved,
     taskDurationHours,
     processFrequency,
