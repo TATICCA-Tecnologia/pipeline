@@ -221,3 +221,24 @@
   transition: all 0.15s ease;
   pointer-events: none;
 }
+
+@media print {
+  @page {
+    size: landscape;
+  }
+  body * {
+    visibility: hidden;
+  }
+  .executive-slide-print-root,
+  .executive-slide-print-root * {
+    visibility: visible;
+  }
+  .executive-slide-print-root {
+    position: fixed;
+    inset: 0;
+    margin: 0;
+    box-shadow: none;
+    max-width: none;
+    aspect-ratio: auto;
+  }
+}
