@@ -35,6 +35,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/src/shared/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/src/shared/components/ui/dialog";
 import { useToast } from "@/src/shared/hooks/use-toast";
 import { trpc } from "@/shared/trpc/client";
 import { useZodForm } from "@/shared/hooks/use-zod-form";
@@ -280,6 +288,13 @@ export default function SolicitarProjetoPage() {
   const [xmlImportOutcome, setXmlImportOutcome] = useState<
     { ok: boolean; title: string; message: string } | null
   >(null);
+  const [pendingXmlImport, setPendingXmlImport] = useState<{
+    formData: SolicitarProjetoFormData;
+    features: string[];
+    benefits: string[];
+    rawCompanyName: string;
+  } | null>(null);
+  const [chosenCompanyId, setChosenCompanyId] = useState<string | undefined>();
   const [selectedCompanyId, setSelectedCompanyId] = useState<string | undefined>();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const xmlInputRef = useRef<HTMLInputElement>(null);
@@ -324,6 +339,41 @@ export default function SolicitarProjetoPage() {
     setAttachedFiles(Array.from(files));
   }
 
+  async function createProjectFromXml(
+    parsed: { formData: SolicitarProjetoFormData; features: string[]; benefits: string[] },
+    companyId: string | undefined
+  ) {
+    if (!user?.id) return;
+    setIsSubmitting(true);
+    try {
+      const payload = buildProjectPayload({
+        data: parsed.formData,
+        features: parsed.features,
+        benefits: parsed.benefits,
+        clientId: user.id,
+        companyId,
+        areas: PROJECT_AREAS,
+        themesByArea: PROJECT_THEMES_BY_AREA,
+        buildTypeLabel: buildClienteProjectTypeLabel,
+      });
+      await addProject(payload);
+
+      setXmlImportOutcome({
+        ok: true,
+        title: "Solicitação enviada",
+        message: `O processo "${parsed.formData.title}" foi criado e está no backlog.`,
+      });
+    } catch {
+      setXmlImportOutcome({
+        ok: false,
+        title: "Erro ao salvar",
+        message: "Não foi possível criar o processo. Tente novamente.",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
   async function handleImportXmlFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     e.target.value = "";
@@ -363,34 +413,31 @@ export default function SolicitarProjetoPage() {
       return;
     }
 
-    setIsSubmitting(true);
-    try {
-      const payload = buildProjectPayload({
-        data: result.formData,
+    if (result.companyUnresolved) {
+      if (companyOptions.length === 0) {
+        setXmlImportOutcome({
+          ok: false,
+          title: "Erro ao importar XML",
+          message: result.rawCompanyName
+            ? `A tag <empresa> tem o valor '${result.rawCompanyName}', mas não há nenhuma empresa disponível para associar este processo.`
+            : "Não há nenhuma empresa disponível para associar este processo.",
+        });
+        return;
+      }
+      setPendingXmlImport({
+        formData: result.formData,
         features: result.features,
         benefits: result.benefits,
-        clientId: user.id,
-        companyId: result.companyId,
-        areas: PROJECT_AREAS,
-        themesByArea: PROJECT_THEMES_BY_AREA,
-        buildTypeLabel: buildClienteProjectTypeLabel,
+        rawCompanyName: result.rawCompanyName,
       });
-      await addProject(payload);
-
-      setXmlImportOutcome({
-        ok: true,
-        title: "Solicitação enviada",
-        message: `O processo "${result.formData.title}" foi criado e está no backlog.`,
-      });
-    } catch {
-      setXmlImportOutcome({
-        ok: false,
-        title: "Erro ao salvar",
-        message: "Não foi possível criar o processo. Tente novamente.",
-      });
-    } finally {
-      setIsSubmitting(false);
+      setChosenCompanyId(companyOptions.length === 1 ? companyOptions[0].id : undefined);
+      return;
     }
+
+    await createProjectFromXml(
+      { formData: result.formData, features: result.features, benefits: result.benefits },
+      result.companyId
+    );
   }
 
   async function goNext() {
@@ -1297,6 +1344,66 @@ export default function SolicitarProjetoPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog
+        open={pendingXmlImport !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setPendingXmlImport(null);
+            setChosenCompanyId(undefined);
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Selecione a empresa</DialogTitle>
+            <DialogDescription>
+              {pendingXmlImport?.rawCompanyName
+                ? `O XML indica a empresa "${pendingXmlImport.rawCompanyName}", que não corresponde a nenhuma empresa disponível.`
+                : "O XML não indica uma empresa."}{" "}
+              Escolha para qual empresa este processo deve ser criado.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label>Empresa</Label>
+            <Select value={chosenCompanyId} onValueChange={setChosenCompanyId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione a empresa" />
+              </SelectTrigger>
+              <SelectContent>
+                {companyOptions.map((company) => (
+                  <SelectItem key={company.id} value={company.id}>
+                    {company.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setPendingXmlImport(null);
+                setChosenCompanyId(undefined);
+              }}
+            >
+              Cancelar
+            </Button>
+            <Button
+              disabled={!chosenCompanyId || isSubmitting}
+              onClick={async () => {
+                if (!pendingXmlImport || !chosenCompanyId) return;
+                const parsed = pendingXmlImport;
+                setPendingXmlImport(null);
+                await createProjectFromXml(parsed, chosenCompanyId);
+                setChosenCompanyId(undefined);
+              }}
+            >
+              Confirmar e criar processo
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </TooltipProvider>
   );
 }

@@ -33,7 +33,7 @@ export default function AjudaXmlPage() {
       tag: "empresa",
       required: false,
       description:
-        "Nome de uma das empresas vinculadas a você. Se você só tiver uma empresa, pode deixar vazio.",
+        "Nome de uma das empresas disponíveis para você. Se você só tiver uma empresa, pode deixar vazio. Se o valor não corresponder a nenhuma empresa, a importação não falha — você escolhe manualmente a empresa correta antes de o processo ser criado.",
     },
     { tag: "titulo", required: true, description: "Nome do processo." },
     {

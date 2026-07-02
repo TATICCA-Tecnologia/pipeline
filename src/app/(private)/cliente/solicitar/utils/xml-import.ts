@@ -23,6 +23,10 @@ export type XmlImportResult =
       features: string[];
       benefits: string[];
       companyId: string | undefined;
+      /** true quando <empresa> não bateu com nenhuma empresa disponível e precisa de escolha manual */
+      companyUnresolved: boolean;
+      /** valor bruto da tag <empresa>, pra exibir contexto quando companyUnresolved */
+      rawCompanyName: string;
     }
   | { ok: false; error: string };
 
@@ -82,29 +86,24 @@ export function parseSolicitacaoXml(
     return { ok: false, error: "A tag <descricao> é obrigatória e não pode ficar vazia." };
   }
 
-  // <empresa>
+  // <empresa> — se não bater com nenhuma opção, não bloqueia o import: fica marcado
+  // como "companyUnresolved" pra quem chama decidir (ex.: pedir escolha manual).
   const empresaTag = getDirectChildText(root, "empresa");
   let companyId: string | undefined;
+  let companyUnresolved = false;
   if (empresaTag) {
     const match = context.companies.find(
       (c) => c.name.trim().toLowerCase() === empresaTag.toLowerCase()
     );
-    if (!match) {
-      const names =
-        context.companies.map((c) => c.name).join(", ") || "(nenhuma empresa vinculada a você)";
-      return {
-        ok: false,
-        error: `A tag <empresa> tem o valor '${empresaTag}', que não corresponde a nenhuma empresa vinculada a você. Empresas disponíveis: ${names}.`,
-      };
+    if (match) {
+      companyId = match.id;
+    } else {
+      companyUnresolved = true;
     }
-    companyId = match.id;
   } else if (context.companies.length === 1) {
     companyId = context.companies[0].id;
-  } else if (context.companies.length > 1) {
-    return {
-      ok: false,
-      error: `A tag <empresa> está vazia, mas você está vinculado a mais de uma empresa. Informe uma das seguintes: ${context.companies.map((c) => c.name).join(", ")}.`,
-    };
+  } else {
+    companyUnresolved = true;
   }
 
   // <area> / <tema> — com fallback "Outro"
@@ -356,5 +355,13 @@ export function parseSolicitacaoXml(
     additionalInfo,
   };
 
-  return { ok: true, formData, features, benefits, companyId };
+  return {
+    ok: true,
+    formData,
+    features,
+    benefits,
+    companyId,
+    companyUnresolved,
+    rawCompanyName: empresaTag,
+  };
 }
