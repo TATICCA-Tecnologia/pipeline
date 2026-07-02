@@ -52,6 +52,20 @@ function mapProject(p: {
   expectedUsers?: string | null;
   urgency?: string | null;
   features?: string[] | null;
+  additionalInfo?: string | null;
+  hasExistingSystem?: string | null;
+  existingSystemDetails?: string | null;
+  hasCurrentApplication?: string | null;
+  currentApplicationDetails?: string | null;
+  projectNarrative?: string | null;
+  benefits?: string[] | null;
+  benefitsDetails?: string | null;
+  monthlyHoursSaved?: number | null;
+  ratingErrorReduction?: number | null;
+  ratingProcessCriticality?: number | null;
+  ratingInternalImpact?: number | null;
+  ratingExternalImpact?: number | null;
+  ratingCompliance?: number | null;
   peopleInvolved?: number | null;
   peopleInvolvedDetails?: string | null;
   taskDurationHours?: number | null;
@@ -79,6 +93,20 @@ function mapProject(p: {
     expectedUsers: p.expectedUsers ?? undefined,
     urgency: p.urgency ?? undefined,
     features: p.features ?? [],
+    additionalInfo: p.additionalInfo ?? undefined,
+    hasExistingSystem: p.hasExistingSystem ?? undefined,
+    existingSystemDetails: p.existingSystemDetails ?? undefined,
+    hasCurrentApplication: p.hasCurrentApplication ?? undefined,
+    currentApplicationDetails: p.currentApplicationDetails ?? undefined,
+    projectNarrative: p.projectNarrative ?? undefined,
+    benefits: p.benefits ?? undefined,
+    benefitsDetails: p.benefitsDetails ?? undefined,
+    monthlyHoursSaved: p.monthlyHoursSaved ?? undefined,
+    ratingErrorReduction: p.ratingErrorReduction ?? undefined,
+    ratingProcessCriticality: p.ratingProcessCriticality ?? undefined,
+    ratingInternalImpact: p.ratingInternalImpact ?? undefined,
+    ratingExternalImpact: p.ratingExternalImpact ?? undefined,
+    ratingCompliance: p.ratingCompliance ?? undefined,
     peopleInvolved: p.peopleInvolved ?? undefined,
     peopleInvolvedDetails: p.peopleInvolvedDetails ?? undefined,
     taskDurationHours: p.taskDurationHours ?? undefined,
@@ -162,6 +190,8 @@ export function ProjectsProvider({ children }: { children: ReactNode }) {
         additionalInfo: project.additionalInfo,
         hasExistingSystem: project.hasExistingSystem,
         existingSystemDetails: project.existingSystemDetails,
+        hasCurrentApplication: project.hasCurrentApplication,
+        currentApplicationDetails: project.currentApplicationDetails,
         projectNarrative: project.projectNarrative,
         benefits: project.benefits,
         benefitsDetails: project.benefitsDetails,
