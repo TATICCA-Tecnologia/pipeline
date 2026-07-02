@@ -62,6 +62,7 @@ export interface Project {
   ratingCompliance?: number;
   // Diagnostico de processo - operacional (cliente)
   peopleInvolved?: number;
+  peopleInvolvedDetails?: string;
   taskDurationHours?: number;
   processFrequency?: string;
   currentAnnualHours?: number;

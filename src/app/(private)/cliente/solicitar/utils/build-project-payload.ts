@@ -98,6 +98,7 @@ export function buildProjectPayload(params: {
       peopleInvolvedValue !== undefined && Number.isFinite(peopleInvolvedValue)
         ? peopleInvolvedValue
         : undefined,
+    peopleInvolvedDetails: data.peopleInvolvedDetails || undefined,
     taskDurationHours:
       taskDurationHoursValue !== undefined && Number.isFinite(taskDurationHoursValue)
         ? taskDurationHoursValue

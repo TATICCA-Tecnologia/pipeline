@@ -132,6 +132,7 @@ const STEPS: StepDef[] = [
       "hasCurrentApplication",
       "customHasCurrentApplication",
       "currentApplicationDetails",
+      "peopleInvolvedDetails",
     ],
   },
   {
@@ -245,6 +246,7 @@ export default function SolicitarProjetoPage() {
       customHasCurrentApplication: "",
       currentApplicationDetails: "",
       peopleInvolved: "",
+      peopleInvolvedDetails: "",
       taskDurationHours: "",
       processFrequency: "",
       customProcessFrequency: "",
@@ -304,6 +306,7 @@ export default function SolicitarProjetoPage() {
     features: string[];
     benefits: string[];
     rawCompanyName: string;
+    warnings: string[];
   } | null>(null);
   const [chosenCompanyId, setChosenCompanyId] = useState<string | undefined>();
   const [selectedCompanyId, setSelectedCompanyId] = useState<string | undefined>();
@@ -351,7 +354,12 @@ export default function SolicitarProjetoPage() {
   }
 
   async function createProjectFromXml(
-    parsed: { formData: SolicitarProjetoFormData; features: string[]; benefits: string[] },
+    parsed: {
+      formData: SolicitarProjetoFormData;
+      features: string[];
+      benefits: string[];
+      warnings?: string[];
+    },
     companyId: string | undefined
   ) {
     if (!user?.id) return;
@@ -369,10 +377,14 @@ export default function SolicitarProjetoPage() {
       });
       await addProject(payload);
 
+      const warningsNote =
+        parsed.warnings && parsed.warnings.length > 0
+          ? ` Alguns valores do XML não foram reconhecidos e foram registrados em "Informações adicionais" para revisão.`
+          : "";
       setXmlImportOutcome({
         ok: true,
         title: "Solicitação enviada",
-        message: `O processo "${parsed.formData.title}" foi criado e está no backlog.`,
+        message: `O processo "${parsed.formData.title}" foi criado e está no backlog.${warningsNote}`,
       });
     } catch {
       setXmlImportOutcome({
@@ -440,13 +452,19 @@ export default function SolicitarProjetoPage() {
         features: result.features,
         benefits: result.benefits,
         rawCompanyName: result.rawCompanyName,
+        warnings: result.warnings,
       });
       setChosenCompanyId(companyOptions.length === 1 ? companyOptions[0].id : undefined);
       return;
     }
 
     await createProjectFromXml(
-      { formData: result.formData, features: result.features, benefits: result.benefits },
+      {
+        formData: result.formData,
+        features: result.features,
+        benefits: result.benefits,
+        warnings: result.warnings,
+      },
       result.companyId
     );
   }
@@ -1117,6 +1135,18 @@ export default function SolicitarProjetoPage() {
                         placeholder="Ex.: 4"
                       />
                     </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="peopleInvolvedDetails">
+                      Quem são os colaboradores envolvidos (opcional)
+                    </Label>
+                    <Textarea
+                      id="peopleInvolvedDetails"
+                      {...register("peopleInvolvedDetails")}
+                      placeholder="Nomes, cargos ou áreas das pessoas envolvidas"
+                      rows={2}
+                    />
                   </div>
 
                   <div className="space-y-2">

@@ -157,6 +157,7 @@ model Project {
 
   // Diagnostico de processo - operacional (preenchido pelo cliente, opcional)
   peopleInvolved     Int?    // colaboradores envolvidos na execução manual hoje
+  peopleInvolvedDetails String? // nomes/observações sobre quem está envolvido (texto livre)
   taskDurationHours  Float?  // duração total de cada execução (somando todos os envolvidos), em horas
   processFrequency   String? // "diario" | "duas-vezes-semana" | "tres-vezes-semana" | "semanal" | "mensal" | "anual"
   currentAnnualHours Float?  // calculado: taskDurationHours * multiplicador(processFrequency) - horas gastas HOJE no processo manual

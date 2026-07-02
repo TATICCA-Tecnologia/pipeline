@@ -97,13 +97,20 @@ export default function AjudaXmlPage() {
     {
       tag: "colaboradoresEnvolvidos",
       required: false,
-      description: "Número de colaboradores envolvidos na execução manual hoje (número inteiro).",
+      description:
+        'Quantidade de colaboradores envolvidos na execução manual hoje (número inteiro — não coloque nomes aqui). Se vier um valor que não seja um número, ele é ignorado sem bloquear a importação e o texto original é movido para <detalhesColaboradores>.',
+    },
+    {
+      tag: "detalhesColaboradores",
+      required: false,
+      description:
+        "Nomes, cargos ou observações sobre quem está envolvido no processo (texto livre, separado de colaboradoresEnvolvidos que é só a contagem).",
     },
     {
       tag: "duracaoPorExecucao",
       required: false,
       description:
-        "Duração total de cada execução em horas, somando o tempo de todos os envolvidos, não só de uma pessoa (número).",
+        "Duração total de cada execução em horas, somando o tempo de todos os envolvidos, não só de uma pessoa (número). Um valor inválido é ignorado (não bloqueia a importação) e fica registrado em Informações adicionais.",
     },
     {
       tag: "periodicidade",
@@ -138,32 +145,38 @@ export default function AjudaXmlPage() {
     {
       tag: "horasEconomizadasPorMes",
       required: false,
-      description: "Estimativa de horas economizadas por mês (número).",
+      description:
+        "Estimativa de horas economizadas por mês (número). Um valor inválido é ignorado (não bloqueia a importação) e fica registrado em Informações adicionais.",
     },
     {
       tag: "avaliacaoReducaoErros",
       required: false,
-      description: "Avaliação de 1 a 5 do quanto o processo reduz erros.",
+      description:
+        "Avaliação de 1 a 5 do quanto o processo reduz erros. Um valor fora de 1-5 é ignorado (não bloqueia a importação) e fica registrado em Informações adicionais.",
     },
     {
       tag: "avaliacaoCriticidadeProcesso",
       required: false,
-      description: "Avaliação de 1 a 5 da criticidade do processo para a empresa.",
+      description:
+        "Avaliação de 1 a 5 da criticidade do processo para a empresa. Um valor fora de 1-5 é ignorado (não bloqueia a importação) e fica registrado em Informações adicionais.",
     },
     {
       tag: "avaliacaoImpactoInterno",
       required: false,
-      description: "Avaliação de 1 a 5 do impacto interno na própria área.",
+      description:
+        "Avaliação de 1 a 5 do impacto interno na própria área. Um valor fora de 1-5 é ignorado (não bloqueia a importação) e fica registrado em Informações adicionais.",
     },
     {
       tag: "avaliacaoImpactoExterno",
       required: false,
-      description: "Avaliação de 1 a 5 do impacto externo (clientes/fornecedores).",
+      description:
+        "Avaliação de 1 a 5 do impacto externo (clientes/fornecedores). Um valor fora de 1-5 é ignorado (não bloqueia a importação) e fica registrado em Informações adicionais.",
     },
     {
       tag: "avaliacaoAtendimentoPoliticas",
       required: false,
-      description: "Avaliação de 1 a 5 do atendimento a políticas e leis.",
+      description:
+        "Avaliação de 1 a 5 do atendimento a políticas e leis. Um valor fora de 1-5 é ignorado (não bloqueia a importação) e fica registrado em Informações adicionais.",
     },
     {
       tag: "urgencia",
@@ -172,7 +185,12 @@ export default function AjudaXmlPage() {
         'Nível de urgência. Se não corresponder a nenhuma opção conhecida, é tratado como "Outro".',
       acceptedValues: URGENCY_LEVELS.map((u) => u.label),
     },
-    { tag: "prazoLimite", required: false, description: "Data limite desejada, no formato AAAA-MM-DD." },
+    {
+      tag: "prazoLimite",
+      required: false,
+      description:
+        "Data limite desejada, no formato AAAA-MM-DD. Um valor em formato diferente é ignorado (não bloqueia a importação) e fica registrado em Informações adicionais.",
+    },
     {
       tag: "informacoesAdicionais",
       required: false,

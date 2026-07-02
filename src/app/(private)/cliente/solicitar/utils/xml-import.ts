@@ -27,6 +27,8 @@ export type XmlImportResult =
       companyUnresolved: boolean;
       /** valor bruto da tag <empresa>, pra exibir contexto quando companyUnresolved */
       rawCompanyName: string;
+      /** avisos de campos que não puderam ser interpretados e foram ignorados/realocados, sem bloquear o import */
+      warnings: string[];
     }
   | { ok: false; error: string };
 
@@ -75,6 +77,9 @@ export function parseSolicitacaoXml(
   if (!root || root.tagName !== "solicitacaoDeProjeto") {
     return { ok: false, error: "A tag raiz do arquivo deve ser <solicitacaoDeProjeto>." };
   }
+
+  // Avisos de campos que não bloqueiam o import (valor ignorado e, quando possível, preservado em outro campo)
+  const warnings: string[] = [];
 
   const titulo = getDirectChildText(root, "titulo");
   if (!titulo) {
@@ -174,18 +179,24 @@ export function parseSolicitacaoXml(
 
   const currentApplicationDetails = getDirectChildText(root, "detalhesAplicacaoExistente");
 
-  // <colaboradoresEnvolvidos>
+  // <colaboradoresEnvolvidos> — deve ser um número (contagem). Se vier texto (ex.: nomes),
+  // não bloqueia o import: o número fica vazio e o texto é preservado em <detalhesColaboradores>.
   const colaboradoresTag = getDirectChildText(root, "colaboradoresEnvolvidos");
+  const detalhesColaboradoresTag = getDirectChildText(root, "detalhesColaboradores");
   let peopleInvolved = "";
+  let peopleInvolvedDetails = detalhesColaboradoresTag;
   if (colaboradoresTag) {
     const n = Number(colaboradoresTag);
     if (!Number.isInteger(n) || n < 0) {
-      return {
-        ok: false,
-        error: `A tag <colaboradoresEnvolvidos> deve ser um número inteiro maior ou igual a zero. Valor recebido: '${colaboradoresTag}'.`,
-      };
+      peopleInvolvedDetails = [detalhesColaboradoresTag, colaboradoresTag]
+        .filter(Boolean)
+        .join(" | ");
+      warnings.push(
+        `<colaboradoresEnvolvidos> esperava um número e recebeu '${colaboradoresTag}'; o texto foi movido para os detalhes dos colaboradores envolvidos.`
+      );
+    } else {
+      peopleInvolved = String(n);
     }
-    peopleInvolved = String(n);
   }
 
   // <duracaoPorExecucao>
@@ -194,12 +205,12 @@ export function parseSolicitacaoXml(
   if (duracaoTag) {
     const n = Number(duracaoTag);
     if (!Number.isFinite(n) || n < 0) {
-      return {
-        ok: false,
-        error: `A tag <duracaoPorExecucao> deve ser um número maior ou igual a zero. Valor recebido: '${duracaoTag}'.`,
-      };
+      warnings.push(
+        `<duracaoPorExecucao> deve ser um número maior ou igual a zero; valor '${duracaoTag}' foi ignorado.`
+      );
+    } else {
+      taskDurationHours = String(n);
     }
-    taskDurationHours = String(n);
   }
 
   // <periodicidade> — com fallback "Outro"
@@ -237,47 +248,34 @@ export function parseSolicitacaoXml(
   if (horasTag) {
     const n = Number(horasTag);
     if (!Number.isFinite(n) || n < 0) {
-      return {
-        ok: false,
-        error: `A tag <horasEconomizadasPorMes> deve ser um número maior ou igual a zero. Valor recebido: '${horasTag}'.`,
-      };
+      warnings.push(
+        `<horasEconomizadasPorMes> deve ser um número maior ou igual a zero; valor '${horasTag}' foi ignorado.`
+      );
+    } else {
+      monthlyHoursSaved = String(n);
     }
-    monthlyHoursSaved = String(n);
   }
 
-  // Avaliações 1-5
-  function parseRating(tag: string): { value: number | null } | { error: string } {
+  // Avaliações 1-5 — se o valor não for um inteiro entre 1 e 5, o campo fica em branco
+  // (não bloqueia o import) e um aviso é registrado.
+  function parseRating(tag: string): number | null {
     const text = getDirectChildText(root, tag);
-    if (!text) return { value: null };
+    if (!text) return null;
     const n = Number(text);
     if (!Number.isInteger(n) || n < 1 || n > 5) {
-      return {
-        error: `A tag <${tag}> deve ser um número inteiro entre 1 e 5. Valor recebido: '${text}'.`,
-      };
+      warnings.push(
+        `<${tag}> deve ser um número inteiro entre 1 e 5; valor '${text}' foi ignorado.`
+      );
+      return null;
     }
-    return { value: n };
+    return n;
   }
 
-  const ratingErrorReductionResult = parseRating("avaliacaoReducaoErros");
-  if ("error" in ratingErrorReductionResult) {
-    return { ok: false, error: ratingErrorReductionResult.error };
-  }
-  const ratingProcessCriticalityResult = parseRating("avaliacaoCriticidadeProcesso");
-  if ("error" in ratingProcessCriticalityResult) {
-    return { ok: false, error: ratingProcessCriticalityResult.error };
-  }
-  const ratingInternalImpactResult = parseRating("avaliacaoImpactoInterno");
-  if ("error" in ratingInternalImpactResult) {
-    return { ok: false, error: ratingInternalImpactResult.error };
-  }
-  const ratingExternalImpactResult = parseRating("avaliacaoImpactoExterno");
-  if ("error" in ratingExternalImpactResult) {
-    return { ok: false, error: ratingExternalImpactResult.error };
-  }
-  const ratingComplianceResult = parseRating("avaliacaoAtendimentoPoliticas");
-  if ("error" in ratingComplianceResult) {
-    return { ok: false, error: ratingComplianceResult.error };
-  }
+  const ratingErrorReduction = parseRating("avaliacaoReducaoErros");
+  const ratingProcessCriticality = parseRating("avaliacaoCriticidadeProcesso");
+  const ratingInternalImpact = parseRating("avaliacaoImpactoInterno");
+  const ratingExternalImpact = parseRating("avaliacaoImpactoExterno");
+  const ratingCompliance = parseRating("avaliacaoAtendimentoPoliticas");
 
   // <urgencia> — com fallback "Outro"
   const urgenciaTag = getDirectChildText(root, "urgencia");
@@ -294,15 +292,24 @@ export function parseSolicitacaoXml(
   let deadline = "";
   if (prazoTag) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(prazoTag)) {
-      return {
-        ok: false,
-        error: `A tag <prazoLimite> deve estar no formato AAAA-MM-DD. Valor recebido: '${prazoTag}'.`,
-      };
+      warnings.push(
+        `<prazoLimite> deve estar no formato AAAA-MM-DD; valor '${prazoTag}' foi ignorado.`
+      );
+    } else {
+      deadline = prazoTag;
     }
-    deadline = prazoTag;
   }
 
-  const additionalInfo = getDirectChildText(root, "informacoesAdicionais");
+  const additionalInfoTag = getDirectChildText(root, "informacoesAdicionais");
+  const additionalInfo =
+    warnings.length > 0
+      ? [
+          additionalInfoTag,
+          `Avisos da importação XML (revise se necessário):\n${warnings.map((w) => `- ${w}`).join("\n")}`,
+        ]
+          .filter(Boolean)
+          .join("\n\n")
+      : additionalInfoTag;
 
   const formData: SolicitarProjetoFormData = {
     title: titulo,
@@ -323,16 +330,17 @@ export function parseSolicitacaoXml(
     customHasCurrentApplication,
     currentApplicationDetails,
     peopleInvolved,
+    peopleInvolvedDetails,
     taskDurationHours,
     processFrequency,
     customProcessFrequency,
     benefitsDetails,
     monthlyHoursSaved,
-    ratingErrorReduction: ratingErrorReductionResult.value,
-    ratingProcessCriticality: ratingProcessCriticalityResult.value,
-    ratingInternalImpact: ratingInternalImpactResult.value,
-    ratingExternalImpact: ratingExternalImpactResult.value,
-    ratingCompliance: ratingComplianceResult.value,
+    ratingErrorReduction,
+    ratingProcessCriticality,
+    ratingInternalImpact,
+    ratingExternalImpact,
+    ratingCompliance,
     projectNarrative,
     urgency,
     customUrgency,
@@ -348,5 +356,6 @@ export function parseSolicitacaoXml(
     companyId,
     companyUnresolved,
     rawCompanyName: empresaTag,
+    warnings,
   };
 }

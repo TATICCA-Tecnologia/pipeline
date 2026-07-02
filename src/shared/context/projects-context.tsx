@@ -53,6 +53,7 @@ function mapProject(p: {
   urgency?: string | null;
   features?: string[] | null;
   peopleInvolved?: number | null;
+  peopleInvolvedDetails?: string | null;
   taskDurationHours?: number | null;
   processFrequency?: string | null;
   currentAnnualHours?: number | null;
@@ -79,6 +80,7 @@ function mapProject(p: {
     urgency: p.urgency ?? undefined,
     features: p.features ?? [],
     peopleInvolved: p.peopleInvolved ?? undefined,
+    peopleInvolvedDetails: p.peopleInvolvedDetails ?? undefined,
     taskDurationHours: p.taskDurationHours ?? undefined,
     processFrequency: p.processFrequency ?? undefined,
     currentAnnualHours: p.currentAnnualHours ?? undefined,
@@ -170,6 +172,7 @@ export function ProjectsProvider({ children }: { children: ReactNode }) {
         ratingExternalImpact: project.ratingExternalImpact,
         ratingCompliance: project.ratingCompliance,
         peopleInvolved: project.peopleInvolved,
+        peopleInvolvedDetails: project.peopleInvolvedDetails,
         taskDurationHours: project.taskDurationHours,
         processFrequency: project.processFrequency as "diario" | "duas-vezes-semana" | "tres-vezes-semana" | "semanal" | "mensal" | "anual" | undefined,
       });

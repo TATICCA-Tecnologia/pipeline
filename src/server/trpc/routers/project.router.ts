@@ -100,6 +100,7 @@ export const projectRouter = router({
         ratingExternalImpact: p.ratingExternalImpact ?? undefined,
         ratingCompliance: p.ratingCompliance ?? undefined,
         peopleInvolved: p.peopleInvolved ?? undefined,
+        peopleInvolvedDetails: p.peopleInvolvedDetails ?? undefined,
         taskDurationHours: p.taskDurationHours ?? undefined,
         processFrequency: p.processFrequency ?? undefined,
         currentAnnualHours: p.currentAnnualHours ?? undefined,
@@ -156,6 +157,7 @@ export const projectRouter = router({
         expectedUsers: project.expectedUsers ?? undefined,
         urgency: project.urgency ?? undefined,
         peopleInvolved: project.peopleInvolved ?? undefined,
+        peopleInvolvedDetails: project.peopleInvolvedDetails ?? undefined,
         taskDurationHours: project.taskDurationHours ?? undefined,
         processFrequency: project.processFrequency ?? undefined,
         currentAnnualHours: project.currentAnnualHours ?? undefined,
@@ -216,6 +218,7 @@ export const projectRouter = router({
         ratingCompliance: z.number().int().min(1).max(5).optional(),
         // Diagnostico de processo - operacional
         peopleInvolved: z.number().int().min(0).optional(),
+        peopleInvolvedDetails: z.string().optional(),
         taskDurationHours: z.number().min(0).optional(),
         processFrequency: processFrequencySchema.optional(),
       })
@@ -272,6 +275,7 @@ export const projectRouter = router({
           ratingExternalImpact: input.ratingExternalImpact ?? null,
           ratingCompliance: input.ratingCompliance ?? null,
           peopleInvolved: input.peopleInvolved ?? null,
+          peopleInvolvedDetails: input.peopleInvolvedDetails ?? null,
           taskDurationHours: input.taskDurationHours ?? null,
           processFrequency: input.processFrequency ?? null,
           currentAnnualHours: computeCurrentAnnualHours(

@@ -28,6 +28,7 @@ export const solicitarProjetoSchema = z
     customHasCurrentApplication: z.string().optional().default(""),
     currentApplicationDetails: z.string().optional().default(""),
     peopleInvolved: z.string().optional().default(""),
+    peopleInvolvedDetails: z.string().optional().default(""),
     taskDurationHours: z.string().optional().default(""),
     processFrequency: z.string().optional().default(""),
     customProcessFrequency: z.string().optional().default(""),
