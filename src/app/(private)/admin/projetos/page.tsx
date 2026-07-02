@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useProjects } from "@/shared/context/projects-context";
 import { KanbanBoard } from "@/shared/components";
 import type { Project, ProjectStatus } from "@/shared/types";
@@ -9,6 +10,11 @@ import { toast } from "sonner";
 import { Button } from "@/src/shared/components/ui/button";
 import { Download } from "lucide-react";
 import { ProjectDetailsModal } from "./_components/project-details.modal";
+import {
+  CompanyFilter,
+  filterProjectsByCompany,
+  ALL_COMPANIES_VALUE,
+} from "@/shared/components/company-filter";
 
 function escapeCSV(value: unknown): string {
   if (value === null || value === undefined) return "";
@@ -109,6 +115,9 @@ const ALL_COLUMNS: ProjectStatus[] = [
 export default function AdminProjetosPage() {
   const { projects, moveProject } = useProjects();
   const { openModal } = useModal();
+  const [companyFilter, setCompanyFilter] = useState(ALL_COMPANIES_VALUE);
+
+  const filteredProjects = filterProjectsByCompany(projects, companyFilter);
 
   const handleMoveProject = (projectId: string, newStatus: ProjectStatus) => {
     moveProject(projectId, newStatus);
@@ -137,18 +146,23 @@ export default function AdminProjetosPage() {
           </p>
         </div>
         <div className="flex items-center gap-3">
+          <CompanyFilter
+            projects={projects}
+            value={companyFilter}
+            onChange={setCompanyFilter}
+          />
           <p className="text-xs uppercase tracking-wider text-muted-foreground">
-            {projects.length}{" "}
-            {projects.length === 1 ? "projeto" : "projetos"}
+            {filteredProjects.length}{" "}
+            {filteredProjects.length === 1 ? "projeto" : "projetos"}
           </p>
           <Button
             variant="outline"
             size="sm"
             onClick={() => {
-              downloadProjectsCSV(projects);
+              downloadProjectsCSV(filteredProjects);
               toast.success("CSV exportado com sucesso");
             }}
-            disabled={projects.length === 0}
+            disabled={filteredProjects.length === 0}
           >
             <Download className="h-3.5 w-3.5 mr-1.5" />
             Exportar CSV
@@ -157,7 +171,7 @@ export default function AdminProjetosPage() {
       </header>
 
       <KanbanBoard
-        projects={projects}
+        projects={filteredProjects}
         onProjectClick={handleProjectClick}
         onMoveProject={handleMoveProject}
         canDrag={true}
