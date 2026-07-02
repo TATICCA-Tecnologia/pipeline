@@ -26,7 +26,12 @@ export function ProjectDetailsModal({
   if (!data) return null;
 
   const { project: cachedProject } = data;
-  const project = (fullProject as Project | undefined) ?? cachedProject;
+  const project: Project = fullProject
+    ? {
+        ...(fullProject as unknown as Project),
+        features: fullProject.features?.map((f) => f.name) ?? [],
+      }
+    : cachedProject;
 
   return (
     <div className="flex max-h-[85vh] flex-col overflow-hidden rounded-[8px] bg-white">
