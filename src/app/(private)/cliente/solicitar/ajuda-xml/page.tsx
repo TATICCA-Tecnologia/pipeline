@@ -134,7 +134,7 @@ export default function AjudaXmlPage() {
       tag: "beneficios",
       required: false,
       description:
-        "Lista de benefícios esperados. Cada item vai em uma tag <beneficio> dentro dela, e cada um deve corresponder a uma das opções abaixo.",
+        'Lista de benefícios esperados. Cada item vai em uma tag <beneficio> dentro dela. Se não corresponder a nenhuma opção conhecida, é tratado como "Outro" e o texto original é preservado em <detalhesBeneficios>.',
       acceptedValues: BENEFIT_OPTIONS.map((b) => b.label),
     },
     {

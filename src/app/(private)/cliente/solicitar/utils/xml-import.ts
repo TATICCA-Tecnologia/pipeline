@@ -226,21 +226,28 @@ export function parseSolicitacaoXml(
   const projectNarrative = getDirectChildText(root, "narrativaDoProcesso");
   const features = getListItems(root, "funcionalidades", "funcionalidade");
 
-  // <beneficios>
+  // <beneficios> — item não reconhecido não bloqueia o import: é tratado como "Outro"
+  // e o texto original é preservado em <detalhesBeneficios>.
   const beneficioItems = getListItems(root, "beneficios", "beneficio");
   const benefits: string[] = [];
+  const unmatchedBenefitItems: string[] = [];
   for (const item of beneficioItems) {
     const match = matchByLabel(item, BENEFIT_OPTIONS);
     if (!match) {
-      return {
-        ok: false,
-        error: `O item '${item}' dentro de <beneficios> não corresponde a nenhum benefício conhecido. Valores aceitos: ${BENEFIT_OPTIONS.map((b) => b.label).join(", ")}.`,
-      };
+      unmatchedBenefitItems.push(item);
+      if (!benefits.includes("outro")) benefits.push("outro");
+      warnings.push(
+        `O item '${item}' dentro de <beneficios> não corresponde a nenhum benefício conhecido; foi tratado como "Outro" e o texto foi preservado nos detalhes dos benefícios.`
+      );
+    } else {
+      benefits.push(match.key);
     }
-    benefits.push(match.key);
   }
 
-  const benefitsDetails = getDirectChildText(root, "detalhesBeneficios");
+  const benefitsDetailsTag = getDirectChildText(root, "detalhesBeneficios");
+  const benefitsDetails = [benefitsDetailsTag, ...unmatchedBenefitItems]
+    .filter(Boolean)
+    .join(" | ");
 
   // <horasEconomizadasPorMes>
   const horasTag = getDirectChildText(root, "horasEconomizadasPorMes");
