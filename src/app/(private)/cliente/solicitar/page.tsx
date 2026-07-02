@@ -26,6 +26,15 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/src/shared/components/ui/tooltip";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/src/shared/components/ui/alert-dialog";
 import { useToast } from "@/src/shared/hooks/use-toast";
 import { trpc } from "@/shared/trpc/client";
 import { useZodForm } from "@/shared/hooks/use-zod-form";
@@ -261,6 +270,9 @@ export default function SolicitarProjetoPage() {
   const [benefits, setBenefits] = useState<string[]>([]);
   const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [xmlImportOutcome, setXmlImportOutcome] = useState<
+    { ok: boolean; title: string; message: string } | null
+  >(null);
   const [selectedCompanyId, setSelectedCompanyId] = useState<string | undefined>();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const xmlInputRef = useRef<HTMLInputElement>(null);
@@ -327,10 +339,10 @@ export default function SolicitarProjetoPage() {
     });
 
     if (!result.ok) {
-      toast({
+      setXmlImportOutcome({
+        ok: false,
         title: "Erro ao importar XML",
-        description: result.error,
-        variant: "destructive",
+        message: result.error,
       });
       return;
     }
@@ -349,16 +361,16 @@ export default function SolicitarProjetoPage() {
       });
       await addProject(payload);
 
-      toast({
+      setXmlImportOutcome({
+        ok: true,
         title: "Solicitação enviada",
-        description: "Seu processo foi criado e está no backlog.",
+        message: `O processo "${result.formData.title}" foi criado e está no backlog.`,
       });
-      router.push("/cliente");
     } catch {
-      toast({
+      setXmlImportOutcome({
+        ok: false,
         title: "Erro ao salvar",
-        description: "Não foi possível criar o processo. Tente novamente.",
-        variant: "destructive",
+        message: "Não foi possível criar o processo. Tente novamente.",
       });
     } finally {
       setIsSubmitting(false);
@@ -1244,6 +1256,31 @@ export default function SolicitarProjetoPage() {
           </div>
         </form>
       </div>
+
+      <AlertDialog
+        open={xmlImportOutcome !== null}
+        onOpenChange={(open) => {
+          if (!open) setXmlImportOutcome(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{xmlImportOutcome?.title}</AlertDialogTitle>
+            <AlertDialogDescription>{xmlImportOutcome?.message}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction
+              onClick={() => {
+                const wasSuccess = xmlImportOutcome?.ok;
+                setXmlImportOutcome(null);
+                if (wasSuccess) router.push("/cliente");
+              }}
+            >
+              {xmlImportOutcome?.ok ? "Ver meus processos" : "Entendi"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </TooltipProvider>
   );
 }
