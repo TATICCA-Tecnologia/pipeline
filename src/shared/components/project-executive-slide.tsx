@@ -219,7 +219,9 @@ export function ProjectExecutiveSlide({ project }: { project: Project }) {
               <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 O processo hoje
               </div>
-              <p className="text-sm leading-relaxed text-foreground/90">{project.description}</p>
+              <p className="line-clamp-3 text-sm leading-relaxed text-foreground/90">
+                {project.description}
+              </p>
             </div>
           )}
           {situacaoAtualLines.length > 0 && (
@@ -261,7 +263,7 @@ export function ProjectExecutiveSlide({ project }: { project: Project }) {
               <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 Benefícios esperados
               </div>
-              <p className="text-sm leading-relaxed text-foreground/90">
+              <p className="line-clamp-2 text-sm leading-relaxed text-foreground/90">
                 {benefitLabels.join(" · ")}
               </p>
             </div>
