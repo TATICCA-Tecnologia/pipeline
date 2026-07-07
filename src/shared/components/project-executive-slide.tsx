@@ -144,6 +144,11 @@ function SectionLabel({ children }: { children: ReactNode }) {
   );
 }
 
+// Evita floats longos (ex.: 3.6666666666666665h) ao converter horas anuais em mensais.
+function roundHours(hours: number): string {
+  return (Math.round(hours * 10) / 10).toString().replace(".", ",");
+}
+
 function buildLabeledLines(
   entries: { label: string; value: string | undefined }[]
 ): { label: string; value: string }[] {
@@ -208,6 +213,13 @@ export function ProjectExecutiveSlide({ project }: { project: Project }) {
     {
       label: "Horas anuais",
       value: project.currentAnnualHours != null ? `${project.currentAnnualHours}h` : undefined,
+    },
+    {
+      label: "Horas totais gastas por mês",
+      value:
+        project.currentAnnualHours != null
+          ? `${roundHours(project.currentAnnualHours / 12)}h`
+          : undefined,
     },
   ]);
   const monthlyHoursSavedLabel =
@@ -320,7 +332,7 @@ export function ProjectExecutiveSlide({ project }: { project: Project }) {
           </div>
 
           <div className="flex flex-1 flex-col gap-5">
-            {quantitativeLines.length > 0 && (
+            {(quantitativeLines.length > 0 || monthlyHoursSavedLabel) && (
               <div>
                 <SectionLabel>Avaliação Quantitativa</SectionLabel>
                 <table className="mt-1.5 w-full border-collapse text-sm">
