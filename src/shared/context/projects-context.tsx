@@ -24,6 +24,7 @@ interface ProjectsContextType {
   addProject: (project: Omit<Project, "id" | "createdAt" | "updatedAt">) => Promise<string>;
   updateProject: (id: string, updates: Partial<Project>) => void;
   moveProject: (id: string, status: ProjectStatus) => void;
+  deleteProject: (id: string) => Promise<void>;
   addRequest: (request: Omit<ProjectRequest, "id" | "createdAt">) => void;
   approveRequest: (requestId: string, developerId?: string) => void;
   getProjectsByStatus: (status: ProjectStatus) => Project[];
@@ -143,6 +144,9 @@ export function ProjectsProvider({ children }: { children: ReactNode }) {
   const moveProjectMutation = trpc.project.move.useMutation({
     onSuccess: () => utils.project.list.invalidate(),
   });
+  const deleteProjectMutation = trpc.project.delete.useMutation({
+    onSuccess: () => utils.project.list.invalidate(),
+  });
   const createRequest = trpc.request.create.useMutation({
     onSuccess: () => utils.request.list.invalidate(),
   });
@@ -233,6 +237,13 @@ export function ProjectsProvider({ children }: { children: ReactNode }) {
     [moveProjectMutation]
   );
 
+  const deleteProject = useCallback(
+    async (id: string) => {
+      await deleteProjectMutation.mutateAsync({ id });
+    },
+    [deleteProjectMutation]
+  );
+
   const addRequest = useCallback(
     (request: Omit<ProjectRequest, "id" | "createdAt">) => {
       createRequest.mutate({
@@ -286,6 +297,7 @@ export function ProjectsProvider({ children }: { children: ReactNode }) {
         addProject,
         updateProject,
         moveProject,
+        deleteProject,
         addRequest,
         approveRequest,
         getProjectsByStatus,
