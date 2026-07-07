@@ -556,7 +556,8 @@ export default function SolicitarProjetoPage() {
       return { ok: true, title: result.formData.title, hasWarnings: result.warnings.length > 0 };
     } catch (error) {
       console.error("Erro ao criar processo a partir do XML:", error);
-      return { ok: false, error: "Não foi possível criar o processo. Tente novamente." };
+      const message = error instanceof Error ? error.message : "Tente novamente.";
+      return { ok: false, error: `Não foi possível criar o processo: ${message}` };
     }
   }
 
