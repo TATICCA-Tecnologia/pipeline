@@ -94,6 +94,15 @@ const QUALITATIVE_RATINGS = [
   { name: "ratingCompliance" as const, label: "Atendimento a políticas e leis" },
 ];
 
+type BatchContext = { fileName: string; index: number; total: number };
+type BatchImportResult = {
+  fileName: string;
+  ok: boolean;
+  title?: string;
+  error?: string;
+  hasWarnings?: boolean;
+};
+
 type StepKey = "basico" | "envolvidos" | "funcionalidades" | "beneficios" | "prazo";
 
 type StepDef = {
@@ -304,13 +313,18 @@ export default function SolicitarProjetoPage() {
   >(null);
   const [pendingXmlImport, setPendingXmlImport] = useState<{
     rawCompanyName: string;
-    batchContext?: { fileName: string; index: number; total: number };
+    batchContext?: BatchContext;
   } | null>(null);
   const [chosenCompanyId, setChosenCompanyId] = useState<string | undefined>();
+  // Guarda o `resolve` de uma Promise pendente enquanto o diálogo "Selecione a
+  // empresa" está aberto. Existe pra permitir que o loop sequencial de import
+  // em lote (`handleImportXmlFile`) dê `await` numa escolha do usuário no meio
+  // da iteração, em vez de processar tudo de uma vez ou empilhar diálogos.
+  // Toda forma de fechar o diálogo (confirmar, cancelar, Esc/clique fora) deve
+  // passar por `closeCompanyResolutionDialog` — se uma delas esquecer de
+  // resolver essa Promise, o import correspondente trava para sempre.
   const companyResolverRef = useRef<((companyId: string | null) => void) | null>(null);
-  const [batchImportResults, setBatchImportResults] = useState<
-    { fileName: string; ok: boolean; title?: string; error?: string; hasWarnings?: boolean }[] | null
-  >(null);
+  const [batchImportResults, setBatchImportResults] = useState<BatchImportResult[] | null>(null);
   const [selectedCompanyId, setSelectedCompanyId] = useState<string | undefined>();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const xmlInputRef = useRef<HTMLInputElement>(null);
@@ -355,9 +369,20 @@ export default function SolicitarProjetoPage() {
     setAttachedFiles(Array.from(files));
   }
 
+  // Única forma de fechar o diálogo "Selecione a empresa": resolve a Promise
+  // pendente (null = cancelado) e limpa o estado. Centralizado aqui pra evitar
+  // que uma nova forma de fechar o diálogo esqueça de resolver a Promise, o
+  // que travaria o import (single ou lote) esperando para sempre.
+  function closeCompanyResolutionDialog(companyId: string | null) {
+    companyResolverRef.current?.(companyId);
+    companyResolverRef.current = null;
+    setPendingXmlImport(null);
+    setChosenCompanyId(undefined);
+  }
+
   function resolveCompanyAmbiguity(
     rawCompanyName: string,
-    batchContext?: { fileName: string; index: number; total: number }
+    batchContext?: BatchContext
   ): Promise<string | null> {
     return new Promise((resolve) => {
       companyResolverRef.current = resolve;
@@ -368,8 +393,11 @@ export default function SolicitarProjetoPage() {
 
   async function importXmlEntry(
     xmlText: string,
-    batchContext?: { fileName: string; index: number; total: number }
+    batchContext?: BatchContext
   ): Promise<{ ok: true; title: string; hasWarnings: boolean } | { ok: false; error: string }> {
+    // Defensivo: handleImportXmlFile já barra a ausência de usuário antes de
+    // chamar esta função (nos dois branches, zip e arquivo único). Mantido
+    // aqui caso importXmlEntry seja reaproveitada em outro ponto de entrada.
     if (!user?.id) return { ok: false, error: "Faça login para importar um XML." };
 
     const result = parseSolicitacaoXml(xmlText, {
@@ -451,8 +479,7 @@ export default function SolicitarProjetoPage() {
           return;
         }
 
-        const results: { fileName: string; ok: boolean; title?: string; error?: string; hasWarnings?: boolean }[] =
-          [];
+        const results: BatchImportResult[] = [];
         for (let i = 0; i < entries.length; i++) {
           const entry = entries[i];
           const outcome = await importXmlEntry(entry.xmlText, {
@@ -1532,12 +1559,7 @@ export default function SolicitarProjetoPage() {
       <Dialog
         open={pendingXmlImport !== null}
         onOpenChange={(open) => {
-          if (!open) {
-            companyResolverRef.current?.(null);
-            companyResolverRef.current = null;
-            setPendingXmlImport(null);
-            setChosenCompanyId(undefined);
-          }
+          if (!open) closeCompanyResolutionDialog(null);
         }}
       >
         <DialogContent>
@@ -1572,25 +1594,19 @@ export default function SolicitarProjetoPage() {
             </Select>
           </div>
           <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                companyResolverRef.current?.(null);
-                companyResolverRef.current = null;
-                setPendingXmlImport(null);
-                setChosenCompanyId(undefined);
-              }}
-            >
+            <Button variant="outline" onClick={() => closeCompanyResolutionDialog(null)}>
               Cancelar
             </Button>
             <Button
+              // isSubmitting fica `true` durante todo o import (único ou lote
+              // inteiro), incluindo enquanto este diálogo está aberto esperando
+              // o usuário — não incluir isSubmitting aqui, senão o botão fica
+              // permanentemente desabilitado e o diálogo trava sem forma de
+              // confirmar.
               disabled={!chosenCompanyId}
               onClick={() => {
                 if (!chosenCompanyId) return;
-                companyResolverRef.current?.(chosenCompanyId);
-                companyResolverRef.current = null;
-                setPendingXmlImport(null);
-                setChosenCompanyId(undefined);
+                closeCompanyResolutionDialog(chosenCompanyId);
               }}
             >
               Confirmar e criar processo
