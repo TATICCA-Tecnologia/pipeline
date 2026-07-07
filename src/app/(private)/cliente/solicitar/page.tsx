@@ -602,7 +602,7 @@ export default function SolicitarProjetoPage() {
           <input
             ref={xmlInputRef}
             type="file"
-            accept=".xml,text/xml"
+            accept=".xml,.zip,text/xml,application/zip"
             className="hidden"
             onChange={handleImportXmlFile}
           />
@@ -1533,6 +1533,8 @@ export default function SolicitarProjetoPage() {
         open={pendingXmlImport !== null}
         onOpenChange={(open) => {
           if (!open) {
+            companyResolverRef.current?.(null);
+            companyResolverRef.current = null;
             setPendingXmlImport(null);
             setChosenCompanyId(undefined);
           }
@@ -1542,6 +1544,12 @@ export default function SolicitarProjetoPage() {
           <DialogHeader>
             <DialogTitle>Selecione a empresa</DialogTitle>
             <DialogDescription>
+              {pendingXmlImport?.batchContext && (
+                <span className="mb-1 block font-medium text-foreground">
+                  Arquivo {pendingXmlImport.batchContext.index} de {pendingXmlImport.batchContext.total}:{" "}
+                  {pendingXmlImport.batchContext.fileName}
+                </span>
+              )}
               {pendingXmlImport?.rawCompanyName
                 ? `O XML indica a empresa "${pendingXmlImport.rawCompanyName}", que não corresponde a nenhuma empresa disponível.`
                 : "O XML não indica uma empresa."}{" "}
@@ -1567,6 +1575,8 @@ export default function SolicitarProjetoPage() {
             <Button
               variant="outline"
               onClick={() => {
+                companyResolverRef.current?.(null);
+                companyResolverRef.current = null;
                 setPendingXmlImport(null);
                 setChosenCompanyId(undefined);
               }}
@@ -1574,12 +1584,12 @@ export default function SolicitarProjetoPage() {
               Cancelar
             </Button>
             <Button
-              disabled={!chosenCompanyId || isSubmitting}
-              onClick={async () => {
-                if (!pendingXmlImport || !chosenCompanyId) return;
-                const parsed = pendingXmlImport;
+              disabled={!chosenCompanyId}
+              onClick={() => {
+                if (!chosenCompanyId) return;
+                companyResolverRef.current?.(chosenCompanyId);
+                companyResolverRef.current = null;
                 setPendingXmlImport(null);
-                await createProjectFromXml(parsed, chosenCompanyId);
                 setChosenCompanyId(undefined);
               }}
             >
@@ -1588,6 +1598,57 @@ export default function SolicitarProjetoPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog
+        open={batchImportResults !== null}
+        onOpenChange={(open) => {
+          if (!open) setBatchImportResults(null);
+        }}
+      >
+        <AlertDialogContent className="max-w-lg">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Resultado da importação em lote</AlertDialogTitle>
+            <AlertDialogDescription>
+              {batchImportResults?.filter((r) => r.ok).length} de {batchImportResults?.length} arquivo(s)
+              importado(s) com sucesso.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="max-h-80 space-y-2 overflow-y-auto text-sm">
+            {batchImportResults?.map((r) => (
+              <div
+                key={r.fileName}
+                className={cn(
+                  "rounded-md border px-3 py-2",
+                  r.ok ? "border-emerald-200 bg-emerald-50" : "border-destructive/30 bg-destructive/5"
+                )}
+              >
+                <div className="font-medium">{r.fileName}</div>
+                {r.ok ? (
+                  <div className="text-muted-foreground">
+                    Processo &quot;{r.title}&quot; criado.
+                    {r.hasWarnings
+                      ? ' Alguns valores não foram reconhecidos — revise em "Informações adicionais".'
+                      : ""}
+                  </div>
+                ) : (
+                  <div className="text-destructive">{r.error}</div>
+                )}
+              </div>
+            ))}
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogAction
+              onClick={() => {
+                const hadAnySuccess = batchImportResults?.some((r) => r.ok);
+                setBatchImportResults(null);
+                if (hadAnySuccess) router.push("/cliente");
+              }}
+            >
+              Ver meus processos
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </TooltipProvider>
   );
 }
