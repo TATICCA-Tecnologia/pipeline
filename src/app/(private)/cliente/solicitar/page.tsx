@@ -74,6 +74,7 @@ import {
 import { useTaxonomy } from "./utils/use-taxonomy";
 import { buildProjectPayload } from "./utils/build-project-payload";
 import { parseSolicitacaoXml } from "./utils/xml-import";
+import { extractXmlEntriesFromZip } from "./utils/zip-import";
 import { cn } from "@/shared/utils";
 
 const QUALITATIVE_RATINGS = [
@@ -302,13 +303,14 @@ export default function SolicitarProjetoPage() {
     { ok: boolean; title: string; message: string } | null
   >(null);
   const [pendingXmlImport, setPendingXmlImport] = useState<{
-    formData: SolicitarProjetoFormData;
-    features: string[];
-    benefits: string[];
     rawCompanyName: string;
-    warnings: string[];
+    batchContext?: { fileName: string; index: number; total: number };
   } | null>(null);
   const [chosenCompanyId, setChosenCompanyId] = useState<string | undefined>();
+  const companyResolverRef = useRef<((companyId: string | null) => void) | null>(null);
+  const [batchImportResults, setBatchImportResults] = useState<
+    { fileName: string; ok: boolean; title?: string; error?: string; hasWarnings?: boolean }[] | null
+  >(null);
   const [selectedCompanyId, setSelectedCompanyId] = useState<string | undefined>();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const xmlInputRef = useRef<HTMLInputElement>(null);
@@ -353,22 +355,51 @@ export default function SolicitarProjetoPage() {
     setAttachedFiles(Array.from(files));
   }
 
-  async function createProjectFromXml(
-    parsed: {
-      formData: SolicitarProjetoFormData;
-      features: string[];
-      benefits: string[];
-      warnings?: string[];
-    },
-    companyId: string | undefined
-  ) {
-    if (!user?.id) return;
-    setIsSubmitting(true);
+  function resolveCompanyAmbiguity(
+    rawCompanyName: string,
+    batchContext?: { fileName: string; index: number; total: number }
+  ): Promise<string | null> {
+    return new Promise((resolve) => {
+      companyResolverRef.current = resolve;
+      setPendingXmlImport({ rawCompanyName, batchContext });
+      setChosenCompanyId(companyOptions.length === 1 ? companyOptions[0].id : undefined);
+    });
+  }
+
+  async function importXmlEntry(
+    xmlText: string,
+    batchContext?: { fileName: string; index: number; total: number }
+  ): Promise<{ ok: true; title: string; hasWarnings: boolean } | { ok: false; error: string }> {
+    if (!user?.id) return { ok: false, error: "Faça login para importar um XML." };
+
+    const result = parseSolicitacaoXml(xmlText, {
+      areas: PROJECT_AREAS,
+      themesByArea: PROJECT_THEMES_BY_AREA,
+      companies: companyOptions,
+    });
+
+    if (!result.ok) return { ok: false, error: result.error };
+
+    let companyId = result.companyId;
+    if (result.companyUnresolved) {
+      if (companyOptions.length === 0) {
+        return {
+          ok: false,
+          error: result.rawCompanyName
+            ? `A tag <empresa> tem o valor '${result.rawCompanyName}', mas não há nenhuma empresa disponível para associar este processo.`
+            : "Não há nenhuma empresa disponível para associar este processo.",
+        };
+      }
+      const chosen = await resolveCompanyAmbiguity(result.rawCompanyName, batchContext);
+      if (!chosen) return { ok: false, error: "Empresa não resolvida (seleção cancelada)." };
+      companyId = chosen;
+    }
+
     try {
       const payload = buildProjectPayload({
-        data: parsed.formData,
-        features: parsed.features,
-        benefits: parsed.benefits,
+        data: result.formData,
+        features: result.features,
+        benefits: result.benefits,
         clientId: user.id,
         companyId,
         areas: PROJECT_AREAS,
@@ -376,25 +407,10 @@ export default function SolicitarProjetoPage() {
         buildTypeLabel: buildClienteProjectTypeLabel,
       });
       await addProject(payload);
-
-      const warningsNote =
-        parsed.warnings && parsed.warnings.length > 0
-          ? ` Alguns valores do XML não foram reconhecidos e foram registrados em "Informações adicionais" para revisão.`
-          : "";
-      setXmlImportOutcome({
-        ok: true,
-        title: "Solicitação enviada",
-        message: `O processo "${parsed.formData.title}" foi criado e está no backlog.${warningsNote}`,
-      });
+      return { ok: true, title: result.formData.title, hasWarnings: result.warnings.length > 0 };
     } catch (error) {
       console.error("Erro ao criar processo a partir do XML:", error);
-      setXmlImportOutcome({
-        ok: false,
-        title: "Erro ao salvar",
-        message: "Não foi possível criar o processo. Tente novamente.",
-      });
-    } finally {
-      setIsSubmitting(false);
+      return { ok: false, error: "Não foi possível criar o processo. Tente novamente." };
     }
   }
 
@@ -421,53 +437,59 @@ export default function SolicitarProjetoPage() {
       return;
     }
 
-    const xmlText = await file.text();
-    const result = parseSolicitacaoXml(xmlText, {
-      areas: PROJECT_AREAS,
-      themesByArea: PROJECT_THEMES_BY_AREA,
-      companies: companyOptions,
-    });
+    const isZip = file.name.toLowerCase().endsWith(".zip");
+    setIsSubmitting(true);
+    try {
+      if (isZip) {
+        const entries = await extractXmlEntriesFromZip(file);
+        if (entries.length === 0) {
+          setXmlImportOutcome({
+            ok: false,
+            title: "Erro ao importar zip",
+            message: "Nenhum arquivo .xml encontrado dentro do zip.",
+          });
+          return;
+        }
 
-    if (!result.ok) {
-      setXmlImportOutcome({
-        ok: false,
-        title: "Erro ao importar XML",
-        message: result.error,
-      });
-      return;
-    }
-
-    if (result.companyUnresolved) {
-      if (companyOptions.length === 0) {
-        setXmlImportOutcome({
-          ok: false,
-          title: "Erro ao importar XML",
-          message: result.rawCompanyName
-            ? `A tag <empresa> tem o valor '${result.rawCompanyName}', mas não há nenhuma empresa disponível para associar este processo.`
-            : "Não há nenhuma empresa disponível para associar este processo.",
-        });
-        return;
+        const results: { fileName: string; ok: boolean; title?: string; error?: string; hasWarnings?: boolean }[] =
+          [];
+        for (let i = 0; i < entries.length; i++) {
+          const entry = entries[i];
+          const outcome = await importXmlEntry(entry.xmlText, {
+            fileName: entry.fileName,
+            index: i + 1,
+            total: entries.length,
+          });
+          results.push(
+            outcome.ok
+              ? { fileName: entry.fileName, ok: true, title: outcome.title, hasWarnings: outcome.hasWarnings }
+              : { fileName: entry.fileName, ok: false, error: outcome.error }
+          );
+        }
+        setBatchImportResults(results);
+      } else {
+        const xmlText = await file.text();
+        const outcome = await importXmlEntry(xmlText);
+        if (outcome.ok) {
+          const warningsNote = outcome.hasWarnings
+            ? ` Alguns valores do XML não foram reconhecidos e foram registrados em "Informações adicionais" para revisão.`
+            : "";
+          setXmlImportOutcome({
+            ok: true,
+            title: "Solicitação enviada",
+            message: `O processo "${outcome.title}" foi criado e está no backlog.${warningsNote}`,
+          });
+        } else {
+          setXmlImportOutcome({
+            ok: false,
+            title: "Erro ao importar XML",
+            message: outcome.error,
+          });
+        }
       }
-      setPendingXmlImport({
-        formData: result.formData,
-        features: result.features,
-        benefits: result.benefits,
-        rawCompanyName: result.rawCompanyName,
-        warnings: result.warnings,
-      });
-      setChosenCompanyId(companyOptions.length === 1 ? companyOptions[0].id : undefined);
-      return;
+    } finally {
+      setIsSubmitting(false);
     }
-
-    await createProjectFromXml(
-      {
-        formData: result.formData,
-        features: result.features,
-        benefits: result.benefits,
-        warnings: result.warnings,
-      },
-      result.companyId
-    );
   }
 
   async function goNext() {
