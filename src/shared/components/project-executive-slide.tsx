@@ -2,7 +2,6 @@
 
 import type { ReactNode } from "react";
 import Image from "next/image";
-import { AlertTriangle } from "lucide-react";
 import type { Project } from "@/shared/types";
 import {
   HAS_EXISTING_SYSTEM_OPTIONS,
@@ -364,18 +363,6 @@ export function ProjectExecutiveSlide({ project }: { project: Project }) {
             </div>
           </div>
         </div>
-
-        {project.additionalInfo && (
-          <div className="mt-6 rounded-r-md border-l-4 border-amber-500 bg-amber-50 px-4 py-3">
-            <div className="mb-1.5 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-amber-800">
-              <AlertTriangle className="h-3.5 w-3.5" />
-              Pontos de atenção
-            </div>
-            <p className="whitespace-pre-line text-sm leading-relaxed text-foreground/90">
-              {project.additionalInfo}
-            </p>
-          </div>
-        )}
       </div>
     </div>
   );
