@@ -484,9 +484,13 @@ export default function SolicitarProjetoPage() {
       companyId = chosen;
     }
 
-    let resolvedAreaId: string | undefined;
-    let resolvedAreaSlug: string | undefined;
-    let resolvedThemeId: string | undefined;
+    // area/tema já vêm com o id real quando <area>/<tema> bateram direto com uma opção
+    // cadastrada (caminho feliz, sem diálogo) — só cai no fluxo de resolução abaixo quando
+    // o valor não bateu com nada ("outro").
+    let resolvedAreaId: string | undefined = result.areaId;
+    let resolvedAreaSlug: string | undefined =
+      result.formData.projectArea !== "outro" ? result.formData.projectArea : undefined;
+    let resolvedThemeId: string | undefined = result.themeId;
 
     if (result.formData.projectArea === "outro" && result.formData.customProjectArea.trim()) {
       const resolvedArea = await resolveTaxonomyAmbiguity(
@@ -656,28 +660,48 @@ export default function SolicitarProjetoPage() {
 
     setIsSubmitting(true);
     try {
-      let areaId: string | undefined;
-      let themeId: string | undefined;
+      // Quando a área/tema escolhida já é uma opção cadastrada (não "outro"), o id real já
+      // está disponível em PROJECT_AREAS/PROJECT_THEMES_BY_AREA (Task 3) — usa direto, sem
+      // precisar de nenhum passo extra. Só fica undefined quando o valor é "outro" e nada foi
+      // registrado como nova categoria (registerNewArea/registerNewTheme abaixo).
+      let areaId: string | undefined = PROJECT_AREAS.find((a) => a.value === data.projectArea)?.id;
+      let themeId: string | undefined = (PROJECT_THEMES_BY_AREA[data.projectArea] ?? []).find(
+        (t) => t.value === data.projectTheme
+      )?.id;
       let areaSlugForPayload = data.projectArea;
       let themeSlugForPayload = data.projectTheme;
 
       if (registerNewArea && data.projectArea === "outro" && data.customProjectArea.trim()) {
         const name = data.customProjectArea.trim();
-        const created = await createAreaMutation.mutateAsync({ name, slug: slugify(name), order: 0 });
-        areaId = created.id;
-        areaSlugForPayload = created.slug;
+        try {
+          const created = await createAreaMutation.mutateAsync({ name, slug: slugify(name), order: 0 });
+          areaId = created.id;
+          areaSlugForPayload = created.slug;
+        } catch (error) {
+          console.error("Erro ao cadastrar área:", error);
+          const message = error instanceof Error ? error.message : "Tente novamente.";
+          toast({ title: "Não foi possível cadastrar a área", description: message, variant: "destructive" });
+          return;
+        }
       }
 
       if (registerNewTheme && data.projectTheme === "outro" && data.customProjectTheme.trim() && areaId) {
         const name = data.customProjectTheme.trim();
-        const created = await createThemeMutation.mutateAsync({
-          name,
-          slug: slugify(name),
-          areaId,
-          order: 0,
-        });
-        themeId = created.id;
-        themeSlugForPayload = created.slug;
+        try {
+          const created = await createThemeMutation.mutateAsync({
+            name,
+            slug: slugify(name),
+            areaId,
+            order: 0,
+          });
+          themeId = created.id;
+          themeSlugForPayload = created.slug;
+        } catch (error) {
+          console.error("Erro ao cadastrar tema:", error);
+          const message = error instanceof Error ? error.message : "Tente novamente.";
+          toast({ title: "Não foi possível cadastrar o tema", description: message, variant: "destructive" });
+          return;
+        }
       }
 
       const payload = buildProjectPayload({

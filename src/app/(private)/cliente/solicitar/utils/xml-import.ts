@@ -11,8 +11,8 @@ import {
 } from "./solicitar.utils";
 
 export interface XmlImportContext {
-  areas: { value: string; label: string }[];
-  themesByArea: Record<string, { value: string; label: string }[]>;
+  areas: { value: string; label: string; id?: string }[];
+  themesByArea: Record<string, { value: string; label: string; id?: string }[]>;
   companies: { id: string; name: string }[];
 }
 
@@ -29,6 +29,10 @@ export type XmlImportResult =
       rawCompanyName: string;
       /** avisos de campos que não puderam ser interpretados e foram ignorados/realocados, sem bloquear o import */
       warnings: string[];
+      /** id real da área quando <area> bateu direto com uma opção cadastrada (undefined se caiu em "outro" ou veio do fallback sem banco) */
+      areaId: string | undefined;
+      /** id real do tema quando <tema> bateu direto com uma opção cadastrada (undefined se caiu em "outro" ou veio do fallback sem banco) */
+      themeId: string | undefined;
     }
   | { ok: false; error: string };
 
@@ -392,5 +396,7 @@ export function parseSolicitacaoXml(
     companyUnresolved,
     rawCompanyName: empresaTag,
     warnings,
+    areaId: areaMatch?.id,
+    themeId: temaMatch?.id,
   };
 }
