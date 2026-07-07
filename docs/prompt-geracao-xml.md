@@ -12,6 +12,20 @@ recorrente for identificado.
 
 ## Histórico
 
+- **2026-07-07 (6)**: análise de 6 XMLs reais mostrou a maioria dos vazios de
+  `<duracaoPorExecucao>`/`<colaboradoresEnvolvidos>` como lacunas genuínas da
+  reunião (perguntado e não respondido, ou processo 100% automatizado sem
+  execução manual) — não falhas de extração. Um caso real (pista qualitativa
+  "a tarefa é curta" não convertida) revelou inconsistência: pistas fracas no
+  extremo "curto" não estavam sendo convertidas do mesmo jeito que pistas no
+  extremo "longo" ("manhã toda"). Adicionado exemplo ERRADO/CERTO específico
+  pra isso. Também adicionada uma trava contra "não quantificado" virar
+  atalho preguiçoso: só é aceitável depois de checar ativamente por pistas
+  diretas, qualitativas E se o dado foi perguntado e desviado — a observação
+  precisa citar essa tentativa, não só declarar vazio. Do lado do sistema
+  (não do prompt): o Slide Executivo agora mostra "Não quantificado nesta
+  reunião" em vez de simplesmente esconder a linha, pra explicar
+  educadamente ao cliente em vez de parecer dado faltando sem motivo.
 - **2026-07-07 (5)**: reforçado explicitamente que `<duracaoPorExecucao>` exige
   MULTIPLICAR tempo-por-pessoa × colaboradoresEnvolvidos quando a transcrição
   der os dois separadamente (ex.: "cada um leva meia hora, somos três" → 1.5h,
@@ -84,6 +98,7 @@ Antes de preencher qualquer XML, faça esta leitura analítica:
    - Varra atrás de quem executa ("sou eu que faço", "duas pessoas revezam", "o time todo passa por isso") e converta para um inteiro. Não conte quem DESENVOLVEU a automação — só quem EXECUTA o processo.
    - `<duracaoPorExecucao>` é o TOTAL da execução, somando todos os envolvidos — se a transcrição der o tempo de UMA pessoa e o número de pessoas separadamente (ex.: "cada um leva meia hora, somos três"), FAÇA a multiplicação você mesma(o) (0.5h × 3 = 1.5h) em vez de devolver só o tempo individual. Você consegue interpretar essa conta a partir da discussão — não deixe pra um cálculo posterior.
    - Só deixe esses campos vazios se a transcrição realmente não der pista nenhuma. Quando ficar vazio, registre a lacuna EXATA em `<informacoesAdicionais>` — e, se o entrevistador chegou a perguntar o tempo e não recebeu número, escreva isso ("tempo perguntado e não quantificado na reunião"), porque essa é a pergunta a repetir com o cliente.
+   - **"Não quantificado" é o último recurso, não um atalho.** O sistema mostra esse rótulo no Slide Executivo exatamente como está escrito na sua observação, então ele precisa refletir uma tentativa real, não uma saída fácil para não fazer a conta. Antes de deixar vazio, confirme que você: (1) leu a transcrição inteira atrás de qualquer menção a tempo/pessoas, mesmo indireta; (2) tentou a conversão de pistas qualitativas (regra acima); (3) considerou se o dado foi perguntado e desviado. Só depois desses três passos é aceitável deixar vazio — e a observação deve citar o que foi encontrado (ex.: a pergunta feita e a resposta que fugiu do assunto), não só dizer "não informado".
 
 4. **Trate transcrição ruim e dado ausente com honestidade.** Áudio truncado, fala cortada ou resposta que fugiu da pergunta são comuns. Nunca invente um número, nome ou prazo para preencher um vazio (ver Regras gerais). O correto é deixar o campo vazio e anotar a lacuna nas observações — não "chutar para não deixar em branco".
 
@@ -159,8 +174,10 @@ Antes de preencher qualquer XML, faça esta leitura analítica:
   **Quando a transcrição der o tempo POR PESSOA e o número de pessoas separadamente (em vez de já somado), FAÇA a conta você mesma(o): tempo por pessoa × colaboradoresEnvolvidos = duracaoPorExecucao. Não deixe essa multiplicação implícita nem devolva só o tempo de uma pessoa — você é capaz de interpretar essa conta a partir da discussão, então faça-a e mostre o raciocínio em <informacoesAdicionais>.**
   ERRADO: deixar vazio só porque não foi dito um número exato e redondo
   ERRADO: transcrição diz "cada um de nós leva 1h nisso, somos 3 pessoas" e a tag sai como <duracaoPorExecucao>1</duracaoPorExecucao> (isso é o tempo de UMA pessoa; faltou multiplicar pelas 3 envolvidas — o correto é 3)
+  ERRADO: transcrição diz "é uma tarefa curta"/"é rapidinho"/"não toma muito tempo" e a tag fica vazia por falta de número exato — isso ainda é uma pista qualitativa como "manhã toda" ou "10 minutos", só que no outro extremo (curto); converta para uma estimativa baixa e conservadora (ex.: "curta"/"rapidinho" ≈ 0.1-0.25h) e registre em <informacoesAdicionais> que é uma estimativa de baixa confiança a partir de uma descrição vaga.
   CERTO: transcrição diz "isso toma uns 10 minutos toda vez que roda" (uma pessoa só), <duracaoPorExecucao>0.17</duracaoPorExecucao> — e em <informacoesAdicionais>: "duracaoPorExecucao estimado a partir de '10 minutos' citado na transcrição."
   CERTO: transcrição diz "cada um de nós leva 1h nisso, somos 3 pessoas", <duracaoPorExecucao>3</duracaoPorExecucao> — e em <informacoesAdicionais>: "duracaoPorExecucao = 1h por pessoa × 3 colaboradoresEnvolvidos = 3h totais."
+  CERTO: transcrição diz "é uma tarefa rápida, não demora nada", <duracaoPorExecucao>0.17</duracaoPorExecucao> — e em <informacoesAdicionais>: "duracaoPorExecucao estimado em 0.17h (10 min) a partir de 'tarefa rápida, não demora nada' — estimativa de baixa confiança, sem número exato citado; confirmar com o cliente."
   Esses dois campos alimentam o cálculo automático de horas anuais e horas totais por mês gastas no processo, exibido no Slide Executivo — deixá-los vazios sem necessidade real esconde essa informação do slide, mesmo quando a reunião discutiu o suficiente para estimar.
 - <periodicidade>: **CAMPO RESTRITO, sem fallback "Outro"**. Use exatamente um destes valores, e SÓ o valor — sem parênteses, sem complemento, sem justificativa dentro da tag:
   Diário | Duas vezes por semana | Três vezes por semana | Semanal | Mensal | Anual

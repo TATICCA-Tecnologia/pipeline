@@ -199,29 +199,41 @@ export function ProjectExecutiveSlide({ project }: { project: Project }) {
 
   const periodicidadeLabel = resolveLabel(project.processFrequency, PROCESS_FREQUENCIES);
 
-  const quantitativeLines = buildLabeledLines([
-    { label: "Periodicidade do processo", value: periodicidadeLabel },
-    { label: "Rodagem do bot", value: project.robotSchedule },
+  // Colaboradores/Duração vêm direto da entrevista com o cliente — ao contrário dos outros
+  // campos desta seção, uma lacuna aqui não deve sumir da tabela (pareceria que ninguém
+  // perguntou); mostra um rótulo neutro em vez do valor, para ser explicado educadamente
+  // ao cliente como algo a confirmar, sem virar um alerta/destaque de atenção no slide.
+  const NOT_QUANTIFIED_LABEL = "Não quantificado nesta reunião";
+
+  const quantitativeLines: { label: string; value: string; isGap?: boolean }[] = [
+    ...buildLabeledLines([
+      { label: "Periodicidade do processo", value: periodicidadeLabel },
+      { label: "Rodagem do bot", value: project.robotSchedule },
+    ]),
     {
       label: "Colaboradores",
-      value: project.peopleInvolved != null ? String(project.peopleInvolved) : undefined,
+      value: project.peopleInvolved != null ? String(project.peopleInvolved) : NOT_QUANTIFIED_LABEL,
+      isGap: project.peopleInvolved == null,
     },
     {
       label: "Duração por execução",
-      value: project.taskDurationHours != null ? `${project.taskDurationHours}h` : undefined,
+      value: project.taskDurationHours != null ? `${project.taskDurationHours}h` : NOT_QUANTIFIED_LABEL,
+      isGap: project.taskDurationHours == null,
     },
-    {
-      label: "Horas anuais",
-      value: project.currentAnnualHours != null ? `${project.currentAnnualHours}h` : undefined,
-    },
-    {
-      label: "Horas totais gastas por mês",
-      value:
-        project.currentAnnualHours != null
-          ? `${roundHours(project.currentAnnualHours / 12)}h`
-          : undefined,
-    },
-  ]);
+    ...buildLabeledLines([
+      {
+        label: "Horas anuais",
+        value: project.currentAnnualHours != null ? `${project.currentAnnualHours}h` : undefined,
+      },
+      {
+        label: "Horas totais gastas por mês",
+        value:
+          project.currentAnnualHours != null
+            ? `${roundHours(project.currentAnnualHours / 12)}h`
+            : undefined,
+      },
+    ]),
+  ];
   const monthlyHoursSavedLabel =
     project.monthlyHoursSaved != null ? `${project.monthlyHoursSaved}h/mês` : undefined;
 
@@ -342,7 +354,15 @@ export function ProjectExecutiveSlide({ project }: { project: Project }) {
                         <td className="bg-teal-50 px-3 py-2 font-medium text-teal-700">
                           {line.label}
                         </td>
-                        <td className="px-3 py-2 text-foreground/90">{line.value}</td>
+                        <td
+                          className={
+                            line.isGap
+                              ? "px-3 py-2 italic text-muted-foreground"
+                              : "px-3 py-2 text-foreground/90"
+                          }
+                        >
+                          {line.value}
+                        </td>
                       </tr>
                     ))}
                     {monthlyHoursSavedLabel && (
