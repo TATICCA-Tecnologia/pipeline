@@ -77,6 +77,16 @@ import { parseSolicitacaoXml } from "./utils/xml-import";
 import { extractXmlEntriesFromZip } from "./utils/zip-import";
 import { cn } from "@/shared/utils";
 
+function slugify(text: string): string {
+  return text
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .replace(/[^a-z0-9\s-]/g, "")
+    .trim()
+    .replace(/\s+/g, "-");
+}
+
 const QUALITATIVE_RATINGS = [
   { name: "ratingErrorReduction" as const, label: "Redução de Erros" },
   {
@@ -324,6 +334,20 @@ export default function SolicitarProjetoPage() {
   // passar por `closeCompanyResolutionDialog` — se uma delas esquecer de
   // resolver essa Promise, o import correspondente trava para sempre.
   const companyResolverRef = useRef<((companyId: string | null) => void) | null>(null);
+  const [pendingTaxonomyResolution, setPendingTaxonomyResolution] = useState<{
+    kind: "area" | "theme";
+    rawValue: string;
+    areaIdForTheme?: string; // só usado quando kind === "theme": área já resolvida a que o tema pertence
+    batchContext?: BatchContext;
+  } | null>(null);
+  const [chosenTaxonomyId, setChosenTaxonomyId] = useState<string | undefined>();
+  const [creatingNewTaxonomy, setCreatingNewTaxonomy] = useState(false);
+  const taxonomyResolverRef = useRef<((result: { id: string; slug: string; name: string } | null) => void) | null>(
+    null
+  );
+
+  const createAreaMutation = trpc.taxonomy.createArea.useMutation();
+  const createThemeMutation = trpc.taxonomy.createTheme.useMutation();
   const [batchImportResults, setBatchImportResults] = useState<BatchImportResult[] | null>(null);
   const [selectedCompanyId, setSelectedCompanyId] = useState<string | undefined>();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -391,6 +415,28 @@ export default function SolicitarProjetoPage() {
     });
   }
 
+  function closeTaxonomyResolutionDialog(result: { id: string; slug: string; name: string } | null) {
+    taxonomyResolverRef.current?.(result);
+    taxonomyResolverRef.current = null;
+    setPendingTaxonomyResolution(null);
+    setChosenTaxonomyId(undefined);
+    setCreatingNewTaxonomy(false);
+  }
+
+  function resolveTaxonomyAmbiguity(
+    kind: "area" | "theme",
+    rawValue: string,
+    areaIdForTheme?: string,
+    batchContext?: BatchContext
+  ): Promise<{ id: string; slug: string; name: string } | null> {
+    return new Promise((resolve) => {
+      taxonomyResolverRef.current = resolve;
+      setPendingTaxonomyResolution({ kind, rawValue, areaIdForTheme, batchContext });
+      setChosenTaxonomyId(undefined);
+      setCreatingNewTaxonomy(false);
+    });
+  }
+
   async function importXmlEntry(
     xmlText: string,
     batchContext?: BatchContext
@@ -423,6 +469,38 @@ export default function SolicitarProjetoPage() {
       companyId = chosen;
     }
 
+    let resolvedAreaId: string | undefined;
+    let resolvedThemeId: string | undefined;
+
+    if (result.formData.projectArea === "outro" && result.formData.customProjectArea.trim()) {
+      const resolvedArea = await resolveTaxonomyAmbiguity(
+        "area",
+        result.formData.customProjectArea.trim(),
+        undefined,
+        batchContext
+      );
+      if (resolvedArea) {
+        resolvedAreaId = resolvedArea.id;
+        result.formData.projectArea = resolvedArea.slug;
+        result.formData.customProjectArea = resolvedArea.slug === "outro" ? result.formData.customProjectArea : "";
+      }
+      // Se o usuário cancelar (resolvedArea === null), mantém "outro" + texto livre — comportamento de hoje.
+    }
+
+    if (result.formData.projectTheme === "outro" && result.formData.customProjectTheme.trim()) {
+      const resolvedTheme = await resolveTaxonomyAmbiguity(
+        "theme",
+        result.formData.customProjectTheme.trim(),
+        resolvedAreaId,
+        batchContext
+      );
+      if (resolvedTheme) {
+        resolvedThemeId = resolvedTheme.id;
+        result.formData.projectTheme = resolvedTheme.slug;
+        result.formData.customProjectTheme = "";
+      }
+    }
+
     try {
       const payload = buildProjectPayload({
         data: result.formData,
@@ -430,6 +508,8 @@ export default function SolicitarProjetoPage() {
         benefits: result.benefits,
         clientId: user.id,
         companyId,
+        areaId: resolvedAreaId,
+        themeId: resolvedThemeId,
         areas: PROJECT_AREAS,
         themesByArea: PROJECT_THEMES_BY_AREA,
         buildTypeLabel: buildClienteProjectTypeLabel,
@@ -1665,6 +1745,128 @@ export default function SolicitarProjetoPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog
+        open={pendingTaxonomyResolution !== null}
+        onOpenChange={(open) => {
+          if (!open) closeTaxonomyResolutionDialog(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {pendingTaxonomyResolution?.kind === "area" ? "Área não cadastrada" : "Tema não cadastrado"}
+            </DialogTitle>
+            <DialogDescription>
+              {pendingTaxonomyResolution?.batchContext && (
+                <span className="mb-1 block font-medium text-foreground">
+                  Arquivo {pendingTaxonomyResolution.batchContext.index} de{" "}
+                  {pendingTaxonomyResolution.batchContext.total}: {pendingTaxonomyResolution.batchContext.fileName}
+                </span>
+              )}
+              O XML indica{" "}
+              {pendingTaxonomyResolution?.kind === "area" ? "a área" : "o tema"} &quot;
+              {pendingTaxonomyResolution?.rawValue}&quot;, que não corresponde a nenhuma opção cadastrada.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3">
+            <div className="space-y-2">
+              <Label>
+                Usar {pendingTaxonomyResolution?.kind === "area" ? "uma área" : "um tema"} já cadastrado
+              </Label>
+              <Select
+                value={creatingNewTaxonomy ? "" : chosenTaxonomyId}
+                onValueChange={(value) => {
+                  setChosenTaxonomyId(value);
+                  setCreatingNewTaxonomy(false);
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione" />
+                </SelectTrigger>
+                <SelectContent>
+                  {(pendingTaxonomyResolution?.kind === "area"
+                    ? PROJECT_AREAS
+                    : PROJECT_THEMES_BY_AREA[pendingTaxonomyResolution?.areaIdForTheme ?? ""] ?? []
+                  )
+                    .filter((opt): opt is typeof opt & { id: string } => Boolean(opt.id))
+                    .map((opt) => (
+                      <SelectItem key={opt.id} value={opt.id}>
+                        {opt.label}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {(user?.role === "admin" || user?.role === "super_admin") &&
+              !(pendingTaxonomyResolution?.kind === "theme" && !pendingTaxonomyResolution?.areaIdForTheme) && (
+                <div className="flex items-center gap-2 rounded-md border border-dashed border-border p-3">
+                  <Checkbox
+                    checked={creatingNewTaxonomy}
+                    onCheckedChange={(checked) => {
+                      setCreatingNewTaxonomy(checked === true);
+                      if (checked === true) setChosenTaxonomyId(undefined);
+                    }}
+                  />
+                  <span className="text-sm">
+                    Cadastrar &quot;{pendingTaxonomyResolution?.rawValue}&quot; como{" "}
+                    {pendingTaxonomyResolution?.kind === "area" ? "nova área" : "novo tema"} permanente
+                  </span>
+                </div>
+              )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => closeTaxonomyResolutionDialog(null)}>
+              Manter como &quot;Outro&quot;
+            </Button>
+            <Button
+              disabled={(!chosenTaxonomyId && !creatingNewTaxonomy) || createAreaMutation.isPending || createThemeMutation.isPending}
+              onClick={async () => {
+                if (!pendingTaxonomyResolution) return;
+                if (creatingNewTaxonomy) {
+                  const name = pendingTaxonomyResolution.rawValue;
+                  const slug = slugify(name);
+                  try {
+                    if (pendingTaxonomyResolution.kind === "area") {
+                      const created = await createAreaMutation.mutateAsync({ name, slug, order: 0 });
+                      closeTaxonomyResolutionDialog({ id: created.id, slug: created.slug, name: created.name });
+                    } else if (pendingTaxonomyResolution.areaIdForTheme) {
+                      const created = await createThemeMutation.mutateAsync({
+                        name,
+                        slug,
+                        areaId: pendingTaxonomyResolution.areaIdForTheme,
+                        order: 0,
+                      });
+                      closeTaxonomyResolutionDialog({ id: created.id, slug: created.slug, name: created.name });
+                    }
+                  } catch (error) {
+                    console.error("Erro ao cadastrar categoria:", error);
+                    toast({
+                      title: "Erro",
+                      description: "Não foi possível cadastrar a categoria. Tente novamente.",
+                      variant: "destructive",
+                    });
+                  }
+                } else if (chosenTaxonomyId) {
+                  const options =
+                    pendingTaxonomyResolution.kind === "area"
+                      ? PROJECT_AREAS
+                      : PROJECT_THEMES_BY_AREA[pendingTaxonomyResolution.areaIdForTheme ?? ""] ?? [];
+                  const picked = options.find((o) => o.id === chosenTaxonomyId);
+                  if (picked?.id) {
+                    closeTaxonomyResolutionDialog({ id: picked.id, slug: picked.value, name: picked.label });
+                  }
+                }
+              }}
+            >
+              {createAreaMutation.isPending || createThemeMutation.isPending ? "Salvando..." : "Confirmar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </TooltipProvider>
   );
 }
