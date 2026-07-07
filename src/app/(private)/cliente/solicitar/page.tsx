@@ -222,7 +222,11 @@ function RatingRow({
 }
 
 export default function SolicitarProjetoPage() {
-  const { user, isSuperAdmin } = useAuth();
+  const { user, actualUser, isSuperAdmin } = useAuth();
+  // Permissão de cadastrar área/tema nova é do usuário REAL, não do papel impersonado por
+  // "visualizar como cliente" — um super_admin navegando como cliente continua podendo cadastrar
+  // (mesmo padrão já usado acima para companyOptions).
+  const canRegisterTaxonomy = actualUser?.role === "admin" || actualUser?.role === "super_admin";
   const { addProject } = useProjects();
   const { addFile } = useFiles();
   const router = useRouter();
@@ -955,7 +959,7 @@ export default function SolicitarProjetoPage() {
                         />
                       )}
                     </div>
-                    {projectArea === "outro" && (user?.role === "admin" || user?.role === "super_admin") && (
+                    {projectArea === "outro" && canRegisterTaxonomy && (
                       <div className="mt-2 flex items-center gap-2">
                         <Checkbox checked={registerNewArea} onCheckedChange={(c) => setRegisterNewArea(c === true)} />
                         <span className="text-xs text-muted-foreground">
@@ -1022,7 +1026,7 @@ export default function SolicitarProjetoPage() {
                         />
                       )}
                     </div>
-                    {projectTheme === "outro" && (user?.role === "admin" || user?.role === "super_admin") && (
+                    {projectTheme === "outro" && canRegisterTaxonomy && (
                       <div className="mt-2 flex items-center gap-2">
                         <Checkbox
                           checked={registerNewTheme}
@@ -1892,7 +1896,7 @@ export default function SolicitarProjetoPage() {
               </Select>
             </div>
 
-            {(user?.role === "admin" || user?.role === "super_admin") &&
+            {canRegisterTaxonomy &&
               !(pendingTaxonomyResolution?.kind === "theme" && !pendingTaxonomyResolution?.areaIdForTheme) && (
                 <div className="flex items-center gap-2 rounded-md border border-dashed border-border p-3">
                   <Checkbox
