@@ -185,6 +185,8 @@ export function ProjectsProvider({ children }: { children: ReactNode }) {
         clientId: project.clientId,
         developerId: project.developerId,
         companyId: project.companyId,
+        areaId: project.areaId,
+        themeId: project.themeId,
         projectType: project.projectType?.trim() || "Outro",
         estimatedDeadline: project.estimatedDeadline,
         targetAudience: project.targetAudience,

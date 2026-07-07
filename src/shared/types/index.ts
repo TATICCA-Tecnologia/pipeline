@@ -38,6 +38,8 @@ export interface Project {
   developerId?: string;
   companyId?: string;
   companyName?: string;
+  areaId?: string;
+  themeId?: string;
   estimatedDeadline?: Date;
   estimatedBudget?: number;
   projectType: string;
