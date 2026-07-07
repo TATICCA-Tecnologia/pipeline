@@ -12,6 +12,14 @@ recorrente for identificado.
 
 ## Histórico
 
+- **2026-07-07 (5)**: reforçado explicitamente que `<duracaoPorExecucao>` exige
+  MULTIPLICAR tempo-por-pessoa × colaboradoresEnvolvidos quando a transcrição
+  der os dois separadamente (ex.: "cada um leva meia hora, somos três" → 1.5h,
+  não 0.5h) — decidido deixar esse cálculo por conta da IA que gera o XML
+  (mais capaz de interpretar a discussão numérica do contexto da reunião),
+  em vez de mover a multiplicação para o código do sistema. Adicionado
+  exemplo ERRADO/CERTO específico dessa multiplicação, tanto na regra do
+  campo quanto na seção de método.
 - **2026-07-07 (4)**: mesclada uma versão do prompt evoluída pelo usuário
   (com ajuda de outra sessão de IA) que adicionou uma seção de método de
   análise, um exemplo completo transcrição→XML, e um formato de saída em
@@ -74,6 +82,7 @@ Antes de preencher qualquer XML, faça esta leitura analítica:
 3. **Persiga números de tempo e de pessoas — este é o ponto mais importante da análise.** `<duracaoPorExecucao>` e `<colaboradoresEnvolvidos>` alimentam o cálculo de horas gastas por ano/mês no Slide Executivo; deixá-los vazios sem necessidade esconde a informação mais valiosa do diagnóstico. Então:
    - Varra a transcrição atrás de QUALQUER pista de tempo, mesmo qualitativa, e converta para horas (ex.: "leva a manhã toda" ≈ 4h; "uns 10-15 minutos" ≈ 0.2h; "o dia inteiro" ≈ 8h; "umas duas horas" = 2h). Explique a conversão em `<informacoesAdicionais>`.
    - Varra atrás de quem executa ("sou eu que faço", "duas pessoas revezam", "o time todo passa por isso") e converta para um inteiro. Não conte quem DESENVOLVEU a automação — só quem EXECUTA o processo.
+   - `<duracaoPorExecucao>` é o TOTAL da execução, somando todos os envolvidos — se a transcrição der o tempo de UMA pessoa e o número de pessoas separadamente (ex.: "cada um leva meia hora, somos três"), FAÇA a multiplicação você mesma(o) (0.5h × 3 = 1.5h) em vez de devolver só o tempo individual. Você consegue interpretar essa conta a partir da discussão — não deixe pra um cálculo posterior.
    - Só deixe esses campos vazios se a transcrição realmente não der pista nenhuma. Quando ficar vazio, registre a lacuna EXATA em `<informacoesAdicionais>` — e, se o entrevistador chegou a perguntar o tempo e não recebeu número, escreva isso ("tempo perguntado e não quantificado na reunião"), porque essa é a pergunta a repetir com o cliente.
 
 4. **Trate transcrição ruim e dado ausente com honestidade.** Áudio truncado, fala cortada ou resposta que fugiu da pergunta são comuns. Nunca invente um número, nome ou prazo para preencher um vazio (ver Regras gerais). O correto é deixar o campo vazio e anotar a lacuna nas observações — não "chutar para não deixar em branco".
@@ -147,8 +156,11 @@ Antes de preencher qualquer XML, faça esta leitura analítica:
   CERTO: transcrição diz "hoje sou eu que recebo o e-mail e jogo na planilha todo dia", <colaboradoresEnvolvidos>1</colaboradoresEnvolvidos>
 - <duracaoPorExecucao>: **mesma prioridade — campo importante, não deixe vazio por padrão**. Número em horas (decimais permitidos, use PONTO como separador decimal), duração TOTAL por execução somando todos os envolvidos, não só uma pessoa. Procure ativamente qualquer estimativa de tempo, mesmo aproximada ou qualitativa, e converta para o número mais próximo, explicando a conversão em <informacoesAdicionais> — só deixe vazio se a transcrição realmente não der nenhuma pista de tempo.
   Exemplos de conversão: "leva a manhã toda" ≈ 4h | "uns 10-15 minutos" ≈ 0.2h | "o dia inteiro" ≈ 8h | "mais ou menos uma hora por dia" ≈ 1h.
+  **Quando a transcrição der o tempo POR PESSOA e o número de pessoas separadamente (em vez de já somado), FAÇA a conta você mesma(o): tempo por pessoa × colaboradoresEnvolvidos = duracaoPorExecucao. Não deixe essa multiplicação implícita nem devolva só o tempo de uma pessoa — você é capaz de interpretar essa conta a partir da discussão, então faça-a e mostre o raciocínio em <informacoesAdicionais>.**
   ERRADO: deixar vazio só porque não foi dito um número exato e redondo
-  CERTO: transcrição diz "isso toma uns 10 minutos toda vez que roda", <duracaoPorExecucao>0.17</duracaoPorExecucao> — e em <informacoesAdicionais>: "duracaoPorExecucao estimado a partir de '10 minutos' citado na transcrição."
+  ERRADO: transcrição diz "cada um de nós leva 1h nisso, somos 3 pessoas" e a tag sai como <duracaoPorExecucao>1</duracaoPorExecucao> (isso é o tempo de UMA pessoa; faltou multiplicar pelas 3 envolvidas — o correto é 3)
+  CERTO: transcrição diz "isso toma uns 10 minutos toda vez que roda" (uma pessoa só), <duracaoPorExecucao>0.17</duracaoPorExecucao> — e em <informacoesAdicionais>: "duracaoPorExecucao estimado a partir de '10 minutos' citado na transcrição."
+  CERTO: transcrição diz "cada um de nós leva 1h nisso, somos 3 pessoas", <duracaoPorExecucao>3</duracaoPorExecucao> — e em <informacoesAdicionais>: "duracaoPorExecucao = 1h por pessoa × 3 colaboradoresEnvolvidos = 3h totais."
   Esses dois campos alimentam o cálculo automático de horas anuais e horas totais por mês gastas no processo, exibido no Slide Executivo — deixá-los vazios sem necessidade real esconde essa informação do slide, mesmo quando a reunião discutiu o suficiente para estimar.
 - <periodicidade>: **CAMPO RESTRITO, sem fallback "Outro"**. Use exatamente um destes valores, e SÓ o valor — sem parênteses, sem complemento, sem justificativa dentro da tag:
   Diário | Duas vezes por semana | Três vezes por semana | Semanal | Mensal | Anual
