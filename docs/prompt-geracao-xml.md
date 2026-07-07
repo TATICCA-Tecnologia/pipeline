@@ -12,6 +12,16 @@ recorrente for identificado.
 
 ## Histórico
 
+- **2026-07-07 (3)**: reforçadas as regras de `<colaboradoresEnvolvidos>` e
+  `<duracaoPorExecucao>` — casos reais mostraram o prompt deixando essas tags
+  vazias (ou preenchendo errado, contando quem *desenvolveu* uma automação
+  informal em vez de quem *executa* o processo manualmente) mesmo quando a
+  transcrição dava pistas suficientes pra estimar. Adicionadas instruções
+  explícitas pra buscar ativamente qualquer pista qualitativa de tempo/equipe
+  e converter pra número, com exemplos de conversão — esses dois campos
+  alimentam o cálculo de horas anuais/mensais exibido na Avaliação
+  Quantitativa do Slide Executivo, então deixá-los vazios sem necessidade
+  esconde essa informação do slide.
 - **2026-07-07 (2)**: reforçada a regra de `<aplicacaoExistenteHoje>` para
   cobrir explicitamente ferramentas de automação já em uso de forma informal
   (n8n, Python, Power Automate, UiPath, Zapier etc.), não só planilhas —
@@ -102,8 +112,16 @@ IMPORTANTE: uma única reunião pode conter mais de um processo/oportunidade de 
   ERRADO: deixar a tag vazia quando a transcrição menciona "já rodamos isso num fluxo do n8n" ou "temos um script em Python que faz isso hoje"
   CERTO: <aplicacaoExistenteHoje>Sim</aplicacaoExistenteHoje> — e em <detalhesAplicacaoExistente>: "Automação feita hoje em n8n" (ou "script em Python", "fluxo no Power Automate", "planilha com macro" — a ferramenta específica citada).
 - <detalhesAplicacaoExistente>: preencha só se aplicacaoExistenteHoje = "Sim". Descreva em 1-2 frases: plataforma/tecnologia usada (nome da ferramenta, ex.: n8n, Python, Power Automate, Power Apps, UiPath), quem desenvolveu, desde quando está em produção, limitações conhecidas — não deixe genérico, use os detalhes específicos citados na transcrição.
-- <colaboradoresEnvolvidos>: número inteiro (quantidade de pessoas envolvidas na execução manual hoje).
-- <duracaoPorExecucao>: número (horas), pode ter casas decimais. É a duração total por execução somando todos os envolvidos, não só uma pessoa.
+- <colaboradoresEnvolvidos>: **campo importante, não deixe vazio por padrão** — número inteiro de pessoas envolvidas na execução MANUAL do processo hoje. Busque ativamente na transcrição qualquer pista sobre quem faz a tarefa (nomes citados, "eu que faço isso", "duas pessoas revezam", "o time todo passa por isso") e converta para um número — só deixe vazio se a transcrição genuinamente não der nenhuma pista, o que deve ser raro numa reunião de levantamento.
+  NÃO confunda com quem desenvolveu uma automação/script/fluxo informal já existente (isso vai em <detalhesAplicacaoExistente>, não aqui) — "colaboradoresEnvolvidos" é sobre quem executa o processo, não quem programou uma ferramenta para ele.
+  ERRADO: deixar vazio porque a transcrição só menciona "foi o Leandro que desenvolveu o fluxo em Power Automate" (isso é sobre desenvolvimento da automação, não sobre quem faz o processo manualmente)
+  ERRADO: <colaboradoresEnvolvidos>Leandro</colaboradoresEnvolvidos> (não é um número; e é o desenvolvedor, não necessariamente quem executa)
+  CERTO: transcrição diz "hoje sou eu que recebo o e-mail e jogo na planilha todo dia", <colaboradoresEnvolvidos>1</colaboradoresEnvolvidos>
+- <duracaoPorExecucao>: **mesma prioridade — campo importante, não deixe vazio por padrão**. Número em horas (decimais permitidos), duração total por execução somando todos os envolvidos, não só uma pessoa. Procure ativamente qualquer estimativa de tempo, mesmo aproximada ou qualitativa, e converta para o número mais próximo, explicando a conversão em <informacoesAdicionais> — só deixe vazio se a transcrição realmente não der nenhuma pista de tempo.
+  Exemplos de conversão: "leva a manhã toda" ≈ 4h | "uns 10-15 minutos" ≈ 0,2h | "o dia inteiro" ≈ 8h | "mais ou menos uma hora por dia" ≈ 1h.
+  ERRADO: deixar vazio só porque não foi dito um número exato e redondo
+  CERTO: transcrição diz "isso toma uns 10 minutos toda vez que roda", <duracaoPorExecucao>0.17</duracaoPorExecucao> — e em <informacoesAdicionais>: "duracaoPorExecucao estimado a partir de '10 minutos' citado na transcrição."
+  Esses dois campos alimentam o cálculo automático de horas anuais e horas totais por mês gastas no processo, exibido no Slide Executivo — deixá-los vazios sem necessidade real esconde essa informação do slide, mesmo quando a reunião discutiu o suficiente para estimar.
 - <periodicidade>: **CAMPO RESTRITO, sem fallback "Outro"**. Use exatamente um destes valores, e SÓ o valor — sem parênteses, sem complemento, sem justificativa dentro da tag:
   Diário | Duas vezes por semana | Três vezes por semana | Semanal | Mensal | Anual
   Esse campo alimenta um cálculo automático de horas gastas por ano (duracaoPorExecucao × ocorrências/ano da periodicidade escolhida — ex.: Mensal = 12×/ano, Semanal = 52×/ano). Qualquer texto extra dentro da tag impede esse cálculo, mesmo que a informação em si esteja correta.
