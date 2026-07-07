@@ -2,24 +2,32 @@
 <solicitacaoDeProjeto>
   <empresa></empresa>
   <titulo></titulo>
+  <!-- Valores sugeridos: Contabilidade, RPA, Desenvolvimento, Consultoria técnica. Fora da lista, é tratado como "Outro" (texto livre aceito). -->
   <area></area>
+  <!-- Tema dentro da área escolhida. Fora da lista, é tratado como "Outro" (texto livre aceito). -->
   <tema></tema>
+  <!-- CAMPO RESTRITO: use exatamente um destes valores, sem texto adicional. Valores: Desktop (Windows / macOS) | Web (desktop e celular) | iOS (iPhone / iPad) | Android | iOS e Android | Todas as plataformas -->
   <plataforma></plataforma>
   <descricao></descricao>
+  <!-- Valores sugeridos: Uso interno da empresa, Clientes, Fornecedores, etc. Fora da lista, é tratado como "Outro" (texto livre aceito). -->
   <publicoAlvo></publicoAlvo>
   <numeroUsuarios></numeroUsuarios>
+  <!-- CAMPO RESTRITO: use exatamente um destes valores, sem texto adicional. Valores: Não, projeto do zero | Sim, quero substituir | Sim, quero integrar/migrar dados | Sim, quero melhorar o existente -->
   <processoExistente></processoExistente>
   <detalhesProcessoAtual></detalhesProcessoAtual>
+  <!-- CAMPO RESTRITO: use exatamente Sim ou Não, sem texto adicional. Detalhes vão em detalhesAplicacaoExistente. -->
   <aplicacaoExistenteHoje></aplicacaoExistenteHoje>
   <detalhesAplicacaoExistente></detalhesAplicacaoExistente>
   <colaboradoresEnvolvidos></colaboradoresEnvolvidos>
   <detalhesColaboradores></detalhesColaboradores>
   <duracaoPorExecucao></duracaoPorExecucao>
+  <!-- CAMPO RESTRITO — alimenta o cálculo automático de horas gastas por ano. Use exatamente um destes valores, SEM parênteses nem texto adicional (contexto extra vai em informacoesAdicionais). Valores: Diário | Duas vezes por semana | Três vezes por semana | Semanal | Mensal | Anual -->
   <periodicidade></periodicidade>
   <narrativaDoProcesso></narrativaDoProcesso>
   <funcionalidades>
     <!-- <funcionalidade>Exemplo de funcionalidade</funcionalidade> -->
   </funcionalidades>
+  <!-- Cada <beneficio> deve corresponder exatamente a um destes rótulos (item que não bater vira "Outro" automaticamente, sem bloquear a importação): Redução de trabalho operacional (tarefas manuais, planilhas, retrabalho) | Melhor relacionamento com o cliente (experiência, atendimento, rapidez) | Melhor relacionamento com fornecedores ou parceiros | Redução de multas, riscos ou infrações (fiscais, regulatórias, contratuais) | Melhoria da qualidade do trabalho (padronização, menos erros, mais visibilidade) -->
   <beneficios>
     <!-- <beneficio>Redução de trabalho operacional (tarefas manuais, planilhas, retrabalho)</beneficio> -->
   </beneficios>
@@ -30,6 +38,7 @@
   <avaliacaoImpactoInterno></avaliacaoImpactoInterno>
   <avaliacaoImpactoExterno></avaliacaoImpactoExterno>
   <avaliacaoAtendimentoPoliticas></avaliacaoAtendimentoPoliticas>
+  <!-- CAMPO RESTRITO: use exatamente um destes valores (incluindo o texto depois do travessão), sem texto adicional. Valores: Baixa — sem pressa definida | Média — próximos 2 a 3 meses | Alta — próximo mês | Urgente — o mais rápido possível -->
   <urgencia></urgencia>
   <prazoLimite></prazoLimite>
   <informacoesAdicionais></informacoesAdicionais>
