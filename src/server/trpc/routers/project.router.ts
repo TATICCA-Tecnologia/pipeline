@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { router, publicProcedure, protectedProcedure } from "../trpc";
+import { router, publicProcedure, protectedProcedure, adminProcedure } from "../trpc";
 import { toFrontendStatus, toPrismaStatus } from "../mappers";
 import type { FrontendProjectStatus } from "../mappers";
 import { PROCESS_FREQUENCY_MULTIPLIERS } from "@/shared/constants/project-taxonomy";
@@ -422,5 +422,15 @@ export const projectRouter = router({
         },
       });
       return { ...project, status: toFrontendStatus(project.status) };
+    }),
+
+  delete: adminProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const project = await ctx.db.project.findUnique({ where: { id: input.id } });
+      if (!project) throw new TRPCError({ code: "NOT_FOUND", message: "Projeto não encontrado" });
+
+      await ctx.db.project.delete({ where: { id: input.id } });
+      return { success: true };
     }),
 });
