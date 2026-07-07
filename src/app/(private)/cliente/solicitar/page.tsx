@@ -346,6 +346,8 @@ export default function SolicitarProjetoPage() {
   } | null>(null);
   const [chosenTaxonomyId, setChosenTaxonomyId] = useState<string | undefined>();
   const [creatingNewTaxonomy, setCreatingNewTaxonomy] = useState(false);
+  const [registerNewArea, setRegisterNewArea] = useState(false);
+  const [registerNewTheme, setRegisterNewTheme] = useState(false);
   // Guarda o resolve() da Promise que pausa importXmlEntry aguardando a escolha do usuário no
   // diálogo de área/tema (mesmo padrão do companyResolverRef acima). Deve ser setado ANTES de abrir
   // o diálogo (evita corrida) e limpo em um único lugar (closeTaxonomyResolutionDialog), alcançado por
@@ -654,12 +656,38 @@ export default function SolicitarProjetoPage() {
 
     setIsSubmitting(true);
     try {
+      let areaId: string | undefined;
+      let themeId: string | undefined;
+      let areaSlugForPayload = data.projectArea;
+      let themeSlugForPayload = data.projectTheme;
+
+      if (registerNewArea && data.projectArea === "outro" && data.customProjectArea.trim()) {
+        const name = data.customProjectArea.trim();
+        const created = await createAreaMutation.mutateAsync({ name, slug: slugify(name), order: 0 });
+        areaId = created.id;
+        areaSlugForPayload = created.slug;
+      }
+
+      if (registerNewTheme && data.projectTheme === "outro" && data.customProjectTheme.trim() && areaId) {
+        const name = data.customProjectTheme.trim();
+        const created = await createThemeMutation.mutateAsync({
+          name,
+          slug: slugify(name),
+          areaId,
+          order: 0,
+        });
+        themeId = created.id;
+        themeSlugForPayload = created.slug;
+      }
+
       const payload = buildProjectPayload({
-        data,
+        data: { ...data, projectArea: areaSlugForPayload, projectTheme: themeSlugForPayload },
         features,
         benefits,
         clientId: user.id,
         companyId: selectedCompanyId,
+        areaId,
+        themeId,
         areas: PROJECT_AREAS,
         themesByArea: PROJECT_THEMES_BY_AREA,
         buildTypeLabel: buildClienteProjectTypeLabel,
@@ -903,6 +931,14 @@ export default function SolicitarProjetoPage() {
                         />
                       )}
                     </div>
+                    {projectArea === "outro" && (user?.role === "admin" || user?.role === "super_admin") && (
+                      <div className="mt-2 flex items-center gap-2">
+                        <Checkbox checked={registerNewArea} onCheckedChange={(c) => setRegisterNewArea(c === true)} />
+                        <span className="text-xs text-muted-foreground">
+                          Cadastrar como nova área permanente
+                        </span>
+                      </div>
+                    )}
                     {errors.projectArea && (
                       <p className="text-xs text-destructive">
                         {errors.projectArea.message}
@@ -962,6 +998,17 @@ export default function SolicitarProjetoPage() {
                         />
                       )}
                     </div>
+                    {projectTheme === "outro" && (user?.role === "admin" || user?.role === "super_admin") && (
+                      <div className="mt-2 flex items-center gap-2">
+                        <Checkbox
+                          checked={registerNewTheme}
+                          onCheckedChange={(c) => setRegisterNewTheme(c === true)}
+                        />
+                        <span className="text-xs text-muted-foreground">
+                          Cadastrar como novo tema permanente
+                        </span>
+                      </div>
+                    )}
                     {errors.projectTheme && (
                       <p className="text-xs text-destructive">
                         {errors.projectTheme.message}
