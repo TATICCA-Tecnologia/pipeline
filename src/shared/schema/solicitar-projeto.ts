@@ -44,6 +44,8 @@ export const solicitarProjetoSchema = z
     customUrgency: z.string().optional().default(""),
     deadline: z.string().optional().default(""),
     additionalInfo: z.string().optional().default(""),
+    resolvedAreaId: z.string().optional(),
+    resolvedThemeId: z.string().optional(),
   })
   .superRefine((data, ctx) => {
     if (data.projectArea === "outro" && !data.customProjectArea.trim()) {

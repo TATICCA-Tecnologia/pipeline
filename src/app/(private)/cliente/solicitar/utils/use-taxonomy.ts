@@ -25,14 +25,14 @@ export function useTaxonomy() {
   const useDb = !isLoading && dbAreas && dbAreas.length > 0;
 
   const areas = useDb
-    ? dbAreas!.map((a) => ({ value: a.slug, label: a.name }))
-    : FALLBACK_AREAS.map((a) => ({ value: a.value, label: a.label }));
+    ? dbAreas!.map((a) => ({ value: a.slug, label: a.name, id: a.id as string | undefined }))
+    : FALLBACK_AREAS.map((a) => ({ value: a.value, label: a.label, id: undefined as string | undefined }));
 
-  const themesByArea: Record<string, { value: string; label: string }[]> = useDb
+  const themesByArea: Record<string, { value: string; label: string; id?: string }[]> = useDb
     ? Object.fromEntries(
         dbAreas!.map((a) => [
           a.slug,
-          a.themes.map((t) => ({ value: t.slug, label: t.name })),
+          a.themes.map((t) => ({ value: t.slug, label: t.name, id: t.id as string | undefined })),
         ])
       )
     : FALLBACK_THEMES;

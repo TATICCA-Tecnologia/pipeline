@@ -10,11 +10,13 @@ export function buildProjectPayload(params: {
   benefits: string[];
   clientId: string;
   companyId: string | undefined;
+  areaId?: string;
+  themeId?: string;
   areas: { value: string; label: string }[];
   themesByArea: Record<string, { value: string; label: string }[]>;
   buildTypeLabel: (areaValue: string, themeValue: string) => string;
 }): ProjectPayload {
-  const { data, features, benefits, clientId, companyId, areas, themesByArea, buildTypeLabel } =
+  const { data, features, benefits, clientId, companyId, areaId, themeId, areas, themesByArea, buildTypeLabel } =
     params;
 
   const areaLabel =
@@ -65,6 +67,8 @@ export function buildProjectPayload(params: {
     description: data.description,
     clientId,
     companyId,
+    areaId,
+    themeId,
     status: "backlog",
     priority:
       data.urgency === "urgente"
