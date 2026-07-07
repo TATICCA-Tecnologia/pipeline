@@ -119,6 +119,11 @@ export function parseSolicitacaoXml(
   const areaMatch = matchByLabel(areaTag, context.areas);
   const projectArea = areaMatch ? areaMatch.value : "outro";
   const customProjectArea = areaMatch ? "" : areaTag;
+  if (!areaMatch) {
+    warnings.push(
+      `<area> com valor '${areaTag}' não corresponde a nenhuma opção conhecida; foi tratado como "Outro" e o texto original foi preservado.`
+    );
+  }
 
   const temaTag = getDirectChildText(root, "tema");
   if (!temaTag) {
@@ -128,6 +133,11 @@ export function parseSolicitacaoXml(
   const temaMatch = matchByLabel(temaTag, themesForArea);
   const projectTheme = temaMatch ? temaMatch.value : "outro";
   const customProjectTheme = temaMatch ? "" : temaTag;
+  if (!temaMatch) {
+    warnings.push(
+      `<tema> com valor '${temaTag}' não corresponde a nenhuma opção conhecida; foi tratado como "Outro" e o texto original foi preservado.`
+    );
+  }
 
   // <plataforma> — com fallback "Outro"
   const plataformaTag = getDirectChildText(root, "plataforma");
@@ -137,6 +147,11 @@ export function parseSolicitacaoXml(
     const platformMatch = matchByLabel(plataformaTag, PLATFORMS);
     platform = platformMatch ? platformMatch.value : "outro";
     customPlatform = platformMatch ? "" : plataformaTag;
+    if (!platformMatch) {
+      warnings.push(
+        `<plataforma> com valor '${plataformaTag}' não corresponde a nenhuma opção conhecida; foi tratado como "Outro" e o texto original foi preservado.`
+      );
+    }
   }
 
   // <publicoAlvo> — com fallback "Outro"
@@ -150,6 +165,9 @@ export function parseSolicitacaoXml(
     } else {
       targetAudience = "outro";
       customTargetAudience = publicoTag;
+      warnings.push(
+        `<publicoAlvo> com valor '${publicoTag}' não corresponde a nenhuma opção conhecida; foi tratado como "Outro" e o texto original foi preservado.`
+      );
     }
   }
 
@@ -163,6 +181,11 @@ export function parseSolicitacaoXml(
     const match = matchByLabel(processoExistenteTag, HAS_EXISTING_SYSTEM_OPTIONS);
     hasExistingSystem = match ? match.value : "outro";
     customHasExistingSystem = match ? "" : processoExistenteTag;
+    if (!match) {
+      warnings.push(
+        `<processoExistente> com valor '${processoExistenteTag}' não corresponde a nenhuma opção conhecida; foi tratado como "Outro" e o texto original foi preservado.`
+      );
+    }
   }
 
   const existingSystemDetails = getDirectChildText(root, "detalhesProcessoAtual");
@@ -175,6 +198,11 @@ export function parseSolicitacaoXml(
     const match = matchByLabel(aplicacaoExistenteTag, HAS_CURRENT_APPLICATION_OPTIONS);
     hasCurrentApplication = match ? match.value : "outro";
     customHasCurrentApplication = match ? "" : aplicacaoExistenteTag;
+    if (!match) {
+      warnings.push(
+        `<aplicacaoExistenteHoje> com valor '${aplicacaoExistenteTag}' não corresponde a nenhuma opção conhecida; foi tratado como "Outro" e o texto original foi preservado.`
+      );
+    }
   }
 
   const currentApplicationDetails = getDirectChildText(root, "detalhesAplicacaoExistente");
@@ -221,6 +249,11 @@ export function parseSolicitacaoXml(
     const match = matchByLabel(periodicidadeTag, PROCESS_FREQUENCIES);
     processFrequency = match ? match.value : "outro";
     customProcessFrequency = match ? "" : periodicidadeTag;
+    if (!match) {
+      warnings.push(
+        `<periodicidade> com valor '${periodicidadeTag}' não corresponde a nenhuma opção conhecida; foi tratado como "Outro". O cálculo automático de horas gastas por ano NÃO será feito para este projeto — se a periodicidade real for uma das opções da lista, ajuste o valor antes de importar.`
+      );
+    }
   }
 
   const projectNarrative = getDirectChildText(root, "narrativaDoProcesso");
@@ -292,6 +325,11 @@ export function parseSolicitacaoXml(
     const match = matchByLabel(urgenciaTag, URGENCY_LEVELS);
     urgency = match ? match.value : "outro";
     customUrgency = match ? "" : urgenciaTag;
+    if (!match) {
+      warnings.push(
+        `<urgencia> com valor '${urgenciaTag}' não corresponde a nenhuma opção conhecida; foi tratado como "Outro" e o texto original foi preservado.`
+      );
+    }
   }
 
   // <prazoLimite>
