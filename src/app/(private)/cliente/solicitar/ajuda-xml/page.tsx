@@ -54,7 +54,7 @@ export default function AjudaXmlPage() {
       tag: "plataforma",
       required: false,
       description:
-        'Onde o processo vai funcionar (não confundir com sistemas que ele integra, como ERPs). Se não corresponder a nenhuma opção conhecida, é tratado como "Outro". Se vazio, usa o padrão (Desktop).',
+        'Onde o processo vai funcionar (não confundir com sistemas que ele integra, como ERPs). Use exatamente um dos valores aceitos, sem texto adicional. Se não corresponder a nenhuma opção conhecida, é tratado como "Outro". Se vazio, usa o padrão (Desktop).',
       acceptedValues: PLATFORMS.map((p) => p.label),
     },
     { tag: "descricao", required: true, description: "Objetivo principal e problema que o processo resolve." },
@@ -73,7 +73,7 @@ export default function AjudaXmlPage() {
       tag: "processoExistente",
       required: false,
       description:
-        'Se já existe um processo ou sistema atual. Se não corresponder a nenhuma opção conhecida, é tratado como "Outro".',
+        'Se já existe um processo ou sistema atual. Use exatamente um dos valores aceitos, sem texto adicional — detalhes vão em "Detalhes do processo atual". Se não corresponder a nenhuma opção conhecida, é tratado como "Outro".',
       acceptedValues: HAS_EXISTING_SYSTEM_OPTIONS.map((o) => o.label),
     },
     {
@@ -85,7 +85,7 @@ export default function AjudaXmlPage() {
       tag: "aplicacaoExistenteHoje",
       required: false,
       description:
-        'Se já existe uma aplicação (app/sistema) para esse processo hoje. Se não corresponder a nenhuma opção conhecida, é tratado como "Outro".',
+        'Se já existe uma aplicação (app/sistema) para esse processo hoje. Use exatamente "Sim" ou "Não", sem texto adicional — detalhes vão em "Detalhes da aplicação existente". Se não corresponder a nenhuma opção conhecida, é tratado como "Outro".',
       acceptedValues: HAS_CURRENT_APPLICATION_OPTIONS.map((o) => o.label),
     },
     {
@@ -116,7 +116,7 @@ export default function AjudaXmlPage() {
       tag: "periodicidade",
       required: false,
       description:
-        'Frequência com que o processo acontece. Se não corresponder a nenhuma opção conhecida, é tratado como "Outro".',
+        'Frequência com que o processo acontece. Use exatamente um dos valores aceitos, sem texto adicional (ex.: não escreva "Mensal (fechamento)"). Esse campo alimenta o cálculo automático de horas gastas por ano — contexto extra vai em "Informações adicionais". Se não corresponder a nenhuma opção conhecida, é tratado como "Outro" e o cálculo automático não é feito.',
       acceptedValues: PROCESS_FREQUENCIES.map((p) => p.label),
     },
     {
@@ -182,7 +182,7 @@ export default function AjudaXmlPage() {
       tag: "urgencia",
       required: false,
       description:
-        'Nível de urgência. Se não corresponder a nenhuma opção conhecida, é tratado como "Outro".',
+        'Nível de urgência. Use exatamente um dos valores aceitos (incluindo o texto depois do travessão), sem texto adicional — o motivo da urgência vai em "Informações adicionais". Se não corresponder a nenhuma opção conhecida, é tratado como "Outro".',
       acceptedValues: URGENCY_LEVELS.map((u) => u.label),
     },
     {
