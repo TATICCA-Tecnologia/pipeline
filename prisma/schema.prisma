@@ -187,6 +187,10 @@ model Project {
   companyId    String?
   developer    User?            @relation("ProjectDeveloper", fields: [developerId], references: [id])
   developerId  String?
+  area         ProjectArea?     @relation(fields: [areaId], references: [id], onDelete: SetNull)
+  areaId       String?
+  theme        ProjectTheme?    @relation(fields: [themeId], references: [id], onDelete: SetNull)
+  themeId      String?
   features     ProjectFeature[]
   phases       ProjectPhase[]
   tasks        Task[]
@@ -449,6 +453,7 @@ model ProjectArea {
   isActive  Boolean        @default(true)
   order     Int            @default(0)
   themes    ProjectTheme[]
+  projects  Project[]
   createdAt DateTime       @default(now())
   updatedAt DateTime       @updatedAt
 
@@ -463,6 +468,7 @@ model ProjectTheme {
   order     Int         @default(0)
   areaId    String
   area      ProjectArea @relation(fields: [areaId], references: [id], onDelete: Cascade)
+  projects  Project[]
   createdAt DateTime    @default(now())
   updatedAt DateTime    @updatedAt
 
