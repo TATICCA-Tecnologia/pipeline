@@ -53,11 +53,10 @@ const CATEGORY_LABEL_POS: {
 ];
 
 function RatingRadarChart({ project }: { project: Project }) {
-  const values = RATING_AXES.map((axis) => {
-    const raw = project[axis.key];
-    return { ...axis, value: raw ?? DEFAULT_RATING, isDefault: raw == null };
-  });
-  const hasAnyDefault = values.some((v) => v.isDefault);
+  const values = RATING_AXES.map((axis) => ({
+    ...axis,
+    value: project[axis.key] ?? DEFAULT_RATING,
+  }));
 
   const gridRings = [1, 2, 3, 4, 5].map((ring) =>
     RATING_AXES.map((_, i) => {
@@ -114,16 +113,15 @@ function RatingRadarChart({ project }: { project: Project }) {
         ))}
         {values.map((v, i) => {
           const p = pointAt(v.value * RADAR_UNIT, i);
-          const color = v.isDefault ? "#9ca3af" : "#4f46e5";
           return (
             <g key={`badge-${i}`}>
-              <circle cx={p.x} cy={p.y} r={14} fill="#ffffff" stroke={color} strokeWidth={2} />
+              <circle cx={p.x} cy={p.y} r={14} fill="#ffffff" stroke="#4f46e5" strokeWidth={2} />
               <text
                 x={p.x}
                 y={p.y + 5}
                 fontSize={14}
                 fontWeight={800}
-                fill={color}
+                fill="#4f46e5"
                 textAnchor="middle"
               >
                 {v.value}
@@ -132,11 +130,6 @@ function RatingRadarChart({ project }: { project: Project }) {
           );
         })}
       </svg>
-      {hasAnyDefault && (
-        <p className="mt-2 text-xs text-muted-foreground">
-          Notas em cinza: valor padrão (3), ainda não avaliado.
-        </p>
-      )}
     </div>
   );
 }
