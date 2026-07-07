@@ -12,6 +12,15 @@ recorrente for identificado.
 
 ## Histórico
 
+- **2026-07-07 (2)**: reforçada a regra de `<aplicacaoExistenteHoje>` para
+  cobrir explicitamente ferramentas de automação já em uso de forma informal
+  (n8n, Python, Power Automate, UiPath, Zapier etc.), não só planilhas —
+  vários casos reais de transcrição citam essas ferramentas como algo já
+  rodando hoje, e o exemplo anterior (só sobre planilha) deixava ambíguo se
+  isso deveria virar "Sim" + `<detalhesAplicacaoExistente>` ou ser tratado
+  como "não há oportunidade aqui". Deixado explícito que citar uma ferramenta
+  existente não elimina a oportunidade — normalmente é o oposto (formalizar,
+  substituir ou melhorar a automação informal).
 - **2026-07-07**: reforçada a profundidade exigida nos campos de texto livre
   (`descricao`, `narrativaDoProcesso`, `detalhesProcessoAtual`,
   `detalhesAplicacaoExistente`, `detalhesBeneficios`) — respostas geradas
@@ -87,10 +96,12 @@ IMPORTANTE: uma única reunião pode conter mais de um processo/oportunidade de 
   ERRADO: <processoExistente>Sim, quero melhorar o existente, mas só a parte de conciliação</processoExistente>
   CERTO: <processoExistente>Sim, quero melhorar o existente</processoExistente> — o recorte "só a parte de conciliação" vai em <detalhesProcessoAtual>.
 - <detalhesProcessoAtual>: 1-2 frases sobre como o processo funciona hoje e o que costuma dar errado — não repita o valor de <processoExistente>, complemente-o com contexto específico da transcrição.
-- <aplicacaoExistenteHoje>: **CAMPO RESTRITO, sem fallback "Outro"**. É um FATO objetivo, diferente do campo acima: já existe hoje uma aplicação/app/sistema pronto (mesmo que informal, tipo um Power Apps já em produção) para esse processo? Use exatamente: "Sim" ou "Não", nada mais dentro da tag.
+- <aplicacaoExistenteHoje>: **CAMPO RESTRITO, sem fallback "Outro"**. É um FATO objetivo, diferente do campo acima: já existe hoje uma aplicação/app/sistema/automação pronta (mesmo que informal e não-oficial — planilha com macro, script em Python, fluxo em n8n, Power Automate, Power Apps, UiPath, Zapier etc.) para esse processo? Use exatamente: "Sim" ou "Não", nada mais dentro da tag.
+  IMPORTANTE: mencionar uma ferramenta de automação já em uso NÃO significa que não há oportunidade ali — normalmente significa que a oportunidade é formalizar, substituir ou melhorar essa automação informal. Continue extraindo o processo como uma oportunidade normalmente, e reflita a intenção real do cliente em <processoExistente> (não assuma "projeto do zero" só porque já existe algo informal rodando). A ferramenta em si só entra aqui e em <detalhesAplicacaoExistente> — nunca em <plataforma>, que é sobre onde a solução final vai rodar (Desktop/Web/mobile), não sobre a ferramenta usada hoje.
   ERRADO: <aplicacaoExistenteHoje>Sim, mas é uma planilha bem simples</aplicacaoExistenteHoje>
-  CERTO: <aplicacaoExistenteHoje>Sim</aplicacaoExistenteHoje> — "é uma planilha bem simples" vai em <detalhesAplicacaoExistente>.
-- <detalhesAplicacaoExistente>: preencha só se aplicacaoExistenteHoje = "Sim". Descreva em 1-2 frases: plataforma/tecnologia usada, quem desenvolveu, desde quando está em produção, limitações conhecidas — não deixe genérico, use os detalhes específicos citados na transcrição.
+  ERRADO: deixar a tag vazia quando a transcrição menciona "já rodamos isso num fluxo do n8n" ou "temos um script em Python que faz isso hoje"
+  CERTO: <aplicacaoExistenteHoje>Sim</aplicacaoExistenteHoje> — e em <detalhesAplicacaoExistente>: "Automação feita hoje em n8n" (ou "script em Python", "fluxo no Power Automate", "planilha com macro" — a ferramenta específica citada).
+- <detalhesAplicacaoExistente>: preencha só se aplicacaoExistenteHoje = "Sim". Descreva em 1-2 frases: plataforma/tecnologia usada (nome da ferramenta, ex.: n8n, Python, Power Automate, Power Apps, UiPath), quem desenvolveu, desde quando está em produção, limitações conhecidas — não deixe genérico, use os detalhes específicos citados na transcrição.
 - <colaboradoresEnvolvidos>: número inteiro (quantidade de pessoas envolvidas na execução manual hoje).
 - <duracaoPorExecucao>: número (horas), pode ter casas decimais. É a duração total por execução somando todos os envolvidos, não só uma pessoa.
 - <periodicidade>: **CAMPO RESTRITO, sem fallback "Outro"**. Use exatamente um destes valores, e SÓ o valor — sem parênteses, sem complemento, sem justificativa dentro da tag:
