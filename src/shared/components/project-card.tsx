@@ -95,6 +95,22 @@ export function ProjectCard({
 
         {/* Badges */}
         <div className="flex min-w-0 flex-col items-start gap-1">
+          {(project.hasCurrentApplication === "sim" || project.hasCurrentApplication === "nao") && (
+            <span
+              className={`inline-block rounded px-1.5 py-px text-[9px] font-semibold uppercase ${
+                project.hasCurrentApplication === "sim"
+                  ? "bg-amber-100 text-amber-800"
+                  : "bg-emerald-100 text-emerald-800"
+              }`}
+              title={
+                project.hasCurrentApplication === "sim"
+                  ? "Já existe uma automação/aplicação hoje para este processo"
+                  : "Processo do zero, sem automação existente hoje"
+              }
+            >
+              {project.hasCurrentApplication === "sim" ? "Melhoria" : "Novo"}
+            </span>
+          )}
           {project.projectType && (
             <span
               className="inline-block max-w-full truncate rounded bg-secondary px-1.5 py-px text-[10px] font-medium text-secondary-foreground"

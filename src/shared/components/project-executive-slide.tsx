@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { type ReactNode, useLayoutEffect, useRef, useState } from "react";
 import Image from "next/image";
 import type { Project } from "@/shared/types";
 import {
@@ -14,6 +14,44 @@ import {
   SOLUTION_TYPES,
   EXECUTION_STRATEGIES,
 } from "@/src/app/(private)/admin/projetos/[id]/especificacao/_constants/architecture";
+
+// Página de tamanho fixo (16:9, mesma proporção de um slide de verdade) — o conteúdo
+// NUNCA muda o tamanho da página; em vez disso, encolhe (useFitToSlide abaixo) até caber.
+const SLIDE_WIDTH = 1100;
+const SLIDE_HEIGHT = Math.round((SLIDE_WIDTH * 9) / 16);
+const MIN_SLIDE_SCALE = 0.55;
+const MAX_FIT_PASSES = 6;
+
+// Mede a altura natural do conteúdo (sem o transform aplicado — scrollHeight ignora
+// transform) e reduz `scale` até caber em SLIDE_HEIGHT. Cada redução muda a largura
+// "natural" do conteúdo (SLIDE_WIDTH / scale), o que muda como o texto quebra linha, então
+// o ajuste é iterativo (algumas passadas) em vez de uma única conta — converge rápido na
+// prática porque o conteúdo não muda de forma drástica entre uma passada e outra.
+function useFitToSlide(
+  contentRef: React.RefObject<HTMLDivElement | null>,
+  resetKey: string
+): number {
+  const [scale, setScale] = useState(1);
+  const passRef = useRef(0);
+
+  useLayoutEffect(() => {
+    const el = contentRef.current;
+    if (!el) return;
+    const naturalHeight = el.scrollHeight;
+    if (naturalHeight <= SLIDE_HEIGHT || passRef.current >= MAX_FIT_PASSES) return;
+    passRef.current += 1;
+    const next = Math.max(MIN_SLIDE_SCALE, SLIDE_HEIGHT / naturalHeight);
+    setScale((current) => (Math.abs(next - current) > 0.005 ? next : current));
+  });
+
+  useLayoutEffect(() => {
+    passRef.current = 0;
+    setScale(1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resetKey]);
+
+  return scale;
+}
 
 type RatingKey =
   | "ratingErrorReduction"
@@ -169,6 +207,9 @@ function buildLabeledLinesWithDetail(
 }
 
 export function ProjectExecutiveSlide({ project }: { project: Project }) {
+  const contentRef = useRef<HTMLDivElement>(null);
+  const scale = useFitToSlide(contentRef, project.id);
+
   const areaEntrevistada = project.projectType.split(" · Plataforma")[0];
 
   const situacaoAtualLines = buildLabeledLinesWithDetail([
@@ -243,22 +284,34 @@ export function ProjectExecutiveSlide({ project }: { project: Project }) {
   const ratingAverageLabel = ratingAverage.toFixed(1).replace(".", ",");
 
   return (
-    <div className="executive-slide-print-root relative mx-auto w-full max-w-[1100px] bg-white text-[#1a1a2e] shadow-md">
+    <div
+      className="executive-slide-print-root relative mx-auto overflow-hidden bg-white shadow-md"
+      style={{ width: SLIDE_WIDTH, height: SLIDE_HEIGHT }}
+    >
       {/*
-        Sem aspect-ratio fixo: o slide cresce verticalmente conforme o
-        conteúdo. Nenhum texto pode ser cortado/truncado — o slide precisa
-        funcionar sozinho, sem depender de abrir o projeto pra ler o resto.
+        Página de tamanho FIXO (16:9) — nunca cresce. Se o conteúdo não couber,
+        useFitToSlide encolhe o conteúdo (fonte/espaçamento, via transform: scale)
+        até caber, em vez de truncar texto ou mudar o tamanho da página.
       */}
       <div
-        className="absolute inset-y-0 left-0 w-16"
-        style={{ background: "#1a2b4a", clipPath: "polygon(0 0, 100% 0, 40% 100%, 0 100%)" }}
-      />
-      <div
-        className="absolute inset-y-0 left-[18px] w-[46px]"
-        style={{ background: "#14b8a6", clipPath: "polygon(0 0, 100% 0, 40% 100%, 0 100%)" }}
-      />
+        ref={contentRef}
+        className="relative text-[#1a1a2e]"
+        style={{
+          width: SLIDE_WIDTH / scale,
+          transform: `scale(${scale})`,
+          transformOrigin: "top left",
+        }}
+      >
+        <div
+          className="absolute inset-y-0 left-0 w-16"
+          style={{ background: "#1a2b4a", clipPath: "polygon(0 0, 100% 0, 40% 100%, 0 100%)" }}
+        />
+        <div
+          className="absolute inset-y-0 left-[18px] w-[46px]"
+          style={{ background: "#14b8a6", clipPath: "polygon(0 0, 100% 0, 40% 100%, 0 100%)" }}
+        />
 
-      <div className="relative flex flex-col p-10 pl-[100px]">
+        <div className="relative flex flex-col p-10 pl-[100px]">
         <div className="mb-6 flex items-start justify-between">
           <div>
             {project.companyName && (
@@ -395,6 +448,7 @@ export function ProjectExecutiveSlide({ project }: { project: Project }) {
             </div>
           </div>
         </div>
+      </div>
       </div>
     </div>
   );

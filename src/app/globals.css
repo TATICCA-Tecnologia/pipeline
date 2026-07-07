@@ -236,14 +236,10 @@
     visibility: visible;
   }
   .executive-slide-print-root {
-    /* Sem position:absolute/inset:0 aqui: o slide não tem mais altura fixa
-       (cresce com o conteúdo, texto nunca é truncado), então precisa ficar no
-       fluxo normal do documento pra imprimir corretamente em várias páginas
-       quando o conteúdo for mais alto que uma página. */
-    position: static;
+    /* Página de tamanho fixo (16:9, ver useFitToSlide no componente) — o
+       conteúdo sempre cabe numa página só, não precisa mais do ajuste de
+       fluxo variável que era necessário quando a altura crescia com o texto. */
     margin: 0 auto;
-    width: 100%;
     box-shadow: none;
-    max-width: none;
   }
 }
