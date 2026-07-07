@@ -111,7 +111,9 @@ export function parseSolicitacaoXml(
     companyUnresolved = true;
   }
 
-  // <area> / <tema> — com fallback "Outro"
+  // <area> / <tema> — com fallback "Outro". Diferente dos campos restritos
+  // abaixo, "Outro" é um resultado normal e esperado aqui (mesmo no
+  // formulário manual, sem XML) — não gera aviso, não há nada para revisar.
   const areaTag = getDirectChildText(root, "area");
   if (!areaTag) {
     return { ok: false, error: "A tag <area> é obrigatória e não pode ficar vazia." };
@@ -119,11 +121,6 @@ export function parseSolicitacaoXml(
   const areaMatch = matchByLabel(areaTag, context.areas);
   const projectArea = areaMatch ? areaMatch.value : "outro";
   const customProjectArea = areaMatch ? "" : areaTag;
-  if (!areaMatch) {
-    warnings.push(
-      `<area> com valor '${areaTag}' não corresponde a nenhuma opção conhecida; foi tratado como "Outro" e o texto original foi preservado.`
-    );
-  }
 
   const temaTag = getDirectChildText(root, "tema");
   if (!temaTag) {
@@ -133,11 +130,6 @@ export function parseSolicitacaoXml(
   const temaMatch = matchByLabel(temaTag, themesForArea);
   const projectTheme = temaMatch ? temaMatch.value : "outro";
   const customProjectTheme = temaMatch ? "" : temaTag;
-  if (!temaMatch) {
-    warnings.push(
-      `<tema> com valor '${temaTag}' não corresponde a nenhuma opção conhecida; foi tratado como "Outro" e o texto original foi preservado.`
-    );
-  }
 
   // <plataforma> — com fallback "Outro"
   const plataformaTag = getDirectChildText(root, "plataforma");
@@ -154,7 +146,8 @@ export function parseSolicitacaoXml(
     }
   }
 
-  // <publicoAlvo> — com fallback "Outro"
+  // <publicoAlvo> — com fallback "Outro" (mesmo caso de <area>/<tema>: normal
+  // e esperado, sem aviso).
   const publicoTag = getDirectChildText(root, "publicoAlvo");
   let targetAudience = "";
   let customTargetAudience = "";
@@ -165,9 +158,6 @@ export function parseSolicitacaoXml(
     } else {
       targetAudience = "outro";
       customTargetAudience = publicoTag;
-      warnings.push(
-        `<publicoAlvo> com valor '${publicoTag}' não corresponde a nenhuma opção conhecida; foi tratado como "Outro" e o texto original foi preservado.`
-      );
     }
   }
 
