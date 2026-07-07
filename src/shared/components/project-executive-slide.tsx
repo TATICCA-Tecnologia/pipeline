@@ -1,5 +1,7 @@
 "use client";
 
+import type { ReactNode } from "react";
+import Image from "next/image";
 import type { Project } from "@/shared/types";
 import {
   HAS_EXISTING_SYSTEM_OPTIONS,
@@ -134,22 +136,10 @@ function RatingRadarChart({ project }: { project: Project }) {
   );
 }
 
-function StatCell({
-  value,
-  label,
-  valueClassName,
-}: {
-  value: string | number | undefined | null;
-  label: string;
-  valueClassName?: string;
-}) {
-  if (value === undefined || value === null || value === "") return <div />;
+function SectionLabel({ children }: { children: ReactNode }) {
   return (
-    <div className="text-center">
-      <div className={`text-3xl font-extrabold leading-none ${valueClassName ?? "text-foreground"}`}>
-        {value}
-      </div>
-      <div className="mt-1 text-[11px] text-muted-foreground">{label}</div>
+    <div className="inline-block border-b-2 border-teal-500 pb-0.5 text-xs font-bold uppercase tracking-wide text-foreground">
+      {children}
     </div>
   );
 }
@@ -186,99 +176,167 @@ export function ProjectExecutiveSlide({ project }: { project: Project }) {
 
   const periodicidadeLabel = resolveLabel(project.processFrequency, PROCESS_FREQUENCIES);
 
-  return (
-    <div className="executive-slide-print-root mx-auto aspect-[16/9] max-w-5xl bg-white p-10 text-[#1a1a2e] shadow-sm">
-      <div className="mb-6">
-        {project.companyName && (
-          <div className="mb-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            {project.companyName}
-          </div>
-        )}
-        <h1 className="max-w-[85%] text-3xl font-extrabold leading-tight tracking-tight">
-          {project.title}
-        </h1>
-        {areaEntrevistada && (
-          <p className="mt-1.5 text-sm text-muted-foreground">
-            Área entrevistada —{" "}
-            <span className="font-semibold text-foreground">{areaEntrevistada}</span>
-          </p>
-        )}
-      </div>
+  const quantitativeLines = buildLabeledLines([
+    { label: "Periodicidade do processo", value: periodicidadeLabel },
+    { label: "Rodagem do bot", value: project.robotSchedule },
+    {
+      label: "Colaboradores",
+      value: project.peopleInvolved != null ? String(project.peopleInvolved) : undefined,
+    },
+    {
+      label: "Duração por execução",
+      value: project.taskDurationHours != null ? `${project.taskDurationHours}h` : undefined,
+    },
+    {
+      label: "Horas anuais",
+      value: project.currentAnnualHours != null ? `${project.currentAnnualHours}h` : undefined,
+    },
+  ]);
+  const monthlyHoursSavedLabel =
+    project.monthlyHoursSaved != null ? `${project.monthlyHoursSaved}h/mês` : undefined;
 
-      <div className="flex gap-10">
-        <div className="flex flex-1 flex-col gap-5">
-          {project.description && (
-            <div>
-              <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                O processo hoje
+  const ratingValues = RATING_AXES.map((axis) => project[axis.key] ?? DEFAULT_RATING);
+  const ratingAverage = ratingValues.reduce((sum, v) => sum + v, 0) / ratingValues.length;
+  const ratingPercent = Math.round((ratingAverage / 5) * 100);
+  const ratingAverageLabel = ratingAverage.toFixed(1).replace(".", ",");
+
+  return (
+    <div className="executive-slide-print-root relative mx-auto aspect-[16/9] max-w-[1100px] overflow-hidden bg-white text-[#1a1a2e] shadow-md">
+      <div
+        className="absolute inset-y-0 left-0 w-16"
+        style={{ background: "#1a2b4a", clipPath: "polygon(0 0, 100% 0, 40% 100%, 0 100%)" }}
+      />
+      <div
+        className="absolute inset-y-0 left-[18px] w-[46px]"
+        style={{ background: "#14b8a6", clipPath: "polygon(0 0, 100% 0, 40% 100%, 0 100%)" }}
+      />
+
+      <div className="absolute inset-0 flex flex-col p-10 pl-[100px]">
+        <div className="mb-6 flex items-start justify-between">
+          <div>
+            {project.companyName && (
+              <div className="mb-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                {project.companyName}
               </div>
-              <p className="line-clamp-3 text-sm leading-relaxed text-foreground/90">
-                {project.description}
-              </p>
-            </div>
-          )}
-          {situacaoAtualLines.length > 0 && (
-            <div>
-              <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Situação atual
-              </div>
-              <div className="space-y-0.5">
-                {situacaoAtualLines.map((line) => (
-                  <p
-                    key={line.label}
-                    className="line-clamp-2 text-sm leading-relaxed text-foreground/90"
-                  >
-                    <span className="font-medium">{line.label}:</span> {line.value}
-                  </p>
-                ))}
-              </div>
-            </div>
-          )}
-          {construcaoLines.length > 0 && (
-            <div>
-              <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Construção
-              </div>
-              <div className="space-y-0.5">
-                {construcaoLines.map((line) => (
-                  <p
-                    key={line.label}
-                    className="line-clamp-2 text-sm leading-relaxed text-foreground/90"
-                  >
-                    <span className="font-medium">{line.label}:</span> {line.value}
-                  </p>
-                ))}
-              </div>
-            </div>
-          )}
-          {benefitLabels.length > 0 && (
-            <div>
-              <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Benefícios esperados
-              </div>
-              <p className="line-clamp-2 text-sm leading-relaxed text-foreground/90">
-                {benefitLabels.join(" · ")}
-              </p>
-            </div>
-          )}
+            )}
+            <h1 className="max-w-[85%] text-3xl font-extrabold leading-tight tracking-tight">
+              {project.title}
+            </h1>
+            {areaEntrevistada && (
+              <p className="mt-1 text-sm font-semibold text-teal-600">{areaEntrevistada}</p>
+            )}
+          </div>
+          <Image
+            src="/taticca-logo-horizontal.png"
+            alt="TATICCA"
+            width={163}
+            height={64}
+            className="h-16 w-auto flex-shrink-0 object-contain"
+          />
         </div>
 
-        <div className="flex flex-1 flex-col">
-          <div className="mb-6 grid grid-cols-2 gap-4">
-            <StatCell
-              value={project.currentAnnualHours != null ? `${project.currentAnnualHours}h` : undefined}
-              label="gastas por ano hoje"
-            />
-            <StatCell value={periodicidadeLabel} label="periodicidade" />
-            <StatCell value={project.peopleInvolved} label="colaboradores envolvidos" />
-            <StatCell
-              value={project.monthlyHoursSaved != null ? `${project.monthlyHoursSaved}h/mês` : undefined}
-              label="economia estimada"
-              valueClassName="text-emerald-600"
-            />
+        <div className="flex flex-1 gap-10">
+          <div className="flex flex-1 flex-col gap-5">
+            {project.description && (
+              <div>
+                <SectionLabel>O processo hoje</SectionLabel>
+                <p className="line-clamp-3 mt-1.5 text-sm leading-relaxed text-foreground/90">
+                  {project.description}
+                </p>
+              </div>
+            )}
+            {situacaoAtualLines.length > 0 && (
+              <div>
+                <SectionLabel>Situação atual</SectionLabel>
+                <div className="mt-1.5 space-y-0.5">
+                  {situacaoAtualLines.map((line) => (
+                    <p
+                      key={line.label}
+                      className="line-clamp-2 text-sm leading-relaxed text-foreground/90"
+                    >
+                      <span className="font-medium">{line.label}:</span> {line.value}
+                    </p>
+                  ))}
+                </div>
+              </div>
+            )}
+            {construcaoLines.length > 0 && (
+              <div>
+                <SectionLabel>Construção</SectionLabel>
+                <div className="mt-1.5 space-y-0.5">
+                  {construcaoLines.map((line) => (
+                    <p
+                      key={line.label}
+                      className="line-clamp-2 text-sm leading-relaxed text-foreground/90"
+                    >
+                      <span className="font-medium">{line.label}:</span> {line.value}
+                    </p>
+                  ))}
+                </div>
+              </div>
+            )}
+            {project.architectNotes && (
+              <div className="rounded-r-md border-l-4 border-teal-500 bg-slate-50 px-4 py-3">
+                <div className="mb-1.5 text-xs font-bold uppercase tracking-wide text-foreground">
+                  Principais ações da automação
+                </div>
+                <p className="line-clamp-3 text-sm leading-relaxed text-foreground/90">
+                  {project.architectNotes}
+                </p>
+              </div>
+            )}
+            {benefitLabels.length > 0 && (
+              <div>
+                <SectionLabel>Benefícios esperados</SectionLabel>
+                <p className="line-clamp-2 mt-1.5 text-sm leading-relaxed text-foreground/90">
+                  {benefitLabels.join(" · ")}
+                </p>
+              </div>
+            )}
           </div>
-          <div className="flex flex-1 items-center justify-center">
-            <RatingRadarChart project={project} />
+
+          <div className="flex flex-1 flex-col gap-5">
+            {quantitativeLines.length > 0 && (
+              <div>
+                <SectionLabel>Avaliação Quantitativa</SectionLabel>
+                <table className="mt-1.5 w-full border-collapse text-sm">
+                  <tbody>
+                    {quantitativeLines.map((line) => (
+                      <tr key={line.label} className="border-b border-slate-100 last:border-b-0">
+                        <td className="bg-teal-50 px-3 py-2 font-medium text-teal-700">
+                          {line.label}
+                        </td>
+                        <td className="px-3 py-2 text-foreground/90">{line.value}</td>
+                      </tr>
+                    ))}
+                    {monthlyHoursSavedLabel && (
+                      <tr>
+                        <td className="bg-teal-50 px-3 py-2 font-medium text-teal-700">
+                          Economia estimada
+                        </td>
+                        <td className="px-3 py-2 font-semibold text-emerald-600">
+                          {monthlyHoursSavedLabel}
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            <div className="flex flex-1 flex-col">
+              <div className="mb-2 flex items-baseline justify-between">
+                <SectionLabel>Avaliação Qualitativa</SectionLabel>
+                <div className="text-lg font-extrabold text-teal-600">
+                  {ratingPercent}%{" "}
+                  <span className="text-sm font-semibold text-muted-foreground">
+                    ({ratingAverageLabel})
+                  </span>
+                </div>
+              </div>
+              <div className="flex flex-1 items-center justify-center">
+                <RatingRadarChart project={project} />
+              </div>
+            </div>
           </div>
         </div>
       </div>
