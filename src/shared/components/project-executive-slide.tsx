@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import Image from "next/image";
+import { AlertTriangle } from "lucide-react";
 import type { Project } from "@/shared/types";
 import {
   HAS_EXISTING_SYSTEM_OPTIONS,
@@ -150,28 +151,32 @@ function buildLabeledLines(
   return entries.filter((e): e is { label: string; value: string } => Boolean(e.value));
 }
 
-function withDetail(base: string | undefined, detail: string | undefined): string | undefined {
-  if (!base) return undefined;
-  return detail ? `${base} — ${detail}` : base;
+// Igual a buildLabeledLines, mas cada linha pode ter um "detail" (texto de
+// contexto complementar) que é renderizado como uma sub-linha própria em vez
+// de concatenado na mesma frase — juntar "Abordagem: Não, projeto do zero" a
+// um parágrafo inteiro sobre como o processo funciona hoje não lê como uma
+// frase única coerente.
+function buildLabeledLinesWithDetail(
+  entries: { label: string; value: string | undefined; detail?: string }[]
+): { label: string; value: string; detail?: string }[] {
+  return entries
+    .filter((e): e is { label: string; value: string; detail?: string } => Boolean(e.value))
+    .map((e) => ({ label: e.label, value: e.value, detail: e.detail?.trim() || undefined }));
 }
 
 export function ProjectExecutiveSlide({ project }: { project: Project }) {
   const areaEntrevistada = project.projectType.split(" · Plataforma")[0];
 
-  const situacaoAtualLines = buildLabeledLines([
+  const situacaoAtualLines = buildLabeledLinesWithDetail([
     {
       label: "Abordagem",
-      value: withDetail(
-        resolveLabel(project.hasExistingSystem, HAS_EXISTING_SYSTEM_OPTIONS),
-        project.existingSystemDetails
-      ),
+      value: resolveLabel(project.hasExistingSystem, HAS_EXISTING_SYSTEM_OPTIONS),
+      detail: project.existingSystemDetails,
     },
     {
       label: "Aplicação existente hoje",
-      value: withDetail(
-        resolveLabel(project.hasCurrentApplication, HAS_CURRENT_APPLICATION_OPTIONS),
-        project.currentApplicationDetails
-      ),
+      value: resolveLabel(project.hasCurrentApplication, HAS_CURRENT_APPLICATION_OPTIONS),
+      detail: project.currentApplicationDetails,
     },
     { label: "Público-alvo", value: project.targetAudience },
   ]);
@@ -215,7 +220,12 @@ export function ProjectExecutiveSlide({ project }: { project: Project }) {
   const ratingAverageLabel = ratingAverage.toFixed(1).replace(".", ",");
 
   return (
-    <div className="executive-slide-print-root relative mx-auto aspect-[16/9] max-w-[1100px] overflow-hidden bg-white text-[#1a1a2e] shadow-md">
+    <div className="executive-slide-print-root relative mx-auto w-full max-w-[1100px] bg-white text-[#1a1a2e] shadow-md">
+      {/*
+        Sem aspect-ratio fixo: o slide cresce verticalmente conforme o
+        conteúdo. Nenhum texto pode ser cortado/truncado — o slide precisa
+        funcionar sozinho, sem depender de abrir o projeto pra ler o resto.
+      */}
       <div
         className="absolute inset-y-0 left-0 w-16"
         style={{ background: "#1a2b4a", clipPath: "polygon(0 0, 100% 0, 40% 100%, 0 100%)" }}
@@ -225,7 +235,7 @@ export function ProjectExecutiveSlide({ project }: { project: Project }) {
         style={{ background: "#14b8a6", clipPath: "polygon(0 0, 100% 0, 40% 100%, 0 100%)" }}
       />
 
-      <div className="absolute inset-0 flex flex-col p-10 pl-[100px]">
+      <div className="relative flex flex-col p-10 pl-[100px]">
         <div className="mb-6 flex items-start justify-between">
           <div>
             {project.companyName && (
@@ -249,12 +259,12 @@ export function ProjectExecutiveSlide({ project }: { project: Project }) {
           />
         </div>
 
-        <div className="flex flex-1 gap-10">
+        <div className="flex gap-10">
           <div className="flex flex-1 flex-col gap-5">
             {project.description && (
               <div>
                 <SectionLabel>O processo hoje</SectionLabel>
-                <p className="line-clamp-3 mt-1.5 text-sm leading-relaxed text-foreground/90">
+                <p className="mt-1.5 text-sm leading-relaxed text-foreground/90">
                   {project.description}
                 </p>
               </div>
@@ -262,14 +272,18 @@ export function ProjectExecutiveSlide({ project }: { project: Project }) {
             {situacaoAtualLines.length > 0 && (
               <div>
                 <SectionLabel>Situação atual</SectionLabel>
-                <div className="mt-1.5 space-y-0.5">
+                <div className="mt-1.5 space-y-2">
                   {situacaoAtualLines.map((line) => (
-                    <p
-                      key={line.label}
-                      className="line-clamp-2 text-sm leading-relaxed text-foreground/90"
-                    >
-                      <span className="font-medium">{line.label}:</span> {line.value}
-                    </p>
+                    <div key={line.label}>
+                      <p className="text-sm leading-relaxed text-foreground/90">
+                        <span className="font-medium">{line.label}:</span> {line.value}
+                      </p>
+                      {line.detail && (
+                        <p className="mt-0.5 text-sm leading-relaxed text-muted-foreground">
+                          {line.detail}
+                        </p>
+                      )}
+                    </div>
                   ))}
                 </div>
               </div>
@@ -279,10 +293,7 @@ export function ProjectExecutiveSlide({ project }: { project: Project }) {
                 <SectionLabel>Construção</SectionLabel>
                 <div className="mt-1.5 space-y-0.5">
                   {construcaoLines.map((line) => (
-                    <p
-                      key={line.label}
-                      className="line-clamp-2 text-sm leading-relaxed text-foreground/90"
-                    >
+                    <p key={line.label} className="text-sm leading-relaxed text-foreground/90">
                       <span className="font-medium">{line.label}:</span> {line.value}
                     </p>
                   ))}
@@ -294,7 +305,7 @@ export function ProjectExecutiveSlide({ project }: { project: Project }) {
                 <div className="mb-1.5 text-xs font-bold uppercase tracking-wide text-foreground">
                   Principais ações da automação
                 </div>
-                <p className="line-clamp-3 text-sm leading-relaxed text-foreground/90">
+                <p className="text-sm leading-relaxed text-foreground/90">
                   {project.architectNotes}
                 </p>
               </div>
@@ -302,7 +313,7 @@ export function ProjectExecutiveSlide({ project }: { project: Project }) {
             {benefitLabels.length > 0 && (
               <div>
                 <SectionLabel>Benefícios esperados</SectionLabel>
-                <p className="line-clamp-2 mt-1.5 text-sm leading-relaxed text-foreground/90">
+                <p className="mt-1.5 text-sm leading-relaxed text-foreground/90">
                   {benefitLabels.join(" · ")}
                 </p>
               </div>
@@ -353,6 +364,18 @@ export function ProjectExecutiveSlide({ project }: { project: Project }) {
             </div>
           </div>
         </div>
+
+        {project.additionalInfo && (
+          <div className="mt-6 rounded-r-md border-l-4 border-amber-500 bg-amber-50 px-4 py-3">
+            <div className="mb-1.5 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-amber-800">
+              <AlertTriangle className="h-3.5 w-3.5" />
+              Pontos de atenção
+            </div>
+            <p className="whitespace-pre-line text-sm leading-relaxed text-foreground/90">
+              {project.additionalInfo}
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -236,11 +236,14 @@
     visibility: visible;
   }
   .executive-slide-print-root {
-    position: absolute;
-    inset: 0;
-    margin: 0;
+    /* Sem position:absolute/inset:0 aqui: o slide não tem mais altura fixa
+       (cresce com o conteúdo, texto nunca é truncado), então precisa ficar no
+       fluxo normal do documento pra imprimir corretamente em várias páginas
+       quando o conteúdo for mais alto que uma página. */
+    position: static;
+    margin: 0 auto;
+    width: 100%;
     box-shadow: none;
     max-width: none;
-    aspect-ratio: auto;
   }
 }
