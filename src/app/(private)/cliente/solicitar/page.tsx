@@ -337,11 +337,21 @@ export default function SolicitarProjetoPage() {
   const [pendingTaxonomyResolution, setPendingTaxonomyResolution] = useState<{
     kind: "area" | "theme";
     rawValue: string;
-    areaIdForTheme?: string; // só usado quando kind === "theme": área já resolvida a que o tema pertence
+    // Ambos só usados quando kind === "theme", para a área já resolvida a que o tema pertence:
+    // areaIdForTheme é o id real (necessário pro createTheme), areaSlugForTheme é a chave usada
+    // por PROJECT_THEMES_BY_AREA (Record indexado por slug, não por id) para listar os temas dela.
+    areaIdForTheme?: string;
+    areaSlugForTheme?: string;
     batchContext?: BatchContext;
   } | null>(null);
   const [chosenTaxonomyId, setChosenTaxonomyId] = useState<string | undefined>();
   const [creatingNewTaxonomy, setCreatingNewTaxonomy] = useState(false);
+  // Guarda o resolve() da Promise que pausa importXmlEntry aguardando a escolha do usuário no
+  // diálogo de área/tema (mesmo padrão do companyResolverRef acima). Deve ser setado ANTES de abrir
+  // o diálogo (evita corrida) e limpo em um único lugar (closeTaxonomyResolutionDialog), alcançado por
+  // todo caminho que fecha o diálogo (Confirmar, "Manter como Outro", Escape/clique fora via onOpenChange).
+  // Se algum caminho de fechamento for adicionado sem passar por essa função, a Promise nunca resolve
+  // e o loop de importação trava indefinidamente nesse item.
   const taxonomyResolverRef = useRef<((result: { id: string; slug: string; name: string } | null) => void) | null>(
     null
   );
@@ -415,6 +425,8 @@ export default function SolicitarProjetoPage() {
     });
   }
 
+  // Único ponto de saída do diálogo de área/tema — resolve a Promise pendente (ou entrega null se
+  // cancelado) e limpa todo o estado relacionado. Toda forma de fechar o diálogo deve passar por aqui.
   function closeTaxonomyResolutionDialog(result: { id: string; slug: string; name: string } | null) {
     taxonomyResolverRef.current?.(result);
     taxonomyResolverRef.current = null;
@@ -427,11 +439,12 @@ export default function SolicitarProjetoPage() {
     kind: "area" | "theme",
     rawValue: string,
     areaIdForTheme?: string,
+    areaSlugForTheme?: string,
     batchContext?: BatchContext
   ): Promise<{ id: string; slug: string; name: string } | null> {
     return new Promise((resolve) => {
       taxonomyResolverRef.current = resolve;
-      setPendingTaxonomyResolution({ kind, rawValue, areaIdForTheme, batchContext });
+      setPendingTaxonomyResolution({ kind, rawValue, areaIdForTheme, areaSlugForTheme, batchContext });
       setChosenTaxonomyId(undefined);
       setCreatingNewTaxonomy(false);
     });
@@ -470,6 +483,7 @@ export default function SolicitarProjetoPage() {
     }
 
     let resolvedAreaId: string | undefined;
+    let resolvedAreaSlug: string | undefined;
     let resolvedThemeId: string | undefined;
 
     if (result.formData.projectArea === "outro" && result.formData.customProjectArea.trim()) {
@@ -477,10 +491,12 @@ export default function SolicitarProjetoPage() {
         "area",
         result.formData.customProjectArea.trim(),
         undefined,
+        undefined,
         batchContext
       );
       if (resolvedArea) {
         resolvedAreaId = resolvedArea.id;
+        resolvedAreaSlug = resolvedArea.slug;
         result.formData.projectArea = resolvedArea.slug;
         result.formData.customProjectArea = resolvedArea.slug === "outro" ? result.formData.customProjectArea : "";
       }
@@ -492,6 +508,7 @@ export default function SolicitarProjetoPage() {
         "theme",
         result.formData.customProjectTheme.trim(),
         resolvedAreaId,
+        resolvedAreaSlug,
         batchContext
       );
       if (resolvedTheme) {
@@ -675,6 +692,13 @@ export default function SolicitarProjetoPage() {
       setIsSubmitting(false);
     }
   }
+
+  // PROJECT_THEMES_BY_AREA é indexado por slug da área, não por id — por isso o lookup de temas usa
+  // areaSlugForTheme (não areaIdForTheme, que serve só para o createTheme mais abaixo).
+  const availableTaxonomyOptions =
+    pendingTaxonomyResolution?.kind === "area"
+      ? PROJECT_AREAS
+      : PROJECT_THEMES_BY_AREA[pendingTaxonomyResolution?.areaSlugForTheme ?? ""] ?? [];
 
   return (
     <TooltipProvider>
@@ -1786,10 +1810,7 @@ export default function SolicitarProjetoPage() {
                   <SelectValue placeholder="Selecione" />
                 </SelectTrigger>
                 <SelectContent>
-                  {(pendingTaxonomyResolution?.kind === "area"
-                    ? PROJECT_AREAS
-                    : PROJECT_THEMES_BY_AREA[pendingTaxonomyResolution?.areaIdForTheme ?? ""] ?? []
-                  )
+                  {availableTaxonomyOptions
                     .filter((opt): opt is typeof opt & { id: string } => Boolean(opt.id))
                     .map((opt) => (
                       <SelectItem key={opt.id} value={opt.id}>
@@ -1844,18 +1865,15 @@ export default function SolicitarProjetoPage() {
                     }
                   } catch (error) {
                     console.error("Erro ao cadastrar categoria:", error);
+                    const message = error instanceof Error ? error.message : "Tente novamente.";
                     toast({
-                      title: "Erro",
-                      description: "Não foi possível cadastrar a categoria. Tente novamente.",
+                      title: "Não foi possível cadastrar a categoria",
+                      description: message,
                       variant: "destructive",
                     });
                   }
                 } else if (chosenTaxonomyId) {
-                  const options =
-                    pendingTaxonomyResolution.kind === "area"
-                      ? PROJECT_AREAS
-                      : PROJECT_THEMES_BY_AREA[pendingTaxonomyResolution.areaIdForTheme ?? ""] ?? [];
-                  const picked = options.find((o) => o.id === chosenTaxonomyId);
+                  const picked = availableTaxonomyOptions.find((o) => o.id === chosenTaxonomyId);
                   if (picked?.id) {
                     closeTaxonomyResolutionDialog({ id: picked.id, slug: picked.value, name: picked.label });
                   }
