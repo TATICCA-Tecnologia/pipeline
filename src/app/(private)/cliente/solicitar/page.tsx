@@ -362,8 +362,18 @@ export default function SolicitarProjetoPage() {
     null
   );
 
+  const utils = trpc.useUtils();
   const createAreaMutation = trpc.taxonomy.createArea.useMutation();
   const createThemeMutation = trpc.taxonomy.createTheme.useMutation();
+  // PROJECT_AREAS/PROJECT_THEMES_BY_AREA vêm de uma query com staleTime de 5min (useTaxonomy) e,
+  // dentro de um lote (.zip com vários XMLs), o loop de importXmlEntry já capturou esses valores
+  // no fechamento antes de rodar — invalidar a query não atualiza esse valor já capturado no meio
+  // do loop. Por isso, além de invalidar (pro resto do app, e pra próxima importação), guardamos
+  // aqui as áreas/temas resolvidos (mapeados OU cadastrados) nesta sessão, pra que o 2º arquivo do
+  // mesmo lote com o mesmo valor bruto (ex.: "Financeiro" duas vezes) reaproveite a escolha em vez
+  // de tentar cadastrar de novo (o que bateria no slug único e falharia) ou perguntar de novo.
+  const areaResolutionCacheRef = useRef<Map<string, { id: string; slug: string; name: string }>>(new Map());
+  const themeResolutionCacheRef = useRef<Map<string, { id: string; slug: string; name: string }>>(new Map());
   const [batchImportResults, setBatchImportResults] = useState<BatchImportResult[] | null>(null);
   const [selectedCompanyId, setSelectedCompanyId] = useState<string | undefined>();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -497,31 +507,32 @@ export default function SolicitarProjetoPage() {
     let resolvedThemeId: string | undefined = result.themeId;
 
     if (result.formData.projectArea === "outro" && result.formData.customProjectArea.trim()) {
-      const resolvedArea = await resolveTaxonomyAmbiguity(
-        "area",
-        result.formData.customProjectArea.trim(),
-        undefined,
-        undefined,
-        batchContext
-      );
+      const rawArea = result.formData.customProjectArea.trim();
+      const areaCacheKey = rawArea.toLowerCase();
+      const cachedArea = areaResolutionCacheRef.current.get(areaCacheKey);
+      const resolvedArea =
+        cachedArea ?? (await resolveTaxonomyAmbiguity("area", rawArea, undefined, undefined, batchContext));
       if (resolvedArea) {
+        if (!cachedArea) areaResolutionCacheRef.current.set(areaCacheKey, resolvedArea);
         resolvedAreaId = resolvedArea.id;
         resolvedAreaSlug = resolvedArea.slug;
         result.formData.projectArea = resolvedArea.slug;
         result.formData.customProjectArea = resolvedArea.slug === "outro" ? result.formData.customProjectArea : "";
       }
       // Se o usuário cancelar (resolvedArea === null), mantém "outro" + texto livre — comportamento de hoje.
+      // Não é cacheado: um próximo arquivo do lote com o mesmo valor bruto pergunta de novo.
     }
 
     if (result.formData.projectTheme === "outro" && result.formData.customProjectTheme.trim()) {
-      const resolvedTheme = await resolveTaxonomyAmbiguity(
-        "theme",
-        result.formData.customProjectTheme.trim(),
-        resolvedAreaId,
-        resolvedAreaSlug,
-        batchContext
-      );
+      const rawTheme = result.formData.customProjectTheme.trim();
+      // Chave inclui a área resolvida porque o mesmo nome de tema pode existir em áreas diferentes.
+      const themeCacheKey = `${resolvedAreaSlug ?? ""}::${rawTheme.toLowerCase()}`;
+      const cachedTheme = themeResolutionCacheRef.current.get(themeCacheKey);
+      const resolvedTheme =
+        cachedTheme ??
+        (await resolveTaxonomyAmbiguity("theme", rawTheme, resolvedAreaId, resolvedAreaSlug, batchContext));
       if (resolvedTheme) {
+        if (!cachedTheme) themeResolutionCacheRef.current.set(themeCacheKey, resolvedTheme);
         resolvedThemeId = resolvedTheme.id;
         result.formData.projectTheme = resolvedTheme.slug;
         result.formData.customProjectTheme = "";
@@ -681,6 +692,7 @@ export default function SolicitarProjetoPage() {
           const created = await createAreaMutation.mutateAsync({ name, slug: slugify(name), order: 0 });
           areaId = created.id;
           areaSlugForPayload = created.slug;
+          utils.taxonomy.listAreas.invalidate();
         } catch (error) {
           console.error("Erro ao cadastrar área:", error);
           const message = error instanceof Error ? error.message : "Tente novamente.";
@@ -700,6 +712,7 @@ export default function SolicitarProjetoPage() {
           });
           themeId = created.id;
           themeSlugForPayload = created.slug;
+          utils.taxonomy.listAreas.invalidate();
         } catch (error) {
           console.error("Erro ao cadastrar tema:", error);
           const message = error instanceof Error ? error.message : "Tente novamente.";
@@ -1928,6 +1941,7 @@ export default function SolicitarProjetoPage() {
                   try {
                     if (pendingTaxonomyResolution.kind === "area") {
                       const created = await createAreaMutation.mutateAsync({ name, slug, order: 0 });
+                      utils.taxonomy.listAreas.invalidate();
                       closeTaxonomyResolutionDialog({ id: created.id, slug: created.slug, name: created.name });
                     } else if (pendingTaxonomyResolution.areaIdForTheme) {
                       const created = await createThemeMutation.mutateAsync({
@@ -1936,6 +1950,7 @@ export default function SolicitarProjetoPage() {
                         areaId: pendingTaxonomyResolution.areaIdForTheme,
                         order: 0,
                       });
+                      utils.taxonomy.listAreas.invalidate();
                       closeTaxonomyResolutionDialog({ id: created.id, slug: created.slug, name: created.name });
                     }
                   } catch (error) {
