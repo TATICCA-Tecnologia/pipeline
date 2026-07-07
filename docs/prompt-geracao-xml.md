@@ -12,6 +12,12 @@ recorrente for identificado.
 
 ## Histórico
 
+- **2026-07-07**: reforçada a profundidade exigida nos campos de texto livre
+  (`descricao`, `narrativaDoProcesso`, `detalhesProcessoAtual`,
+  `detalhesAplicacaoExistente`, `detalhesBeneficios`) — respostas geradas
+  estavam pobres demais, prejudicando o Slide Executivo
+  (`ProjectExecutiveSlide`), que exibe esse texto. Ver
+  `docs/superpowers/specs/2026-07-07-executive-slide-clarity-design.md`.
 - **2026-07-03**: adicionada a regra geral sobre campos restritos e um
   exemplo ERRADO/CERTO em cada campo restrito, depois de um caso real em que
   `<periodicidade>` recebeu `"Mensal (fechamento); parte também no ciclo de
@@ -65,7 +71,8 @@ IMPORTANTE: uma única reunião pode conter mais de um processo/oportunidade de 
 ## Regras de preenchimento por campo
 
 - <empresa>: deve ser IGUAL ao nome oficial da empresa cliente (ex.: "Local Frio"). Se não tiver certeza do nome exato usado no cadastro do cliente, deixe vazio e anote nas observações.
-- <titulo>, <descricao>: obrigatórios. Nunca deixe vazios.
+- <titulo>: obrigatório. Nunca deixe vazio.
+- <descricao>: obrigatório, nunca vazio. Escreva 2-3 frases objetivas com contexto suficiente para alguém que NÃO estava na reunião entender o processo (o que é, por que é feito, quem faz hoje). Evite respostas de uma linha genérica como "Automatizar processo X" — isso não é descrição suficiente.
 - <area> / <tema>: use o melhor rótulo possível (ex.: área "RPA", "Contabilidade", "Desenvolvimento", "Consultoria técnica"). Se nada bater bem, pode escrever livremente — o sistema aceita como "Outro" automaticamente.
 - <plataforma>: **CAMPO RESTRITO, sem fallback "Outro"**. Aqui não é a ferramenta usada no processo (Power Apps, Excel etc.) — é a plataforma-alvo de execução. Use exatamente um destes valores, e nada além disso:
   Desktop (Windows / macOS) | Web (desktop e celular) | iOS (iPhone / iPad) | Android | iOS e Android | Todas as plataformas
@@ -79,11 +86,11 @@ IMPORTANTE: uma única reunião pode conter mais de um processo/oportunidade de 
   Não escreva apenas "Sim" ou "Não" aqui, nem acrescente detalhes dentro da tag — detalhes vão em <detalhesProcessoAtual>.
   ERRADO: <processoExistente>Sim, quero melhorar o existente, mas só a parte de conciliação</processoExistente>
   CERTO: <processoExistente>Sim, quero melhorar o existente</processoExistente> — o recorte "só a parte de conciliação" vai em <detalhesProcessoAtual>.
-- <detalhesProcessoAtual>: como o processo funciona hoje, o que costuma dar errado.
+- <detalhesProcessoAtual>: 1-2 frases sobre como o processo funciona hoje e o que costuma dar errado — não repita o valor de <processoExistente>, complemente-o com contexto específico da transcrição.
 - <aplicacaoExistenteHoje>: **CAMPO RESTRITO, sem fallback "Outro"**. É um FATO objetivo, diferente do campo acima: já existe hoje uma aplicação/app/sistema pronto (mesmo que informal, tipo um Power Apps já em produção) para esse processo? Use exatamente: "Sim" ou "Não", nada mais dentro da tag.
   ERRADO: <aplicacaoExistenteHoje>Sim, mas é uma planilha bem simples</aplicacaoExistenteHoje>
   CERTO: <aplicacaoExistenteHoje>Sim</aplicacaoExistenteHoje> — "é uma planilha bem simples" vai em <detalhesAplicacaoExistente>.
-- <detalhesAplicacaoExistente>: preencha só se aplicacaoExistenteHoje = "Sim". Descreva a aplicação existente: plataforma/tecnologia usada, quem desenvolveu, desde quando está em produção, limitações conhecidas.
+- <detalhesAplicacaoExistente>: preencha só se aplicacaoExistenteHoje = "Sim". Descreva em 1-2 frases: plataforma/tecnologia usada, quem desenvolveu, desde quando está em produção, limitações conhecidas — não deixe genérico, use os detalhes específicos citados na transcrição.
 - <colaboradoresEnvolvidos>: número inteiro (quantidade de pessoas envolvidas na execução manual hoje).
 - <duracaoPorExecucao>: número (horas), pode ter casas decimais. É a duração total por execução somando todos os envolvidos, não só uma pessoa.
 - <periodicidade>: **CAMPO RESTRITO, sem fallback "Outro"**. Use exatamente um destes valores, e SÓ o valor — sem parênteses, sem complemento, sem justificativa dentro da tag:
@@ -91,7 +98,7 @@ IMPORTANTE: uma única reunião pode conter mais de um processo/oportunidade de 
   Esse campo alimenta um cálculo automático de horas gastas por ano (duracaoPorExecucao × ocorrências/ano da periodicidade escolhida — ex.: Mensal = 12×/ano, Semanal = 52×/ano). Qualquer texto extra dentro da tag impede esse cálculo, mesmo que a informação em si esteja correta.
   ERRADO: <periodicidade>Mensal (fechamento); parte também no ciclo de orçamento</periodicidade>
   CERTO: <periodicidade>Mensal</periodicidade> — e em <informacoesAdicionais>: "Também ocorre pontualmente durante o ciclo de orçamento, além do fechamento mensal."
-- <narrativaDoProcesso>: descrição livre e mais completa do fluxo, com contexto e exceções mencionadas.
+- <narrativaDoProcesso>: descrição livre e mais completa do fluxo (2-3 frases), com contexto, passos principais e exceções mencionadas na transcrição — este campo pode (e deve) ser mais detalhado que <descricao>, que é só o resumo objetivo.
 - <funcionalidades>/<funcionalidade>: texto livre, uma tag por funcionalidade citada.
 - <beneficios>/<beneficio>: cada item deve corresponder EXATAMENTE a um destes rótulos (senão o sistema rejeita o item):
   Redução de trabalho operacional (tarefas manuais, planilhas, retrabalho)
@@ -100,7 +107,7 @@ IMPORTANTE: uma única reunião pode conter mais de um processo/oportunidade de 
   Redução de multas, riscos ou infrações (fiscais, regulatórias, contratuais)
   Melhoria da qualidade do trabalho (padronização, menos erros, mais visibilidade)
   Outro
-- <detalhesBeneficios>: texto livre com números/impactos citados.
+- <detalhesBeneficios>: 1-2 frases com números/impactos específicos citados na transcrição (ex.: "reduz retrabalho de ~5h/semana do time fiscal") — evite deixar vazio ou genérico quando a transcrição mencionar qualquer número ou exemplo concreto.
 - <horasEconomizadasPorMes>: número (pode ser decimal). Se não foi dito na reunião, calcule com base em duracaoPorExecucao x execuções por mês x colaboradoresEnvolvidos, e explique o cálculo nas observações.
 - <avaliacaoReducaoErros>, <avaliacaoCriticidadeProcesso>, <avaliacaoImpactoInterno>, <avaliacaoImpactoExterno>, <avaliacaoAtendimentoPoliticas>: **SEMPRE um número inteiro de 1 a 5** (nunca texto como "Média" ou "Alta"). 1 = muito baixo, 5 = muito alto. Se a transcrição só deu uma indicação qualitativa (ex.: "é bem crítico"), converta para o número mais próximo (ex.: 4) e registre essa conversão nas observações.
 - <urgencia>: **CAMPO RESTRITO, sem fallback "Outro"**. Use exatamente um destes valores, incluindo o texto depois do travessão:
@@ -112,7 +119,7 @@ IMPORTANTE: uma única reunião pode conter mais de um processo/oportunidade de 
 
 ## Regras gerais
 
-1. Use SOMENTE informações explícitas ou razoavelmente inferíveis da transcrição. Não invente números, nomes ou prazos.
+1. Use SOMENTE informações explícitas ou razoavelmente inferíveis da transcrição. Não invente números, nomes ou prazos. Nos campos de texto livre (<descricao>, <narrativaDoProcesso>, <detalhesProcessoAtual>, <detalhesAplicacaoExistente>, <detalhesBeneficios>), prefira sempre a versão mais completa que a transcrição permitir, dentro do limite de 2-3 frases indicado em cada campo — não comprima informação real da reunião numa frase única e genérica.
 2. Se um campo não pode ser preenchido com segurança, deixe a tag vazia — nunca escreva "não informado" dentro dela.
 3. Toda inferência ou cálculo deve ser explicado na seção de observações ao final (fora do XML), mesmo quando também repetido dentro de <informacoesAdicionais>.
 4. Não misture informações de processos diferentes no mesmo XML.
