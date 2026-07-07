@@ -96,6 +96,7 @@ export function ProjectDetailsModal({
           <Button variant="outline" className="cursor-pointer" type="button" onClick={onClose}>
             Fechar
           </Button>
+          {/* Exclusão é admin/super_admin apenas — mais restrita que o Slide Executivo abaixo, que também libera developer */}
           {(user?.role === "admin" || user?.role === "super_admin") && (
             <Button
               variant="destructive"
