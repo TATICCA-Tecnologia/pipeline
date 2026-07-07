@@ -161,22 +161,31 @@ function StatCell({
   );
 }
 
+function buildLabeledLines(
+  entries: { label: string; value: string | undefined }[]
+): { label: string; value: string }[] {
+  return entries.filter((e): e is { label: string; value: string } => Boolean(e.value));
+}
+
 export function ProjectExecutiveSlide({ project }: { project: Project }) {
   const areaEntrevistada = project.projectType.split(" · Plataforma")[0];
 
-  const situacaoAtualParts = [
-    resolveLabel(project.hasExistingSystem, HAS_EXISTING_SYSTEM_OPTIONS),
-    resolveLabel(project.hasCurrentApplication, HAS_CURRENT_APPLICATION_OPTIONS),
-    project.targetAudience,
-  ].filter((v): v is string => Boolean(v));
+  const situacaoAtualLines = buildLabeledLines([
+    { label: "Abordagem", value: resolveLabel(project.hasExistingSystem, HAS_EXISTING_SYSTEM_OPTIONS) },
+    {
+      label: "Aplicação existente hoje",
+      value: resolveLabel(project.hasCurrentApplication, HAS_CURRENT_APPLICATION_OPTIONS),
+    },
+    { label: "Público-alvo", value: project.targetAudience },
+  ]);
 
   const solutionTypeLabels = (project.solutionTypes ?? []).map(
     (v) => SOLUTION_TYPES.find((s) => s.value === v)?.label ?? v
   );
-  const construcaoParts = [
-    ...solutionTypeLabels,
-    resolveLabel(project.executionStrategy, EXECUTION_STRATEGIES),
-  ].filter((v): v is string => Boolean(v));
+  const construcaoLines = buildLabeledLines([
+    { label: "Solução", value: solutionTypeLabels.length > 0 ? solutionTypeLabels.join(", ") : undefined },
+    { label: "Execução", value: resolveLabel(project.executionStrategy, EXECUTION_STRATEGIES) },
+  ]);
 
   const benefitLabels = (project.benefits ?? []).map(
     (key) => BENEFIT_OPTIONS.find((b) => b.key === key)?.label ?? key
@@ -213,24 +222,38 @@ export function ProjectExecutiveSlide({ project }: { project: Project }) {
               <p className="text-sm leading-relaxed text-foreground/90">{project.description}</p>
             </div>
           )}
-          {situacaoAtualParts.length > 0 && (
+          {situacaoAtualLines.length > 0 && (
             <div>
               <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 Situação atual
               </div>
-              <p className="text-sm leading-relaxed text-foreground/90">
-                {situacaoAtualParts.join(" · ")}
-              </p>
+              <div className="space-y-0.5">
+                {situacaoAtualLines.map((line) => (
+                  <p
+                    key={line.label}
+                    className="line-clamp-2 text-sm leading-relaxed text-foreground/90"
+                  >
+                    <span className="font-medium">{line.label}:</span> {line.value}
+                  </p>
+                ))}
+              </div>
             </div>
           )}
-          {construcaoParts.length > 0 && (
+          {construcaoLines.length > 0 && (
             <div>
               <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 Construção
               </div>
-              <p className="text-sm leading-relaxed text-foreground/90">
-                {construcaoParts.join(" · ")}
-              </p>
+              <div className="space-y-0.5">
+                {construcaoLines.map((line) => (
+                  <p
+                    key={line.label}
+                    className="line-clamp-2 text-sm leading-relaxed text-foreground/90"
+                  >
+                    <span className="font-medium">{line.label}:</span> {line.value}
+                  </p>
+                ))}
+              </div>
             </div>
           )}
           {benefitLabels.length > 0 && (
