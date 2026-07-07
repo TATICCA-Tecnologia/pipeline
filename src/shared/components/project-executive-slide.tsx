@@ -150,14 +150,28 @@ function buildLabeledLines(
   return entries.filter((e): e is { label: string; value: string } => Boolean(e.value));
 }
 
+function withDetail(base: string | undefined, detail: string | undefined): string | undefined {
+  if (!base) return undefined;
+  return detail ? `${base} — ${detail}` : base;
+}
+
 export function ProjectExecutiveSlide({ project }: { project: Project }) {
   const areaEntrevistada = project.projectType.split(" · Plataforma")[0];
 
   const situacaoAtualLines = buildLabeledLines([
-    { label: "Abordagem", value: resolveLabel(project.hasExistingSystem, HAS_EXISTING_SYSTEM_OPTIONS) },
+    {
+      label: "Abordagem",
+      value: withDetail(
+        resolveLabel(project.hasExistingSystem, HAS_EXISTING_SYSTEM_OPTIONS),
+        project.existingSystemDetails
+      ),
+    },
     {
       label: "Aplicação existente hoje",
-      value: resolveLabel(project.hasCurrentApplication, HAS_CURRENT_APPLICATION_OPTIONS),
+      value: withDetail(
+        resolveLabel(project.hasCurrentApplication, HAS_CURRENT_APPLICATION_OPTIONS),
+        project.currentApplicationDetails
+      ),
     },
     { label: "Público-alvo", value: project.targetAudience },
   ]);
