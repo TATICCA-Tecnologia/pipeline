@@ -352,6 +352,7 @@ export const projectRouter = router({
         complexity: complexitySchema.nullable().optional(),
         robotSchedule: z.string().nullable().optional(),
         estimatedAnnualSavingBRL: z.number().nullable().optional(),
+        hasCurrentApplication: z.string().nullable().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -372,6 +373,8 @@ export const projectRouter = router({
       if (rest.robotSchedule !== undefined) data.robotSchedule = rest.robotSchedule;
       if (rest.estimatedAnnualSavingBRL !== undefined)
         data.estimatedAnnualSavingBRL = rest.estimatedAnnualSavingBRL;
+      if (rest.hasCurrentApplication !== undefined)
+        data.hasCurrentApplication = rest.hasCurrentApplication;
       if (rest.peopleInvolved !== undefined) data.peopleInvolved = rest.peopleInvolved;
       if (rest.taskDurationHours !== undefined || rest.processFrequency !== undefined) {
         const current = await ctx.db.project.findUnique({
