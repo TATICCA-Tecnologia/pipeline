@@ -1,6 +1,8 @@
 import { z } from "zod";
 import { router, protectedProcedure, adminProcedure } from "../trpc";
 
+const interviewStatusSchema = z.enum(["realizado", "agendado", "cancelado"]);
+
 export const interviewRouter = router({
   list: protectedProcedure
     .input(z.object({ companyId: z.string() }))
@@ -16,8 +18,8 @@ export const interviewRouter = router({
     .input(
       z.object({
         companyId: z.string(),
-        participantName: z.string().min(1),
-        status: z.string().default("realizado"),
+        participantName: z.string().trim().min(1),
+        status: interviewStatusSchema.default("realizado"),
         scheduledDate: z.coerce.date(),
         areaId: z.string().nullable().optional(),
       })
@@ -39,8 +41,8 @@ export const interviewRouter = router({
     .input(
       z.object({
         id: z.string(),
-        participantName: z.string().min(1).optional(),
-        status: z.string().optional(),
+        participantName: z.string().trim().min(1).optional(),
+        status: interviewStatusSchema.optional(),
         scheduledDate: z.coerce.date().optional(),
         areaId: z.string().nullable().optional(),
       })

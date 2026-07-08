@@ -49,7 +49,9 @@ interface Props {
 
 const AREA_NONE = "__none__";
 
-const STATUS_OPTIONS = [
+type InterviewStatus = "realizado" | "agendado" | "cancelado";
+
+const STATUS_OPTIONS: { value: InterviewStatus; label: string }[] = [
   { value: "realizado", label: "Realizado" },
   { value: "agendado", label: "Agendado" },
   { value: "cancelado", label: "Cancelado" },
@@ -65,14 +67,35 @@ const STATUS_VARIANT: Record<string, "default" | "secondary" | "outline"> = {
   cancelado: "outline",
 };
 
-function todayISO(): string {
-  return new Date().toISOString().slice(0, 10);
+// Usa os componentes de data locais (não toISOString/UTC) para que o valor do
+// input "date" bata com a data exibida na tabela via toLocaleDateString("pt-BR")
+// — no fuso do Brasil (UTC-3), toISOString() pode arredondar para o dia
+// seguinte perto da meia-noite.
+function toLocalDateInputValue(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
-const EMPTY_FORM = {
+// new Date("YYYY-MM-DD") interpreta a string como UTC meia-noite (spec do
+// ISO 8601 para strings "date-only"), o que no fuso do Brasil (UTC-3) cai no
+// dia anterior às 21h — por isso construímos a partir dos componentes
+// locais em vez de deixar o Date parsear a string diretamente.
+function parseLocalDateInputValue(value: string): Date {
+  const [year, month, day] = value.split("-").map(Number);
+  return new Date(year, month - 1, day);
+}
+
+const EMPTY_FORM: {
+  participantName: string;
+  status: InterviewStatus;
+  scheduledDate: string;
+  areaId: string;
+} = {
   participantName: "",
   status: "realizado",
-  scheduledDate: todayISO(),
+  scheduledDate: toLocalDateInputValue(new Date()),
   areaId: AREA_NONE,
 };
 
@@ -135,8 +158,8 @@ export default function EntrevistasPage({ params }: Props) {
   function openEdit(interview: (typeof interviews)[number]) {
     setForm({
       participantName: interview.participantName,
-      status: interview.status,
-      scheduledDate: new Date(interview.scheduledDate).toISOString().slice(0, 10),
+      status: interview.status as InterviewStatus,
+      scheduledDate: toLocalDateInputValue(new Date(interview.scheduledDate)),
       areaId: interview.areaId ?? AREA_NONE,
     });
     setDialog({ open: true, editingId: interview.id });
@@ -146,7 +169,7 @@ export default function EntrevistasPage({ params }: Props) {
     const payload = {
       participantName: form.participantName,
       status: form.status,
-      scheduledDate: new Date(form.scheduledDate),
+      scheduledDate: parseLocalDateInputValue(form.scheduledDate),
       areaId: form.areaId === AREA_NONE ? null : form.areaId,
     };
     if (dialog.editingId) {
@@ -296,7 +319,9 @@ export default function EntrevistasPage({ params }: Props) {
               <Label>Status</Label>
               <Select
                 value={form.status}
-                onValueChange={(value) => setForm((f) => ({ ...f, status: value }))}
+                onValueChange={(value) =>
+                  setForm((f) => ({ ...f, status: value as InterviewStatus }))
+                }
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Status" />
