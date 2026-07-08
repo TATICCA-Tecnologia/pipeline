@@ -24,8 +24,9 @@ import {
   TableRow,
 } from "@/src/shared/components/ui/table";
 import { useToast } from "@/src/shared/hooks/use-toast";
-import { Building2, Plus, Search, Pencil, ListOrdered, Users } from "lucide-react";
+import { Building2, Plus, Search, Pencil, ListOrdered, Users, Download } from "lucide-react";
 import Link from "next/link";
+import { getTrpcUserId } from "@/shared/trpc/auth-header";
 
 const EMPTY_FORM = { name: "", document: "", email: "", phone: "" };
 
@@ -35,6 +36,7 @@ export default function EmpresasPage() {
   const { data: companies = [], isLoading } = trpc.company.listAll.useQuery();
 
   const [search, setSearch] = useState("");
+  const [exportingId, setExportingId] = useState<string | null>(null);
   const [dialog, setDialog] = useState<{ open: boolean; editingId?: string }>({
     open: false,
   });
@@ -91,6 +93,40 @@ export default function EmpresasPage() {
       updateMutation.mutate({ id: dialog.editingId, ...form });
     } else {
       createMutation.mutate(form);
+    }
+  }
+
+  // Download do deck consolidado (.pptx). A rota /api/empresas/[id]/deck exige
+  // o header x-user-id (mesma auth do resto do app), que uma navegação simples
+  // de <a href> não incluiria — por isso fazemos um fetch manual com o header,
+  // convertemos em blob e disparamos o download por um link temporário.
+  async function handleExportDeck(company: (typeof companies)[number]) {
+    setExportingId(company.id);
+    try {
+      const response = await fetch(`/api/empresas/${company.id}/deck`, {
+        headers: { "x-user-id": getTrpcUserId() },
+      });
+      if (!response.ok) {
+        const message = await response.text();
+        throw new Error(message || `Erro ${response.status}`);
+      }
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `diagnostico-${company.name}.pptx`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      toast({
+        title: "Erro ao exportar diagnóstico",
+        description: error instanceof Error ? error.message : "Erro desconhecido",
+        variant: "destructive",
+      });
+    } finally {
+      setExportingId(null);
     }
   }
 
@@ -196,6 +232,15 @@ export default function EmpresasPage() {
                             <Users className="h-4 w-4" />
                           </Button>
                         </Link>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          title="Exportar diagnóstico completo (.pptx)"
+                          disabled={exportingId === company.id}
+                          onClick={() => handleExportDeck(company)}
+                        >
+                          <Download className="h-4 w-4" />
+                        </Button>
                         <Button size="icon" variant="ghost" onClick={() => openEdit(company)}>
                           <Pencil className="h-4 w-4" />
                         </Button>

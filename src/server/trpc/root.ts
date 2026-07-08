@@ -1,4 +1,4 @@
-import { router } from "./trpc";
+import { router, createCallerFactory } from "./trpc";
 import { projectRouter } from "./routers/project.router";
 import { userRouter } from "./routers/user.router";
 import { authRouter } from "./routers/auth.router";
@@ -30,3 +30,9 @@ export const appRouter = router({
 });
 
 export type AppRouter = typeof appRouter;
+
+// Caller server-side do appRouter: permite invocar os procedures existentes
+// fora de uma requisição HTTP (ex.: geração do deck consolidado em PPTX no
+// Passo 8a), reaproveitando toda a lógica de negócio sem duplicá-la. Recebe um
+// Context montado manualmente (ver src/server/deck/build-diagnostic-deck.ts).
+export const createCaller = createCallerFactory(appRouter);
