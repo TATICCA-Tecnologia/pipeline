@@ -64,6 +64,9 @@ export function ArchitectureTab({ projectId }: ArchitectureTabProps) {
   const [complexity, setComplexity] = useState<string>("");
   const [robotSchedule, setRobotSchedule] = useState<string>("");
   const [estimatedAnnualSavingBRL, setEstimatedAnnualSavingBRL] = useState<string>("");
+  const [implementationEffortDays, setImplementationEffortDays] = useState<string>("");
+  const [implementationWave, setImplementationWave] = useState<string>("");
+  const [waveOrder, setWaveOrder] = useState<string>("");
 
   useEffect(() => {
     if (project) {
@@ -78,6 +81,15 @@ export function ArchitectureTab({ projectId }: ArchitectureTabProps) {
           ? String(project.estimatedAnnualSavingBRL)
           : ""
       );
+      setImplementationEffortDays(
+        project.implementationEffortDays != null
+          ? String(project.implementationEffortDays)
+          : ""
+      );
+      setImplementationWave(
+        project.implementationWave != null ? String(project.implementationWave) : ""
+      );
+      setWaveOrder(project.waveOrder != null ? String(project.waveOrder) : "");
     }
   }, [project]);
 
@@ -94,6 +106,9 @@ export function ArchitectureTab({ projectId }: ArchitectureTabProps) {
       .replace(/\.(?=\d{3}(\D|$))/g, "")
       .replace(",", ".");
     const parsedSaving = parseFloat(normalizedSaving);
+    const parsedEffortDays = parseInt(implementationEffortDays, 10);
+    const parsedWave = parseInt(implementationWave, 10);
+    const parsedWaveOrder = parseInt(waveOrder, 10);
     updateProject.mutate({
       id: projectId,
       solutionTypes,
@@ -104,6 +119,11 @@ export function ArchitectureTab({ projectId }: ArchitectureTabProps) {
       robotSchedule: robotSchedule || null,
       estimatedAnnualSavingBRL:
         !Number.isNaN(parsedSaving) && parsedSaving >= 0 ? parsedSaving : null,
+      implementationEffortDays: !Number.isNaN(parsedEffortDays)
+        ? parsedEffortDays
+        : undefined,
+      implementationWave: !Number.isNaN(parsedWave) ? parsedWave : undefined,
+      waveOrder: !Number.isNaN(parsedWaveOrder) ? parsedWaveOrder : undefined,
     });
   };
 
@@ -220,6 +240,51 @@ export function ArchitectureTab({ projectId }: ArchitectureTabProps) {
               />
               <p className="text-xs text-muted-foreground">
                 Só aparece nesta tela de administração — nunca é exibido ao cliente.
+              </p>
+            </div>
+          </div>
+
+          <div className="grid gap-5 sm:grid-cols-3">
+            <div className="space-y-2">
+              <Label>Esforço de implementação (dias úteis)</Label>
+              <Input
+                type="number"
+                min={0}
+                step={1}
+                value={implementationEffortDays}
+                onChange={(e) => setImplementationEffortDays(e.target.value)}
+                placeholder="Ex.: 10"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Onda de implementação</Label>
+              <Select
+                value={implementationWave}
+                onValueChange={setImplementationWave}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="1">Onda 1 (priorizada)</SelectItem>
+                  <SelectItem value="2">Onda 2</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Ordem na onda</Label>
+              <Input
+                type="number"
+                min={0}
+                step={1}
+                value={waveOrder}
+                onChange={(e) => setWaveOrder(e.target.value)}
+                placeholder="Ex.: 1"
+              />
+              <p className="text-xs text-muted-foreground">
+                Ordem de execução dentro da onda (menor = primeiro).
               </p>
             </div>
           </div>

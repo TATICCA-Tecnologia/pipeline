@@ -180,6 +180,11 @@ model Project {
   robotSchedule            String? // texto livre curto, ex.: "Hora fixa, uma vez por dia"
   estimatedAnnualSavingBRL Float?  // saving estimado anual em reais
 
+  // Esforço de implementação (preenchido pelo arquiteto, nunca exposto ao cliente)
+  implementationEffortDays Int? // dias úteis estimados de desenvolvimento do robô
+  implementationWave       Int? // 1 = onda 1 (priorizada), 2 = onda 2, null = não classificado ainda
+  waveOrder                Int? // ordem de execução dentro da onda (menor = primeiro), null = ainda não sequenciado
+
   // Relacionamentos
   client       User             @relation("ProjectClient", fields: [clientId], references: [id])
   clientId     String
@@ -516,6 +521,10 @@ model SystemSettings {
   scoreWeightEconomia          Float @default(0.4)
   scoreWeightQualitativo       Float @default(0.4)
   scoreWeightComplexidade      Float @default(0.2)
+
+  // Premissas de implementação (usadas em timeline e payback)
+  developerDailyRateBRL Float?
+  wave1StartDate        DateTime?
 
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt

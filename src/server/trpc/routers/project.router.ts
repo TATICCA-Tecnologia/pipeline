@@ -98,6 +98,9 @@ export const projectRouter = router({
         complexity: p.complexity ?? undefined,
         robotSchedule: p.robotSchedule ?? undefined,
         estimatedAnnualSavingBRL: p.estimatedAnnualSavingBRL ?? undefined,
+        implementationEffortDays: p.implementationEffortDays ?? undefined,
+        implementationWave: p.implementationWave ?? undefined,
+        waveOrder: p.waveOrder ?? undefined,
         createdAt: p.createdAt,
         updatedAt: p.updatedAt,
         client: p.client
@@ -169,6 +172,9 @@ export const projectRouter = router({
         complexity: project.complexity ?? undefined,
         robotSchedule: project.robotSchedule ?? undefined,
         estimatedAnnualSavingBRL: project.estimatedAnnualSavingBRL ?? undefined,
+        implementationEffortDays: project.implementationEffortDays ?? undefined,
+        implementationWave: project.implementationWave ?? undefined,
+        waveOrder: project.waveOrder ?? undefined,
         solutionTypes: (project.solutionTypes as string[] | null) ?? [],
         mainTool: project.mainTool ?? undefined,
         executionStrategy: project.executionStrategy ?? undefined,
@@ -352,6 +358,9 @@ export const projectRouter = router({
         complexity: complexitySchema.nullable().optional(),
         robotSchedule: z.string().nullable().optional(),
         estimatedAnnualSavingBRL: z.number().nullable().optional(),
+        implementationEffortDays: z.number().int().optional(),
+        implementationWave: z.number().int().optional(),
+        waveOrder: z.number().int().optional(),
         hasCurrentApplication: z.string().nullable().optional(),
       })
     )
@@ -373,6 +382,11 @@ export const projectRouter = router({
       if (rest.robotSchedule !== undefined) data.robotSchedule = rest.robotSchedule;
       if (rest.estimatedAnnualSavingBRL !== undefined)
         data.estimatedAnnualSavingBRL = rest.estimatedAnnualSavingBRL;
+      if (rest.implementationEffortDays !== undefined)
+        data.implementationEffortDays = rest.implementationEffortDays;
+      if (rest.implementationWave !== undefined)
+        data.implementationWave = rest.implementationWave;
+      if (rest.waveOrder !== undefined) data.waveOrder = rest.waveOrder;
       if (rest.hasCurrentApplication !== undefined)
         data.hasCurrentApplication = rest.hasCurrentApplication;
       if (rest.peopleInvolved !== undefined) data.peopleInvolved = rest.peopleInvolved;

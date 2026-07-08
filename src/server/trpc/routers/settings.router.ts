@@ -21,6 +21,8 @@ export const settingsRouter = router({
   // Atualiza os pesos de priorização. Aceita um subconjunto dos 8 campos; a
   // validação da soma (~1.0 por grupo) considera os valores novos combinados
   // com os atuais do banco para os campos não enviados.
+  // Também aceita developerDailyRateBRL e wave1StartDate — premissas usadas
+  // na timeline/payback de implementação, que não entram em nenhuma soma.
   updateScoringWeights: adminProcedure
     .input(
       z.object({
@@ -32,6 +34,8 @@ export const settingsRouter = router({
         scoreWeightEconomia: z.number().min(0).max(1).optional(),
         scoreWeightQualitativo: z.number().min(0).max(1).optional(),
         scoreWeightComplexidade: z.number().min(0).max(1).optional(),
+        developerDailyRateBRL: z.number().min(0).optional(),
+        wave1StartDate: z.coerce.date().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {

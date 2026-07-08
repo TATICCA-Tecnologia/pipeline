@@ -122,6 +122,10 @@ export default function AdminConfiguracoesPage() {
     scoreWeightComplexidade: "",
   });
 
+  // Premissas de implementação (taxa diária do desenvolvedor, data de início da onda 1).
+  const [developerDailyRateBRL, setDeveloperDailyRateBRL] = useState<string>("");
+  const [wave1StartDate, setWave1StartDate] = useState<string>("");
+
   // Semeia os inputs a partir dos valores reais quando a query resolve.
   useEffect(() => {
     if (!settingsQuery.data) return;
@@ -136,6 +140,12 @@ export default function AdminConfiguracoesPage() {
       scoreWeightQualitativo: String(s.scoreWeightQualitativo),
       scoreWeightComplexidade: String(s.scoreWeightComplexidade),
     });
+    setDeveloperDailyRateBRL(
+      s.developerDailyRateBRL != null ? String(s.developerDailyRateBRL) : ""
+    );
+    setWave1StartDate(
+      s.wave1StartDate ? new Date(s.wave1StartDate).toISOString().slice(0, 10) : ""
+    );
   }, [settingsQuery.data]);
 
   const qualSum = sumWeights(
@@ -161,6 +171,9 @@ export default function AdminConfiguracoesPage() {
       scoreWeightEconomia: Number(weights.scoreWeightEconomia),
       scoreWeightQualitativo: Number(weights.scoreWeightQualitativo),
       scoreWeightComplexidade: Number(weights.scoreWeightComplexidade),
+      developerDailyRateBRL:
+        developerDailyRateBRL.trim() !== "" ? Number(developerDailyRateBRL) : undefined,
+      wave1StartDate: wave1StartDate ? new Date(wave1StartDate) : undefined,
     });
   }
 
@@ -568,8 +581,9 @@ export default function AdminConfiguracoesPage() {
     },
     {
       id: "priorizacao",
-      label: "Pesos de priorização",
-      description: "Ajuste os pesos do motor de scoring de projetos",
+      label: "Premissas de priorização",
+      description:
+        "Ajuste os pesos do motor de scoring e as premissas de implementação (taxa diária, início da onda 1)",
       icon: SlidersHorizontal,
       content: (
         <div className="space-y-6">
@@ -655,6 +669,42 @@ export default function AdminConfiguracoesPage() {
                     Os pesos do score combinado devem somar 1.00.
                   </p>
                 )}
+              </div>
+
+              <Separator />
+
+              {/* Bloco 3: premissas de implementação (taxa diária, início da onda 1) */}
+              <div className="space-y-3">
+                <p className="text-sm font-semibold">Premissas de implementação</p>
+                <p className="text-xs text-muted-foreground">
+                  Usadas para calcular a timeline e o payback de implementação dos
+                  robôs (ondas de priorização).
+                </p>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">
+                      Taxa diária do desenvolvedor (R$)
+                    </label>
+                    <Input
+                      type="number"
+                      min={0}
+                      step="any"
+                      value={developerDailyRateBRL}
+                      onChange={(e) => setDeveloperDailyRateBRL(e.target.value)}
+                      placeholder="Ex.: 800"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">
+                      Data de início da onda 1
+                    </label>
+                    <Input
+                      type="date"
+                      value={wave1StartDate}
+                      onChange={(e) => setWave1StartDate(e.target.value)}
+                    />
+                  </div>
+                </div>
               </div>
 
               <div className="flex justify-end pt-2">
