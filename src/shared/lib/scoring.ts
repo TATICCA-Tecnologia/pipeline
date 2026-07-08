@@ -11,6 +11,19 @@ import type { Project } from "@prisma/client";
 /** Valor usado quando um rating individual é `null` (mesma convenção de project-executive-slide.tsx). */
 export const DEFAULT_RATING = 3;
 
+/** Nota máxima possível para um rating individual (escala 1-5). */
+export const MAX_RATING = 5;
+
+/** Score de complexidade usado quando `complexity` é `null` ou não reconhecido. */
+export const DEFAULT_COMPLEXITY_SCORE = 0.6;
+
+/** Mapa fixo de dificuldade técnica (complexidade) para score 0-1. */
+const COMPLEXITY_SCORE_MAP: Record<string, number> = {
+  baixa: 1,
+  media: DEFAULT_COMPLEXITY_SCORE,
+  alta: 0.3,
+};
+
 export type QualitativeWeights = {
   qualWeightErrorReduction: number;
   qualWeightProcessCriticality: number;
@@ -43,7 +56,7 @@ export function computeQualitativeScore(
   project: ProjectRatings,
   weights: QualitativeWeights
 ): number {
-  const norm = (rating: number | null) => (rating ?? DEFAULT_RATING) / 5;
+  const norm = (rating: number | null) => (rating ?? DEFAULT_RATING) / MAX_RATING;
 
   const weighted =
     norm(project.ratingErrorReduction) * weights.qualWeightErrorReduction +
@@ -58,12 +71,10 @@ export function computeQualitativeScore(
 /**
  * Mapeia a dificuldade técnica (complexidade) para um score 0-1 onde valores
  * maiores significam "mais fácil" (portanto melhor para priorizar).
- * Retorna 0.6 quando `complexity` é null ou não reconhecido.
+ * Retorna DEFAULT_COMPLEXITY_SCORE quando `complexity` é null ou não reconhecido.
  */
 export function computeComplexityScore(complexity: string | null): number {
-  const map: Record<string, number> = { baixa: 1, media: 0.6, alta: 0.3 };
-  if (complexity === null) return 0.6;
-  return map[complexity] ?? 0.6;
+  return (complexity === null ? undefined : COMPLEXITY_SCORE_MAP[complexity]) ?? DEFAULT_COMPLEXITY_SCORE;
 }
 
 /**

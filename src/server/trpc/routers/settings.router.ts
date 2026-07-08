@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { router, protectedProcedure, adminProcedure } from "../trpc";
+import { router, adminProcedure } from "../trpc";
 import { TRPCError } from "@trpc/server";
 
 const WEIGHT_SUM_MIN = 0.99;
@@ -7,8 +7,10 @@ const WEIGHT_SUM_MAX = 1.01;
 
 export const settingsRouter = router({
   // Garante que a linha "default" existe e a retorna (com os defaults do schema
-  // na primeira vez).
-  getSettings: protectedProcedure.query(async ({ ctx }) => {
+  // na primeira vez). Admin-only: o registro carrega campos sensíveis
+  // (pixKey, companyEmail, maintenanceMode, etc.) que não devem vazar para
+  // usuários autenticados não-admin. A página que consome isto vive sob /admin/.
+  getSettings: adminProcedure.query(async ({ ctx }) => {
     return ctx.db.systemSettings.upsert({
       where: { id: "default" },
       create: { id: "default" },
@@ -22,14 +24,14 @@ export const settingsRouter = router({
   updateScoringWeights: adminProcedure
     .input(
       z.object({
-        qualWeightErrorReduction: z.number().optional(),
-        qualWeightProcessCriticality: z.number().optional(),
-        qualWeightInternalImpact: z.number().optional(),
-        qualWeightExternalImpact: z.number().optional(),
-        qualWeightCompliance: z.number().optional(),
-        scoreWeightEconomia: z.number().optional(),
-        scoreWeightQualitativo: z.number().optional(),
-        scoreWeightComplexidade: z.number().optional(),
+        qualWeightErrorReduction: z.number().min(0).max(1).optional(),
+        qualWeightProcessCriticality: z.number().min(0).max(1).optional(),
+        qualWeightInternalImpact: z.number().min(0).max(1).optional(),
+        qualWeightExternalImpact: z.number().min(0).max(1).optional(),
+        qualWeightCompliance: z.number().min(0).max(1).optional(),
+        scoreWeightEconomia: z.number().min(0).max(1).optional(),
+        scoreWeightQualitativo: z.number().min(0).max(1).optional(),
+        scoreWeightComplexidade: z.number().min(0).max(1).optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -54,17 +56,17 @@ export const settingsRouter = router({
         merged.scoreWeightQualitativo +
         merged.scoreWeightComplexidade;
 
-      if (qualSum < WEIGHT_SUM_MIN || qualSum > WEIGHT_SUM_MAX) {
+      if (!Number.isFinite(qualSum) || qualSum < WEIGHT_SUM_MIN || qualSum > WEIGHT_SUM_MAX) {
         throw new TRPCError({
           code: "BAD_REQUEST",
-          message: `A soma dos pesos qualitativos deve ser 1.0 (valor somado: ${qualSum.toFixed(2)}).`,
+          message: `A soma dos pesos qualitativos deve ser 1.0 (valor somado: ${Number.isFinite(qualSum) ? qualSum.toFixed(2) : "inválido"}).`,
         });
       }
 
-      if (scoreSum < WEIGHT_SUM_MIN || scoreSum > WEIGHT_SUM_MAX) {
+      if (!Number.isFinite(scoreSum) || scoreSum < WEIGHT_SUM_MIN || scoreSum > WEIGHT_SUM_MAX) {
         throw new TRPCError({
           code: "BAD_REQUEST",
-          message: `A soma dos pesos do score combinado deve ser 1.0 (valor somado: ${scoreSum.toFixed(2)}).`,
+          message: `A soma dos pesos do score combinado deve ser 1.0 (valor somado: ${Number.isFinite(scoreSum) ? scoreSum.toFixed(2) : "inválido"}).`,
         });
       }
 
