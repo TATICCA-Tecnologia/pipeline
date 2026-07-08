@@ -27,6 +27,14 @@ export type WaveTimelineItem = {
   endDate: Date;
   /** Opcional: usada só para colorir a barra por área (cor cíclica, não requisito rígido). */
   areaName?: string | null;
+  /**
+   * `false` quando a duração veio do fallback de 1 dia de `computeWaveSchedule`
+   * (esforço ainda não estimado pelo arquiteto), não de um
+   * `implementationEffortDays` real — a barra recebe uma indicação visual
+   * diferente para não ser confundida com uma estimativa real de 1 dia.
+   * Omitido/`undefined` é tratado como `true` (barra "normal").
+   */
+  effortEstimated?: boolean;
 };
 
 interface WaveTimelineProps {
@@ -118,15 +126,29 @@ export function WaveTimeline({
           const color = item.areaName
             ? (areaColorMap.get(item.areaName) ?? "var(--color-chart-1)")
             : "var(--color-chart-1)";
+          // effortEstimated === false: duração veio do fallback de 1 dia
+          // (esforço ainda não estimado), não de um valor real — sinalizar
+          // com borda tracejada + opacidade reduzida + "?" no rótulo, para
+          // não parecer uma estimativa real de 1 dia.
+          const isFallback = item.effortEstimated === false;
 
           return (
             <div key={item.projectId} className="relative h-9">
               <div
-                className="absolute h-9 rounded-md flex items-center px-2 text-xs font-medium text-white shadow-sm overflow-hidden whitespace-nowrap"
+                className={cn(
+                  "absolute h-9 rounded-md flex items-center px-2 text-xs font-medium text-white shadow-sm overflow-hidden whitespace-nowrap",
+                  isFallback && "border-2 border-dashed border-white/70 opacity-70"
+                )}
                 style={{ left: `${left}%`, width: `${width}%`, backgroundColor: color }}
-                title={`${item.title}: ${format(item.startDate, "dd/MM/yyyy")} – ${format(item.endDate, "dd/MM/yyyy")}`}
+                title={
+                  `${item.title}: ${format(item.startDate, "dd/MM/yyyy")} – ${format(item.endDate, "dd/MM/yyyy")}` +
+                  (isFallback ? " (esforço ainda não estimado — assumido 1 dia)" : "")
+                }
               >
-                <span className="truncate">{item.title}</span>
+                <span className="truncate">
+                  {item.title}
+                  {isFallback && " (?)"}
+                </span>
               </div>
             </div>
           );

@@ -1,4 +1,4 @@
-import { addBusinessDays } from "date-fns";
+import { addBusinessDays, isWeekend } from "date-fns";
 
 /**
  * Agendamento sequencial de robôs dentro de uma onda de implementação
@@ -23,6 +23,12 @@ export type WaveScheduleItem = {
   title: string;
   startDate: Date;
   endDate: Date;
+  /**
+   * `false` quando `implementationEffortDays` era `null` e o fallback de 1
+   * dia foi usado — permite que a UI distinga "estimado em 1 dia" de "ainda
+   * não estimado" em vez de renderizar as duas situações de forma idêntica.
+   */
+  effortEstimated: boolean;
 };
 
 /**
@@ -33,6 +39,8 @@ export type WaveScheduleItem = {
  * nenhum aviso, o que é pior para o caso de uso ("ver a sequência completa
  * da onda"). 1 dia é o menor incremento útil e não distorce muito a soma
  * cumulativa para os poucos projetos que ainda não têm esforço estimado.
+ * `WaveScheduleItem.effortEstimated` sinaliza quando esse fallback foi usado,
+ * para a UI conseguir diferenciar visualmente.
  */
 const FALLBACK_EFFORT_DAYS = 1;
 
@@ -60,12 +68,20 @@ export function computeWaveSchedule(
   });
 
   const schedule: WaveScheduleItem[] = [];
-  let cursor = startDate;
+  // `addBusinessDays(weekendDate, 0)` retorna a própria data de fim de semana
+  // inalterada (não "avança" para o próximo dia útil) — por isso o início da
+  // onda precisa ser normalizado manualmente antes do primeiro agendamento,
+  // senão o primeiro robô começaria num sábado/domingo.
+  let cursor = nextBusinessDayOnOrAfter(startDate);
 
   for (const project of ordered) {
+    const effortEstimated = project.implementationEffortDays !== null;
     const effortDays = project.implementationEffortDays ?? FALLBACK_EFFORT_DAYS;
     // effortDays dias úteis a partir de `cursor` inclui o próprio `cursor`
     // como primeiro dia — por isso o fim é cursor + (effortDays - 1) dias úteis.
+    // Math.max(1, effortDays) também protege contra um `implementationEffortDays`
+    // explícito de 0 (ou negativo), evitando uma chamada "para trás" de
+    // addBusinessDays — tratado como 1 dia, igual ao fallback de null.
     const projectStart = cursor;
     const projectEnd = addBusinessDays(projectStart, Math.max(1, effortDays) - 1);
 
@@ -74,10 +90,16 @@ export function computeWaveSchedule(
       title: project.title,
       startDate: projectStart,
       endDate: projectEnd,
+      effortEstimated,
     });
 
     cursor = addBusinessDays(projectEnd, 1);
   }
 
   return schedule;
+}
+
+/** Retorna `date` se já for dia útil (seg-sex), senão avança para o próximo dia útil. */
+function nextBusinessDayOnOrAfter(date: Date): Date {
+  return isWeekend(date) ? addBusinessDays(date, 1) : date;
 }

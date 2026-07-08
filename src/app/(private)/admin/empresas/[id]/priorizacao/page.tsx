@@ -488,13 +488,17 @@ export default function PriorizacaoPage({ params }: Props) {
               </p>
             </CardHeader>
             <CardContent>
-              <WaveTimeline
-                items={wave1Schedule.map((item) => ({
-                  ...item,
-                  areaName: areaNameByProjectId.get(item.projectId) ?? null,
-                }))}
-                emptyMessage="Nenhum projeto marcado na onda 1."
-              />
+              {isLoading ? (
+                <p className="text-sm text-muted-foreground py-10 text-center">Carregando...</p>
+              ) : (
+                <WaveTimeline
+                  items={wave1Schedule.map((item) => ({
+                    ...item,
+                    areaName: areaNameByProjectId.get(item.projectId) ?? null,
+                  }))}
+                  emptyMessage="Nenhum projeto marcado na onda 1."
+                />
+              )}
             </CardContent>
           </Card>
 
@@ -507,13 +511,17 @@ export default function PriorizacaoPage({ params }: Props) {
               </p>
             </CardHeader>
             <CardContent>
-              <WaveTimeline
-                items={wave2Schedule.map((item) => ({
-                  ...item,
-                  areaName: areaNameByProjectId.get(item.projectId) ?? null,
-                }))}
-                emptyMessage="Nenhum projeto marcado na onda 2."
-              />
+              {isLoading ? (
+                <p className="text-sm text-muted-foreground py-10 text-center">Carregando...</p>
+              ) : (
+                <WaveTimeline
+                  items={wave2Schedule.map((item) => ({
+                    ...item,
+                    areaName: areaNameByProjectId.get(item.projectId) ?? null,
+                  }))}
+                  emptyMessage="Nenhum projeto marcado na onda 2."
+                />
+              )}
             </CardContent>
           </Card>
         </TabsContent>
