@@ -581,6 +581,42 @@ function buildQuantitativeLines(project: ProjectDeckRow): QuantitativeLine[] {
   return lines;
 }
 
+// Layout do bloco direito (tabela quantitativa + header/radar qualitativo).
+// A tabela usa linhas de altura automática (sem `autoPage`, sem tamanho fixo),
+// então o header/radar abaixo dela precisam ser posicionados dinamicamente —
+// caso contrário, um projeto com as 7 linhas preenchidas (ou um valor longo,
+// como `robotSchedule` livre ou o fallback "Não quantificado nesta reunião",
+// que pode quebrar em 2 linhas dentro da coluna de 3.2") faz a tabela crescer
+// além da posição fixa onde o header/radar estavam, colidindo visualmente.
+// `estimateQuantTableHeight` é uma estimativa conservadora (superestima) da
+// altura renderizada, usada só para posicionar os elementos abaixo — não
+// precisa ser exata, só nunca subestimar.
+const RIGHT_TABLE_TOP_Y = 1.45;
+const ROW_BASE_HEIGHT_IN = 0.34; // altura de uma linha de 1 linha de texto (fontSize 10, valign middle)
+const ROW_WRAP_EXTRA_IN = 0.24; // altura adicional por linha extra de quebra
+const CHARS_PER_LINE_AT_10PT = 34; // heurística conservadora p/ coluna de valor (~3.2")
+const RADAR_HEADER_GAP_IN = 0.35; // espaço entre o fim da tabela e o header qualitativo
+const QUALITATIVE_HEADER_MIN_Y = 4.55; // posição original (piso) quando a tabela é curta
+const QUALITATIVE_HEADER_TO_RADAR_GAP_IN = 0.4;
+const RADAR_CHART_DEFAULT_H = 2.3;
+const RADAR_CHART_MIN_H = 1.5; // nunca encolhe o radar abaixo disso (ilegível)
+const SLIDE_CONTENT_BOTTOM_Y = 7.3; // LAYOUT_WIDE tem 7.5" de altura; margem de 0.2"
+
+function estimateWrappedLines(text: string, charsPerLine: number): number {
+  return Math.max(1, Math.ceil(text.length / charsPerLine));
+}
+
+function estimateQuantTableHeight(lines: QuantitativeLine[]): number {
+  return lines.reduce((total, line) => {
+    // Label e valor podem quebrar independentemente (colunas de larguras
+    // diferentes) — usa o maior número de linhas entre os dois.
+    const labelLines = estimateWrappedLines(line.label, CHARS_PER_LINE_AT_10PT);
+    const valueLines = estimateWrappedLines(line.value, CHARS_PER_LINE_AT_10PT);
+    const wrappedLines = Math.max(labelLines, valueLines);
+    return total + ROW_BASE_HEIGHT_IN + (wrappedLines - 1) * ROW_WRAP_EXTRA_IN;
+  }, 0);
+}
+
 function addSectionLabel(slide: Slide, text: string, x: number, y: number, w: number): void {
   slide.addText(text.toUpperCase(), {
     x,
@@ -691,7 +727,7 @@ function addProjectSlide(pres: PptxGenJS, project: ProjectDeckRow): void {
     ]);
     slide.addTable(rows, {
       x: rightX,
-      y: 1.45,
+      y: RIGHT_TABLE_TOP_Y,
       w: rightW,
       colW: [2.6, rightW - 2.6],
       fontSize: 10,
@@ -699,6 +735,26 @@ function addProjectSlide(pres: PptxGenJS, project: ProjectDeckRow): void {
       valign: "middle",
     });
   }
+
+  // Header/radar qualitativos são posicionados ABAIXO do fim estimado da
+  // tabela (nunca numa posição fixa) — ver comentário de
+  // `estimateQuantTableHeight` acima sobre por que isso é necessário.
+  const estimatedTableBottomY =
+    quantitativeLines.length > 0
+      ? RIGHT_TABLE_TOP_Y + estimateQuantTableHeight(quantitativeLines)
+      : RIGHT_TABLE_TOP_Y;
+  const qualitativeHeaderY = Math.max(
+    QUALITATIVE_HEADER_MIN_Y,
+    estimatedTableBottomY + RADAR_HEADER_GAP_IN
+  );
+  const radarY = qualitativeHeaderY + QUALITATIVE_HEADER_TO_RADAR_GAP_IN;
+  // Se a tabela estimada for tão alta que empurra o radar perto do fim do
+  // slide, encolhe a altura do radar (nunca abaixo de RADAR_CHART_MIN_H) em
+  // vez de deixá-lo estourar a página.
+  const radarH = Math.max(
+    RADAR_CHART_MIN_H,
+    Math.min(RADAR_CHART_DEFAULT_H, SLIDE_CONTENT_BOTTOM_Y - radarY)
+  );
 
   // Radar: 5 eixos = os 5 critérios, com DEFAULT_RATING=3 de fallback (mesma
   // regra do componente React). ratingPercent = média/5*100 arredondado.
@@ -712,7 +768,7 @@ function addProjectSlide(pres: PptxGenJS, project: ProjectDeckRow): void {
       { text: "AVALIAÇÃO QUALITATIVA   ", options: { bold: true, fontSize: 10, color: COLOR_PRIMARY, charSpacing: 1 } },
       { text: `${ratingPercent}% (${ratingAverageLabel})`, options: { bold: true, fontSize: 14, color: COLOR_TEAL } },
     ],
-    { x: rightX, y: 4.55, w: rightW, h: 0.4, valign: "middle" }
+    { x: rightX, y: qualitativeHeaderY, w: rightW, h: 0.4, valign: "middle" }
   );
 
   slide.addChart(
@@ -726,9 +782,9 @@ function addProjectSlide(pres: PptxGenJS, project: ProjectDeckRow): void {
     ],
     {
       x: rightX,
-      y: 4.95,
+      y: radarY,
       w: rightW,
-      h: 2.3,
+      h: radarH,
       radarStyle: "filled",
       showLegend: false,
       showTitle: false,
