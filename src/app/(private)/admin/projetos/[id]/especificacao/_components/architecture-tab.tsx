@@ -119,11 +119,12 @@ export function ArchitectureTab({ projectId }: ArchitectureTabProps) {
       robotSchedule: robotSchedule || null,
       estimatedAnnualSavingBRL:
         !Number.isNaN(parsedSaving) && parsedSaving >= 0 ? parsedSaving : null,
-      implementationEffortDays: !Number.isNaN(parsedEffortDays)
-        ? parsedEffortDays
-        : undefined,
-      implementationWave: !Number.isNaN(parsedWave) ? parsedWave : undefined,
-      waveOrder: !Number.isNaN(parsedWaveOrder) ? parsedWaveOrder : undefined,
+      implementationEffortDays:
+        !Number.isNaN(parsedEffortDays) && parsedEffortDays >= 0 ? parsedEffortDays : null,
+      implementationWave:
+        !Number.isNaN(parsedWave) && parsedWave >= 0 ? parsedWave : null,
+      waveOrder:
+        !Number.isNaN(parsedWaveOrder) && parsedWaveOrder >= 0 ? parsedWaveOrder : null,
     });
   };
 

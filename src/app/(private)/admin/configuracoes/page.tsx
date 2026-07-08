@@ -162,6 +162,7 @@ export default function AdminConfiguracoesPage() {
 
   function handleSaveWeights() {
     if (!weightsValid) return;
+    const parsedRate = Number(developerDailyRateBRL);
     updateWeights.mutate({
       qualWeightErrorReduction: Number(weights.qualWeightErrorReduction),
       qualWeightProcessCriticality: Number(weights.qualWeightProcessCriticality),
@@ -172,8 +173,10 @@ export default function AdminConfiguracoesPage() {
       scoreWeightQualitativo: Number(weights.scoreWeightQualitativo),
       scoreWeightComplexidade: Number(weights.scoreWeightComplexidade),
       developerDailyRateBRL:
-        developerDailyRateBRL.trim() !== "" ? Number(developerDailyRateBRL) : undefined,
-      wave1StartDate: wave1StartDate ? new Date(wave1StartDate) : undefined,
+        developerDailyRateBRL.trim() !== "" && !Number.isNaN(parsedRate) && parsedRate >= 0
+          ? parsedRate
+          : null,
+      wave1StartDate: wave1StartDate ? new Date(wave1StartDate) : null,
     });
   }
 

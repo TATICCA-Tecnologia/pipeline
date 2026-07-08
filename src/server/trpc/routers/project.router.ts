@@ -355,9 +355,9 @@ export const projectRouter = router({
         complexity: complexitySchema.nullable().optional(),
         robotSchedule: z.string().nullable().optional(),
         estimatedAnnualSavingBRL: z.number().nullable().optional(),
-        implementationEffortDays: z.number().int().optional(),
-        implementationWave: z.number().int().optional(),
-        waveOrder: z.number().int().optional(),
+        implementationEffortDays: z.number().int().min(0).nullable().optional(),
+        implementationWave: z.number().int().min(0).nullable().optional(),
+        waveOrder: z.number().int().min(0).nullable().optional(),
         hasCurrentApplication: z.string().nullable().optional(),
       })
     )

@@ -34,8 +34,8 @@ export const settingsRouter = router({
         scoreWeightEconomia: z.number().min(0).max(1).optional(),
         scoreWeightQualitativo: z.number().min(0).max(1).optional(),
         scoreWeightComplexidade: z.number().min(0).max(1).optional(),
-        developerDailyRateBRL: z.number().min(0).optional(),
-        wave1StartDate: z.coerce.date().optional(),
+        developerDailyRateBRL: z.number().min(0).nullable().optional(),
+        wave1StartDate: z.coerce.date().nullable().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
