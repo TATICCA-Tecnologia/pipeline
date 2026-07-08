@@ -2,7 +2,7 @@
 
 import { use, useMemo, useState } from "react";
 import Link from "next/link";
-import { addBusinessDays } from "date-fns";
+import { addBusinessDays, differenceInCalendarDays } from "date-fns";
 import {
   Bar,
   ComposedChart,
@@ -41,7 +41,9 @@ import { ArrowLeft, ListOrdered } from "lucide-react";
 import { formatCurrency, formatCompactBRL } from "@/shared/utils";
 import { COMPLEXITY_LEVELS } from "@/shared/constants/project-taxonomy";
 import { computeWaveSchedule } from "@/shared/lib/wave-schedule";
+import { computePaybackCurve, findPaybackDate } from "@/shared/lib/payback";
 import { WaveTimeline } from "@/src/shared/components/wave-timeline";
+import { PaybackChart } from "@/src/shared/components/payback-chart";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -218,6 +220,49 @@ export default function PriorizacaoPage({ params }: Props) {
     [ranking]
   );
 
+  // Payback (Passo 6): reaproveita os dois schedules já calculados acima pelo
+  // Passo 5 (nenhuma chamada de rede adicional) e a saving anual de cada
+  // robô, já presente no ranking buscado no topo da página.
+  const savingByProjectId = useMemo(
+    () => new Map(ranking.map((row) => [row.id, row.estimatedAnnualSavingBRL ?? 0])),
+    [ranking]
+  );
+
+  const paybackSchedule = useMemo(
+    () =>
+      [...wave1Schedule, ...wave2Schedule].map((item) => ({
+        projectId: item.projectId,
+        startDate: item.startDate,
+        endDate: item.endDate,
+        estimatedAnnualSavingBRL: savingByProjectId.get(item.projectId) ?? 0,
+      })),
+    [wave1Schedule, wave2Schedule, savingByProjectId]
+  );
+
+  const developerDailyRateBRL = settings?.developerDailyRateBRL ?? 0;
+
+  const paybackCurve = useMemo(
+    () => computePaybackCurve(paybackSchedule, developerDailyRateBRL),
+    [paybackSchedule, developerDailyRateBRL]
+  );
+
+  const paybackDate = useMemo(() => findPaybackDate(paybackCurve), [paybackCurve]);
+
+  // "Data de início do cronograma": a menor startDate entre os dois schedules
+  // combinados (equivale a wave1StartDate quando a onda 1 tem projetos; cai
+  // para wave2StartDate se a onda 1 estiver vazia) — usada só para expressar
+  // o payback em "N meses a partir do início", nunca como um número fixo.
+  const scheduleStartDate = useMemo(() => {
+    if (paybackSchedule.length === 0) return wave1StartDate;
+    return new Date(Math.min(...paybackSchedule.map((item) => item.startDate.getTime())));
+  }, [paybackSchedule, wave1StartDate]);
+
+  const paybackMonths = useMemo(() => {
+    if (!paybackDate) return null;
+    const days = differenceInCalendarDays(paybackDate, scheduleStartDate);
+    return Math.max(0, Math.round(days / 30.44));
+  }, [paybackDate, scheduleStartDate]);
+
   function handleWaveChange(row: RankingRow, value: string) {
     if (value === WAVE_NONE) {
       updateMutation.mutate({ id: row.id, implementationWave: null, waveOrder: null });
@@ -272,6 +317,7 @@ export default function PriorizacaoPage({ params }: Props) {
         <TabsList>
           <TabsTrigger value="ranking">Ranking</TabsTrigger>
           <TabsTrigger value="cronograma">Cronograma</TabsTrigger>
+          <TabsTrigger value="payback">Payback</TabsTrigger>
         </TabsList>
 
         <TabsContent value="ranking" className="space-y-6 mt-4">
@@ -521,6 +567,32 @@ export default function PriorizacaoPage({ params }: Props) {
                   }))}
                   emptyMessage="Nenhum projeto marcado na onda 2."
                 />
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="payback" className="space-y-6 mt-4">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">Payback / ROI acumulado</CardTitle>
+              <p className="text-sm font-medium">
+                {paybackDate
+                  ? `Payback estimado em ${paybackMonths} ${paybackMonths === 1 ? "mês" : "meses"}`
+                  : "Payback não atingido no período calculado"}
+              </p>
+              {!settings?.developerDailyRateBRL && (
+                <p className="text-xs text-muted-foreground">
+                  Taxa diária do desenvolvedor ainda não configurada em Configurações — usando R$ 0
+                  como referência (o custo acumulado ficará zerado).
+                </p>
+              )}
+            </CardHeader>
+            <CardContent>
+              {isLoading ? (
+                <p className="text-sm text-muted-foreground py-10 text-center">Carregando...</p>
+              ) : (
+                <PaybackChart curve={paybackCurve} paybackDate={paybackDate} />
               )}
             </CardContent>
           </Card>
