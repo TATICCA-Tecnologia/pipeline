@@ -20,16 +20,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/src/shared/components/ui/table";
-import { formatCurrency } from "@/shared/utils";
+import { formatCurrency, formatCompactBRL } from "@/shared/utils";
 
 function formatHours(hours: number): string {
   return `${Math.round(hours).toLocaleString("pt-BR")}h`;
-}
-
-function formatCompactBRL(value: number): string {
-  if (value >= 1_000_000) return `R$ ${(value / 1_000_000).toFixed(1)}M`;
-  if (value >= 1_000) return `R$ ${(value / 1_000).toFixed(0)}mil`;
-  return formatCurrency(value);
 }
 
 type AreaSummaryTooltipPayload = {

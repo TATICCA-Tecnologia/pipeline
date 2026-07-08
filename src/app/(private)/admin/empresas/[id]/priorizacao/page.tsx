@@ -36,7 +36,7 @@ import {
   SelectValue,
 } from "@/src/shared/components/ui/select";
 import { ArrowLeft, ListOrdered } from "lucide-react";
-import { formatCurrency } from "@/shared/utils";
+import { formatCurrency, formatCompactBRL } from "@/shared/utils";
 import { COMPLEXITY_LEVELS } from "@/shared/constants/project-taxonomy";
 
 interface Props {
@@ -56,12 +56,6 @@ const COMPLEXITY_LABEL: Record<string, string> = Object.fromEntries(
 );
 
 const WAVE_NONE = "__none__";
-
-function formatCompactBRL(value: number): string {
-  if (value >= 1_000_000) return `R$ ${(value / 1_000_000).toFixed(1)}M`;
-  if (value >= 1_000) return `R$ ${(value / 1_000).toFixed(0)}mil`;
-  return formatCurrency(value);
-}
 
 function truncate(text: string, max: number): string {
   return text.length > max ? `${text.slice(0, max - 1)}…` : text;

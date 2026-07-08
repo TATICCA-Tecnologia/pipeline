@@ -30,6 +30,13 @@ export function formatCurrency(value: number): string {
   }).format(value);
 }
 
+/** Formata BRL de forma compacta (ex.: "R$ 1.2M", "R$ 350mil") para eixos de gráfico. */
+export function formatCompactBRL(value: number): string {
+  if (value >= 1_000_000) return `R$ ${(value / 1_000_000).toFixed(1)}M`;
+  if (value >= 1_000) return `R$ ${(value / 1_000).toFixed(0)}mil`;
+  return formatCurrency(value);
+}
+
 export function formatTimeSpent(minutes: number): string {
   const hours = Math.floor(minutes / 60);
   const mins = minutes % 60;
