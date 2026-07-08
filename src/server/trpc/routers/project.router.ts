@@ -440,4 +440,45 @@ export const projectRouter = router({
       await ctx.db.project.delete({ where: { id: input.id } });
       return { success: true };
     }),
+
+  // Agregação de projetos por área (contagem, saving estimado e horas atuais).
+  // adminProcedure: soma de saving por área é um dado sensível, não deve vazar
+  // para roles não-admin (mesma lógica de segurança do Passo 1 / settings).
+  // Reutilizada pelo dashboard admin (Passo 2) e futuramente pelo deck consolidado (Passo 8a).
+  getAreaSummary: adminProcedure
+    .input(z.object({ companyId: z.string().optional() }))
+    .query(async ({ ctx, input }) => {
+      const grouped = await ctx.db.project.groupBy({
+        by: ["areaId"],
+        _count: true,
+        _sum: { estimatedAnnualSavingBRL: true, currentAnnualHours: true },
+        where: {
+          areaId: { not: null },
+          ...(input.companyId ? { companyId: input.companyId } : {}),
+        },
+      });
+
+      const areaIds = grouped
+        .map((g) => g.areaId)
+        .filter((id): id is string => id != null);
+
+      const areas = await ctx.db.projectArea.findMany({
+        where: { id: { in: areaIds } },
+      });
+      const areaById = new Map(areas.map((a) => [a.id, a]));
+
+      return grouped
+        .filter((g) => g.areaId != null && areaById.has(g.areaId))
+        .map((g) => {
+          const area = areaById.get(g.areaId as string)!;
+          return {
+            areaId: area.id,
+            areaName: area.name,
+            projectCount: g._count,
+            totalEstimatedSavingBRL: g._sum.estimatedAnnualSavingBRL ?? 0,
+            totalCurrentAnnualHours: g._sum.currentAnnualHours ?? 0,
+          };
+        })
+        .sort((a, b) => b.projectCount - a.projectCount);
+    }),
 });

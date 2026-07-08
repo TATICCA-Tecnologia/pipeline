@@ -6,6 +6,7 @@ import type { ProjectStatus } from "@/shared/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/src/shared/components/ui/card";
 import { Progress } from "@/src/shared/components/ui/progress";
 import { useCountUp } from "@/shared/hooks/use-count-up";
+import { AreaSummaryChart } from "@/shared/components/area-summary-chart";
 import {
   FolderKanban,
   Clock,
@@ -213,6 +214,8 @@ export default function AdminDashboard() {
           </CardContent>
         </Card>
       </div>
+
+      <AreaSummaryChart />
     </div>
   );
 }
