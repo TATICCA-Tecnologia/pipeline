@@ -24,7 +24,8 @@ import {
   TableRow,
 } from "@/src/shared/components/ui/table";
 import { useToast } from "@/src/shared/hooks/use-toast";
-import { Building2, Plus, Search, Pencil } from "lucide-react";
+import { Building2, Plus, Search, Pencil, ListOrdered } from "lucide-react";
+import Link from "next/link";
 
 const EMPTY_FORM = { name: "", document: "", email: "", phone: "" };
 
@@ -136,7 +137,7 @@ export default function EmpresasPage() {
                 <TableHead>Clientes</TableHead>
                 <TableHead>Projetos</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead className="w-[70px]"></TableHead>
+                <TableHead className="w-[100px]"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -184,9 +185,16 @@ export default function EmpresasPage() {
                       />
                     </TableCell>
                     <TableCell>
-                      <Button size="icon" variant="ghost" onClick={() => openEdit(company)}>
-                        <Pencil className="h-4 w-4" />
-                      </Button>
+                      <div className="flex items-center gap-1">
+                        <Link href={`/admin/empresas/${company.id}/priorizacao`}>
+                          <Button size="icon" variant="ghost" title="Priorização">
+                            <ListOrdered className="h-4 w-4" />
+                          </Button>
+                        </Link>
+                        <Button size="icon" variant="ghost" onClick={() => openEdit(company)}>
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))

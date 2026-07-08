@@ -4,6 +4,31 @@ import { router, publicProcedure, protectedProcedure, adminProcedure } from "../
 import { toFrontendStatus, toPrismaStatus } from "../mappers";
 import type { FrontendProjectStatus } from "../mappers";
 import { PROCESS_FREQUENCY_MULTIPLIERS } from "@/shared/constants/project-taxonomy";
+import {
+  computeQualitativeScore,
+  computeComplexityScore,
+  computeEconomiaScore,
+  computeCombinedScore,
+  type QualitativeWeights,
+  type CombinedScoreWeights,
+} from "@/shared/lib/scoring";
+
+// Fallback dos pesos default do SystemSettings (schema.prisma), usado apenas se
+// a linha "default" ainda não existir por algum motivo (nunca deveria acontecer
+// em produção, já que settings.router.ts faz upsert, mas evitamos depender disso).
+const DEFAULT_QUALITATIVE_WEIGHTS: QualitativeWeights = {
+  qualWeightErrorReduction: 0.24,
+  qualWeightProcessCriticality: 0.28,
+  qualWeightInternalImpact: 0.1,
+  qualWeightExternalImpact: 0.23,
+  qualWeightCompliance: 0.15,
+};
+
+const DEFAULT_COMBINED_WEIGHTS: CombinedScoreWeights = {
+  scoreWeightEconomia: 0.4,
+  scoreWeightQualitativo: 0.4,
+  scoreWeightComplexidade: 0.2,
+};
 
 const projectStatusSchema = z.enum([
   "backlog",
@@ -491,5 +516,99 @@ export const projectRouter = router({
           };
         })
         .sort((a, b) => b.projectCount - a.projectCount);
+    }),
+
+  // Ranking priorizado dos projetos de uma empresa, reordenável por economia,
+  // qualitativo ou score combinado (Passo 4 do blueprint de diagnóstico de
+  // robotização). adminProcedure: expõe rating/complexidade/saving, dados
+  // sensíveis que nunca devem vazar para o cliente.
+  getPrioritizedRanking: adminProcedure
+    .input(
+      z.object({
+        companyId: z.string(),
+        sortBy: z.enum(["economia", "qualitativo", "combinado"]),
+      })
+    )
+    .query(async ({ ctx, input }) => {
+      const [projects, settings] = await Promise.all([
+        ctx.db.project.findMany({
+          where: { companyId: input.companyId },
+          select: {
+            id: true,
+            title: true,
+            areaId: true,
+            area: { select: { name: true } },
+            ratingErrorReduction: true,
+            ratingProcessCriticality: true,
+            ratingInternalImpact: true,
+            ratingExternalImpact: true,
+            ratingCompliance: true,
+            complexity: true,
+            estimatedAnnualSavingBRL: true,
+            implementationWave: true,
+            waveOrder: true,
+            implementationEffortDays: true,
+          },
+        }),
+        ctx.db.systemSettings.findUnique({ where: { id: "default" } }),
+      ]);
+
+      const qualWeights: QualitativeWeights = settings
+        ? {
+            qualWeightErrorReduction: settings.qualWeightErrorReduction,
+            qualWeightProcessCriticality: settings.qualWeightProcessCriticality,
+            qualWeightInternalImpact: settings.qualWeightInternalImpact,
+            qualWeightExternalImpact: settings.qualWeightExternalImpact,
+            qualWeightCompliance: settings.qualWeightCompliance,
+          }
+        : DEFAULT_QUALITATIVE_WEIGHTS;
+
+      const combinedWeights: CombinedScoreWeights = settings
+        ? {
+            scoreWeightEconomia: settings.scoreWeightEconomia,
+            scoreWeightQualitativo: settings.scoreWeightQualitativo,
+            scoreWeightComplexidade: settings.scoreWeightComplexidade,
+          }
+        : DEFAULT_COMBINED_WEIGHTS;
+
+      const maxSavingInSet = projects.reduce(
+        (max, p) => Math.max(max, p.estimatedAnnualSavingBRL ?? 0),
+        0
+      );
+
+      const ranked = projects.map((p) => {
+        const qualitativeScorePercent = computeQualitativeScore(p, qualWeights);
+        const complexityScoreValue = computeComplexityScore(p.complexity);
+        const economiaScore = computeEconomiaScore(p.estimatedAnnualSavingBRL, maxSavingInSet);
+        const combinedScore = computeCombinedScore(
+          economiaScore,
+          qualitativeScorePercent,
+          complexityScoreValue,
+          combinedWeights
+        );
+
+        return {
+          id: p.id,
+          title: p.title,
+          areaName: p.area?.name ?? null,
+          qualitativeScorePercent,
+          complexity: p.complexity,
+          estimatedAnnualSavingBRL: p.estimatedAnnualSavingBRL,
+          economiaScore,
+          combinedScore,
+          implementationWave: p.implementationWave,
+          waveOrder: p.waveOrder,
+          implementationEffortDays: p.implementationEffortDays,
+        };
+      });
+
+      const sortKey =
+        input.sortBy === "economia"
+          ? ("economiaScore" as const)
+          : input.sortBy === "qualitativo"
+            ? ("qualitativeScorePercent" as const)
+            : ("combinedScore" as const);
+
+      return ranked.sort((a, b) => b[sortKey] - a[sortKey]);
     }),
 });
