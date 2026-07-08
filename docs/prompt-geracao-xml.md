@@ -12,6 +12,12 @@ recorrente for identificado.
 
 ## Histórico
 
+- **2026-07-07 (7)**: simplificada a regra de `<aplicacaoExistenteHoje>` — um
+  caso real (script Python inativo após troca de máquina) mostrou a tag
+  marcada "Sim" mesmo com o processo 100% manual hoje. A regra era ambígua
+  entre "já existiu algo" e "existe algo rodando agora"; deixado explícito
+  que é sempre a segunda: estado ATUAL, não histórico. Adicionado exemplo
+  ERRADO/CERTO específico de ferramenta inativa/abandonada.
 - **2026-07-07 (6)**: análise de 6 XMLs reais mostrou a maioria dos vazios de
   `<duracaoPorExecucao>`/`<colaboradoresEnvolvidos>` como lacunas genuínas da
   reunião (perguntado e não respondido, ou processo 100% automatizado sem
@@ -158,11 +164,13 @@ Antes de preencher qualquer XML, faça esta leitura analítica:
   ERRADO: <processoExistente>Sim, quero melhorar o existente, mas só a parte de conciliação</processoExistente>
   CERTO: <processoExistente>Sim, quero melhorar o existente</processoExistente> — o recorte "só a parte de conciliação" vai em <detalhesProcessoAtual>.
 - <detalhesProcessoAtual>: 1-2 frases sobre como o processo funciona hoje e o que costuma dar errado — não repita o valor de <processoExistente>, complemente-o com contexto específico da transcrição.
-- <aplicacaoExistenteHoje>: **CAMPO RESTRITO, sem fallback "Outro"**. É um FATO objetivo, diferente do campo acima: já existe hoje uma aplicação/app/sistema/automação pronta (mesmo que informal e não-oficial — planilha com macro, script em Python, fluxo em n8n, Power Automate, Power Apps, UiPath, Zapier etc.) para esse processo? Use exatamente: "Sim" ou "Não", nada mais dentro da tag.
+- <aplicacaoExistenteHoje>: **CAMPO RESTRITO, sem fallback "Outro"**. Pergunta simples e literal: **existe algo RODANDO/FUNCIONANDO agora, executando esse processo, hoje?** Não é "alguém já programou algo alguma vez" — é o estado ATUAL. Se quebrou, ficou inativo, foi abandonado ou nunca chegou a rodar de verdade, a resposta é "Não" (o processo é manual hoje, mesmo que tenha uma história de automação por trás — essa história vai em <detalhesAplicacaoExistente>, não muda a resposta desta tag). Use exatamente: "Sim" ou "Não", nada mais dentro da tag.
   IMPORTANTE: mencionar uma ferramenta de automação já em uso NÃO significa que não há oportunidade ali — normalmente significa que a oportunidade é formalizar, substituir ou melhorar essa automação informal. Continue extraindo o processo como uma oportunidade normalmente, e reflita a intenção real do cliente em <processoExistente> (não assuma "projeto do zero" só porque já existe algo informal rodando). A ferramenta em si só entra aqui e em <detalhesAplicacaoExistente> — nunca em <plataforma>, que é sobre onde a solução final vai rodar (Desktop/Web/mobile), não sobre a ferramenta usada hoje.
   ERRADO: <aplicacaoExistenteHoje>Sim, mas é uma planilha bem simples</aplicacaoExistenteHoje>
   ERRADO: deixar a tag vazia quando a transcrição menciona "já rodamos isso num fluxo do n8n" ou "temos um script em Python que faz isso hoje"
-  CERTO: <aplicacaoExistenteHoje>Sim</aplicacaoExistenteHoje> — e em <detalhesAplicacaoExistente>: "Automação feita hoje em n8n" (ou "script em Python", "fluxo no Power Automate", "planilha com macro" — a ferramenta específica citada).
+  ERRADO: transcrição diz "tínhamos um script que fazia isso, mas parou de funcionar depois da troca de máquina, hoje fazemos na mão" e a tag sai como <aplicacaoExistenteHoje>Sim</aplicacaoExistenteHoje> (o script existiu, mas NÃO está rodando hoje — o processo é manual agora; o correto é "Não", com a história do script antigo em <detalhesAplicacaoExistente>)
+  CERTO: transcrição diz "já rodamos isso num fluxo do n8n" ou "temos um script em Python que faz isso hoje" (ativo, funcionando), <aplicacaoExistenteHoje>Sim</aplicacaoExistenteHoje> — e em <detalhesAplicacaoExistente>: "Automação feita hoje em n8n" (ou "script em Python", "fluxo no Power Automate", "planilha com macro" — a ferramenta específica citada).
+  CERTO: transcrição diz "tínhamos um script, mas parou de funcionar, hoje é manual", <aplicacaoExistenteHoje>Não</aplicacaoExistenteHoje> — e em <detalhesAplicacaoExistente> (ou <detalhesProcessoAtual>): "Existiu um script em Python que fazia isso, hoje inativo após troca de máquina; processo voltou a ser manual."
 - <detalhesAplicacaoExistente>: preencha só se aplicacaoExistenteHoje = "Sim". Descreva em 1-2 frases: plataforma/tecnologia usada (nome da ferramenta, ex.: n8n, Python, Power Automate, Power Apps, UiPath), quem desenvolveu, desde quando está em produção, limitações conhecidas — não deixe genérico, use os detalhes específicos citados na transcrição.
 - <colaboradoresEnvolvidos>: **campo importante, não deixe vazio por padrão** — número inteiro de pessoas envolvidas na execução MANUAL do processo hoje. Busque ativamente na transcrição qualquer pista sobre quem faz a tarefa (nomes citados, "eu que faço isso", "duas pessoas revezam", "o time todo passa por isso") e converta para um número — só deixe vazio se a transcrição genuinamente não der nenhuma pista, o que deve ser raro numa reunião de levantamento.
   NÃO confunda com quem desenvolveu uma automação/script/fluxo informal já existente (isso vai em <detalhesAplicacaoExistente>, não aqui) — "colaboradoresEnvolvidos" é sobre quem executa o processo, não quem programou uma ferramenta para ele.
