@@ -58,21 +58,17 @@ const INTERVIEW_STATUS_LABEL: Record<string, string> = {
 /**
  * Gera o buffer (.pptx) do deck consolidado de diagnóstico de uma empresa.
  *
- * Lança um erro claro se não houver nenhum admin no banco (necessário para
- * montar o Context do caller, já que os procedures agregados são admin-only)
- * ou se a empresa não existir.
+ * `actingUserId`: id do admin já autenticado/verificado pelo chamador (a rota
+ * `/api/empresas/[id]/deck` já leu `x-user-id` e confirmou role ADMIN/SUPER_ADMIN
+ * antes de chegar aqui) — usado diretamente para montar o Context do caller,
+ * sem repetir nenhuma query. Não fazemos `findFirst` por um admin arbitrário
+ * aqui: a identidade que already passou pela checagem de autorização é a que
+ * deve ser usada, tanto por consistência de auditoria (ActivityLog, se algum
+ * procedure futuro vier a gravar um) quanto para não mascarar quem gerou o export.
+ *
+ * Lança um erro claro se a empresa não existir.
  */
-export async function buildDiagnosticDeck(companyId: string): Promise<Buffer> {
-  const admin = await db.user.findFirst({
-    where: { role: { in: ["ADMIN", "SUPER_ADMIN"] } },
-    select: { id: true },
-  });
-  if (!admin) {
-    throw new Error(
-      "Nenhum usuário ADMIN/SUPER_ADMIN encontrado no banco — impossível montar o contexto autorizado para gerar o deck."
-    );
-  }
-
+export async function buildDiagnosticDeck(companyId: string, actingUserId: string): Promise<Buffer> {
   const company = await db.company.findUnique({
     where: { id: companyId },
     select: { name: true },
@@ -81,7 +77,7 @@ export async function buildDiagnosticDeck(companyId: string): Promise<Buffer> {
     throw new Error(`Empresa não encontrada (id: ${companyId}).`);
   }
 
-  const ctx: Context = { db, userId: admin.id, realUserId: admin.id };
+  const ctx: Context = { db, userId: actingUserId, realUserId: actingUserId };
   const caller = createCaller(ctx);
 
   const [areaSummary, rankingEconomia, rankingQualitativo, rankingCombinado, settings, interviews] =

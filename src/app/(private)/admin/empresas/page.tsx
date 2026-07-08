@@ -27,6 +27,7 @@ import { useToast } from "@/src/shared/hooks/use-toast";
 import { Building2, Plus, Search, Pencil, ListOrdered, Users, Download } from "lucide-react";
 import Link from "next/link";
 import { getTrpcUserId } from "@/shared/trpc/auth-header";
+import { slugifyFilename } from "@/shared/utils";
 
 const EMPTY_FORM = { name: "", document: "", email: "", phone: "" };
 
@@ -112,13 +113,22 @@ export default function EmpresasPage() {
       }
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
+      // Blob URLs ignoram o header Content-Disposition do servidor — o browser
+      // usa `link.download` diretamente. Por isso sanitizamos o nome aqui
+      // também (mesma função `slugifyFilename` usada no Content-Disposition
+      // da rota), senão o nome real do arquivo baixado usaria o `company.name`
+      // cru, que pode ter acentos, espaços ou "/" (caractere hostil a path).
+      const safeName = slugifyFilename(company.name) || company.id;
       const link = document.createElement("a");
       link.href = url;
-      link.download = `diagnostico-${company.name}.pptx`;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      URL.revokeObjectURL(url);
+      link.download = `diagnostico-${safeName}.pptx`;
+      try {
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+      } finally {
+        URL.revokeObjectURL(url);
+      }
     } catch (error) {
       toast({
         title: "Erro ao exportar diagnóstico",

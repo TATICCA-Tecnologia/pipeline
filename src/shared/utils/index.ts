@@ -57,3 +57,20 @@ export function getInitials(name: string): string {
 export function generateId(): string {
   return Math.random().toString(36).substring(2, 9);
 }
+
+/**
+ * Normaliza um texto arbitrário (ex.: nome de empresa) para um filename
+ * seguro: sem acentos, espaços ou caracteres hostis a sistema de arquivos
+ * (`/`, `\`, etc.). Compartilhado entre server (Content-Disposition da rota
+ * de export do deck) e client (nome do arquivo no download via blob URL —
+ * blob URLs ignoram Content-Disposition e usam `link.download` diretamente,
+ * por isso a mesma sanitização precisa acontecer dos dois lados).
+ */
+export function slugifyFilename(value: string): string {
+  return value
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}

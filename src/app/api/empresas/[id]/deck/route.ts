@@ -1,5 +1,6 @@
 import { db } from "@/server/db";
 import { buildDiagnosticDeck } from "@/server/deck/build-diagnostic-deck";
+import { slugifyFilename } from "@/shared/utils";
 
 /**
  * GET /api/empresas/[id]/deck
@@ -41,26 +42,24 @@ export async function GET(
     return new Response("Empresa não encontrada.", { status: 404 });
   }
 
-  const buffer = await buildDiagnosticDeck(companyId);
+  try {
+    const buffer = await buildDiagnosticDeck(companyId, userId);
 
-  const safeName = slugify(company.name) || companyId;
+    const safeName = slugifyFilename(company.name) || companyId;
 
-  return new Response(new Uint8Array(buffer), {
-    status: 200,
-    headers: {
-      "Content-Type":
-        "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-      "Content-Disposition": `attachment; filename="diagnostico-${safeName}.pptx"`,
-    },
-  });
-}
-
-/** Normaliza o nome da empresa para um filename seguro (sem acentos/espaços). */
-function slugify(value: string): string {
-  return value
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
+    return new Response(new Uint8Array(buffer), {
+      status: 200,
+      headers: {
+        "Content-Type":
+          "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        // Fallback inofensivo: o download real (via blob URL, ver admin/empresas/page.tsx)
+        // ignora este header e usa `link.download` sanitizado no client — mantido aqui
+        // para qualquer consumidor futuro não-blob que respeite Content-Disposition.
+        "Content-Disposition": `attachment; filename="diagnostico-${safeName}.pptx"`,
+      },
+    });
+  } catch (err) {
+    console.error("Falha ao gerar deck de diagnóstico:", err);
+    return new Response("Falha ao gerar o diagnóstico.", { status: 500 });
+  }
 }
