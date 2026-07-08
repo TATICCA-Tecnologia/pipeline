@@ -98,9 +98,6 @@ export const projectRouter = router({
         complexity: p.complexity ?? undefined,
         robotSchedule: p.robotSchedule ?? undefined,
         estimatedAnnualSavingBRL: p.estimatedAnnualSavingBRL ?? undefined,
-        implementationEffortDays: p.implementationEffortDays ?? undefined,
-        implementationWave: p.implementationWave ?? undefined,
-        waveOrder: p.waveOrder ?? undefined,
         createdAt: p.createdAt,
         updatedAt: p.updatedAt,
         client: p.client
