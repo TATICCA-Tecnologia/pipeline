@@ -24,7 +24,7 @@ import {
   TableRow,
 } from "@/src/shared/components/ui/table";
 import { useToast } from "@/src/shared/hooks/use-toast";
-import { Building2, Plus, Search, Pencil, ListOrdered } from "lucide-react";
+import { Building2, Plus, Search, Pencil, ListOrdered, Users } from "lucide-react";
 import Link from "next/link";
 
 const EMPTY_FORM = { name: "", document: "", email: "", phone: "" };
@@ -189,6 +189,11 @@ export default function EmpresasPage() {
                         <Link href={`/admin/empresas/${company.id}/priorizacao`}>
                           <Button size="icon" variant="ghost" title="Priorização">
                             <ListOrdered className="h-4 w-4" />
+                          </Button>
+                        </Link>
+                        <Link href={`/admin/empresas/${company.id}/entrevistas`}>
+                          <Button size="icon" variant="ghost" title="Entrevistas">
+                            <Users className="h-4 w-4" />
                           </Button>
                         </Link>
                         <Button size="icon" variant="ghost" onClick={() => openEdit(company)}>
