@@ -10,6 +10,7 @@ import { featureRouter } from "./routers/feature.router";
 import { specificationRouter } from "./routers/specification.router";
 import { taxonomyRouter } from "./routers/taxonomy.router";
 import { companyRouter } from "./routers/company.router";
+import { settingsRouter } from "./routers/settings.router";
 
 export const appRouter = router({
   project: projectRouter,
@@ -23,6 +24,7 @@ export const appRouter = router({
   specification: specificationRouter,
   taxonomy: taxonomyRouter,
   company: companyRouter,
+  settings: settingsRouter,
 });
 
 export type AppRouter = typeof appRouter;

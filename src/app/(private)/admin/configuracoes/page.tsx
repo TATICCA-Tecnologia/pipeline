@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
+import { trpc } from "@/shared/trpc/client";
 import { Button } from "@/src/shared/components/ui/button";
 import { Input } from "@/src/shared/components/ui/input";
 import { Switch } from "@/src/shared/components/ui/switch";
@@ -20,7 +21,33 @@ import {
   Globe,
   Tag,
   ChevronRight,
+  SlidersHorizontal,
 } from "lucide-react";
+
+// Pesos de priorização (motor de scoring) — agrupados para a UI.
+const QUAL_WEIGHT_FIELDS = [
+  { key: "qualWeightErrorReduction", label: "Redução de erros" },
+  { key: "qualWeightProcessCriticality", label: "Criticidade do processo" },
+  { key: "qualWeightInternalImpact", label: "Impacto interno" },
+  { key: "qualWeightExternalImpact", label: "Impacto externo" },
+  { key: "qualWeightCompliance", label: "Políticas / leis" },
+] as const;
+
+const SCORE_WEIGHT_FIELDS = [
+  { key: "scoreWeightEconomia", label: "Economia financeira" },
+  { key: "scoreWeightQualitativo", label: "Qualitativo" },
+  { key: "scoreWeightComplexidade", label: "Complexidade técnica" },
+] as const;
+
+type WeightKey =
+  | (typeof QUAL_WEIGHT_FIELDS)[number]["key"]
+  | (typeof SCORE_WEIGHT_FIELDS)[number]["key"];
+
+const WEIGHT_SUM_TOLERANCE = 0.01;
+
+function sumWeights(weights: Record<string, string>, keys: readonly string[]) {
+  return keys.reduce((total, key) => total + (Number(weights[key]) || 0), 0);
+}
 
 export default function AdminConfiguracoesPage() {
   const { toast } = useToast();
@@ -63,6 +90,79 @@ export default function AdminConfiguracoesPage() {
   });
 
   const [isLoading, setIsLoading] = useState(false);
+
+  // ── Pesos de priorização (dados reais) ────────────────────────────────
+  const settingsQuery = trpc.settings.getSettings.useQuery();
+  const utils = trpc.useUtils();
+  const updateWeights = trpc.settings.updateScoringWeights.useMutation({
+    onSuccess: async () => {
+      await utils.settings.getSettings.invalidate();
+      toast({
+        title: "Pesos atualizados",
+        description: "Os pesos de priorização foram salvos.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Erro ao salvar",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const [weights, setWeights] = useState<Record<WeightKey, string>>({
+    qualWeightErrorReduction: "",
+    qualWeightProcessCriticality: "",
+    qualWeightInternalImpact: "",
+    qualWeightExternalImpact: "",
+    qualWeightCompliance: "",
+    scoreWeightEconomia: "",
+    scoreWeightQualitativo: "",
+    scoreWeightComplexidade: "",
+  });
+
+  // Semeia os inputs a partir dos valores reais quando a query resolve.
+  useEffect(() => {
+    if (!settingsQuery.data) return;
+    const s = settingsQuery.data;
+    setWeights({
+      qualWeightErrorReduction: String(s.qualWeightErrorReduction),
+      qualWeightProcessCriticality: String(s.qualWeightProcessCriticality),
+      qualWeightInternalImpact: String(s.qualWeightInternalImpact),
+      qualWeightExternalImpact: String(s.qualWeightExternalImpact),
+      qualWeightCompliance: String(s.qualWeightCompliance),
+      scoreWeightEconomia: String(s.scoreWeightEconomia),
+      scoreWeightQualitativo: String(s.scoreWeightQualitativo),
+      scoreWeightComplexidade: String(s.scoreWeightComplexidade),
+    });
+  }, [settingsQuery.data]);
+
+  const qualSum = sumWeights(
+    weights,
+    QUAL_WEIGHT_FIELDS.map((f) => f.key)
+  );
+  const scoreSum = sumWeights(
+    weights,
+    SCORE_WEIGHT_FIELDS.map((f) => f.key)
+  );
+  const qualSumValid = Math.abs(qualSum - 1) <= WEIGHT_SUM_TOLERANCE;
+  const scoreSumValid = Math.abs(scoreSum - 1) <= WEIGHT_SUM_TOLERANCE;
+  const weightsValid = qualSumValid && scoreSumValid;
+
+  function handleSaveWeights() {
+    if (!weightsValid) return;
+    updateWeights.mutate({
+      qualWeightErrorReduction: Number(weights.qualWeightErrorReduction),
+      qualWeightProcessCriticality: Number(weights.qualWeightProcessCriticality),
+      qualWeightInternalImpact: Number(weights.qualWeightInternalImpact),
+      qualWeightExternalImpact: Number(weights.qualWeightExternalImpact),
+      qualWeightCompliance: Number(weights.qualWeightCompliance),
+      scoreWeightEconomia: Number(weights.scoreWeightEconomia),
+      scoreWeightQualitativo: Number(weights.scoreWeightQualitativo),
+      scoreWeightComplexidade: Number(weights.scoreWeightComplexidade),
+    });
+  }
 
   async function handleSaveCompany() {
     setIsLoading(true);
@@ -463,6 +563,110 @@ export default function AdminConfiguracoesPage() {
               Salvar Segurança
             </Button>
           </div>
+        </div>
+      ),
+    },
+    {
+      id: "priorizacao",
+      label: "Pesos de priorização",
+      description: "Ajuste os pesos do motor de scoring de projetos",
+      icon: SlidersHorizontal,
+      content: (
+        <div className="space-y-6">
+          {settingsQuery.isLoading ? (
+            <p className="text-sm text-muted-foreground">Carregando...</p>
+          ) : (
+            <>
+              {/* Bloco 1: pesos qualitativos */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between gap-4">
+                  <p className="text-sm font-semibold">Pesos qualitativos</p>
+                  <span
+                    className={`text-xs font-medium ${
+                      qualSumValid ? "text-muted-foreground" : "text-destructive"
+                    }`}
+                  >
+                    Soma: {qualSum.toFixed(2)}
+                  </span>
+                </div>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  {QUAL_WEIGHT_FIELDS.map((field) => (
+                    <div key={field.key} className="space-y-2">
+                      <label className="text-sm font-medium">{field.label}</label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={weights[field.key]}
+                        onChange={(e) =>
+                          setWeights((prev) => ({
+                            ...prev,
+                            [field.key]: e.target.value,
+                          }))
+                        }
+                      />
+                    </div>
+                  ))}
+                </div>
+                {!qualSumValid && (
+                  <p className="text-xs text-destructive">
+                    Os pesos qualitativos devem somar 1.00.
+                  </p>
+                )}
+              </div>
+
+              <Separator />
+
+              {/* Bloco 2: pesos do score combinado */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between gap-4">
+                  <p className="text-sm font-semibold">
+                    Pesos do score combinado
+                  </p>
+                  <span
+                    className={`text-xs font-medium ${
+                      scoreSumValid
+                        ? "text-muted-foreground"
+                        : "text-destructive"
+                    }`}
+                  >
+                    Soma: {scoreSum.toFixed(2)}
+                  </span>
+                </div>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  {SCORE_WEIGHT_FIELDS.map((field) => (
+                    <div key={field.key} className="space-y-2">
+                      <label className="text-sm font-medium">{field.label}</label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={weights[field.key]}
+                        onChange={(e) =>
+                          setWeights((prev) => ({
+                            ...prev,
+                            [field.key]: e.target.value,
+                          }))
+                        }
+                      />
+                    </div>
+                  ))}
+                </div>
+                {!scoreSumValid && (
+                  <p className="text-xs text-destructive">
+                    Os pesos do score combinado devem somar 1.00.
+                  </p>
+                )}
+              </div>
+
+              <div className="flex justify-end pt-2">
+                <Button
+                  onClick={handleSaveWeights}
+                  disabled={!weightsValid || updateWeights.isPending}
+                >
+                  {updateWeights.isPending ? "Salvando..." : "Salvar Pesos"}
+                </Button>
+              </div>
+            </>
+          )}
         </div>
       ),
     },

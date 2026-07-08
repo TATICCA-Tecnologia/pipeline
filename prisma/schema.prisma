@@ -506,6 +506,17 @@ model SystemSettings {
   sessionTimeout   Int      @default(30) // minutos
   pixEnabled       Boolean  @default(true)
   pixKey           String?
+
+  // Pesos de priorização (motor de scoring)
+  qualWeightErrorReduction     Float @default(0.24)
+  qualWeightProcessCriticality Float @default(0.28)
+  qualWeightInternalImpact     Float @default(0.10)
+  qualWeightExternalImpact     Float @default(0.23)
+  qualWeightCompliance         Float @default(0.15)
+  scoreWeightEconomia          Float @default(0.4)
+  scoreWeightQualitativo       Float @default(0.4)
+  scoreWeightComplexidade      Float @default(0.2)
+
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
