@@ -9,6 +9,11 @@ import {
   findPaybackDate,
   type PaybackPoint,
 } from "@/shared/lib/payback";
+import {
+  BENEFIT_OPTIONS,
+  PROCESS_FREQUENCIES,
+  resolveLabel,
+} from "@/shared/constants/project-taxonomy";
 import { formatCurrency, formatDate } from "@/shared/utils";
 
 /**
@@ -55,6 +60,58 @@ const INTERVIEW_STATUS_LABEL: Record<string, string> = {
   cancelado: "Cancelado",
 };
 
+// Destaque teal do card React ("Principais ações da automação" e cabeçalhos da
+// tabela quantitativa) — mantido aqui para que o slide por processo tenha o
+// mesmo vocabulário visual do componente de referência.
+const COLOR_TEAL = "0D9488"; // teal-600
+const COLOR_TEAL_BG = "F0FDFA"; // teal-50
+const COLOR_HIGHLIGHT_BG = "F8FAFC"; // slate-50 (caixa do architectNotes)
+const COLOR_SAVING = "059669"; // emerald-600 (economia estimada)
+
+// Eixos e fallback da avaliação qualitativa — MESMA config e MESMA regra do
+// componente React `project-executive-slide.tsx` (RATING_AXES / DEFAULT_RATING).
+// Uma nota null usa 3 como fallback, e o percentual é média/5*100 arredondado.
+type RatingKey =
+  | "ratingErrorReduction"
+  | "ratingProcessCriticality"
+  | "ratingInternalImpact"
+  | "ratingExternalImpact"
+  | "ratingCompliance";
+
+const RATING_AXES: { key: RatingKey; label: string }[] = [
+  { key: "ratingErrorReduction", label: "Redução de erros" },
+  { key: "ratingProcessCriticality", label: "Criticidade" },
+  { key: "ratingInternalImpact", label: "Impacto interno" },
+  { key: "ratingExternalImpact", label: "Impacto externo" },
+  { key: "ratingCompliance", label: "Políticas" },
+];
+
+const DEFAULT_RATING = 3;
+
+/**
+ * Campos de Project lidos pelo slide por processo. Selecionados explicitamente
+ * numa ÚNICA `findMany` (ver `buildDiagnosticDeck`) — sem N+1: os dados de todos
+ * os projetos vêm de uma só query, nunca uma por projeto.
+ */
+type ProjectDeckRow = {
+  id: string;
+  title: string;
+  description: string | null;
+  architectNotes: string | null;
+  benefits: unknown;
+  processFrequency: string | null;
+  robotSchedule: string | null;
+  peopleInvolved: number | null;
+  taskDurationHours: number | null;
+  currentAnnualHours: number | null;
+  monthlyHoursSaved: number | null;
+  ratingErrorReduction: number | null;
+  ratingProcessCriticality: number | null;
+  ratingInternalImpact: number | null;
+  ratingExternalImpact: number | null;
+  ratingCompliance: number | null;
+};
+
 /**
  * Gera o buffer (.pptx) do deck consolidado de diagnóstico de uma empresa.
  *
@@ -80,15 +137,52 @@ export async function buildDiagnosticDeck(companyId: string, actingUserId: strin
   const ctx: Context = { db, userId: actingUserId, realUserId: actingUserId };
   const caller = createCaller(ctx);
 
-  const [areaSummary, rankingEconomia, rankingQualitativo, rankingCombinado, settings, interviews] =
-    await Promise.all([
-      caller.project.getAreaSummary({ companyId }),
-      caller.project.getPrioritizedRanking({ companyId, sortBy: "economia" }),
-      caller.project.getPrioritizedRanking({ companyId, sortBy: "qualitativo" }),
-      caller.project.getPrioritizedRanking({ companyId, sortBy: "combinado" }),
-      caller.settings.getSettings(),
-      caller.interview.list({ companyId }),
-    ]);
+  const [
+    areaSummary,
+    rankingEconomia,
+    rankingQualitativo,
+    rankingCombinado,
+    settings,
+    interviews,
+    projects,
+  ] = await Promise.all([
+    caller.project.getAreaSummary({ companyId }),
+    caller.project.getPrioritizedRanking({ companyId, sortBy: "economia" }),
+    caller.project.getPrioritizedRanking({ companyId, sortBy: "qualitativo" }),
+    caller.project.getPrioritizedRanking({ companyId, sortBy: "combinado" }),
+    caller.settings.getSettings(),
+    caller.interview.list({ companyId }),
+    // Slide por processo (Passo 8b): TODOS os projetos da empresa numa ÚNICA
+    // query (sem N+1). Ordem determinística por createdAt asc (empate por id)
+    // para que o mesmo deck saia sempre na mesma sequência.
+    // NOTA DE PERFORMANCE: um deck com dezenas de projetos gera um slide (com
+    // tabela + radar chart) por projeto; para empresas muito grandes isso pode
+    // se aproximar do timeout de função serverless. Não é resolvível/testável
+    // sem ambiente de produção neste passo — apenas registrado como preocupação
+    // conhecida caso vire um problema real (ex.: paginar/limitar o export).
+    db.project.findMany({
+      where: { companyId },
+      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        architectNotes: true,
+        benefits: true,
+        processFrequency: true,
+        robotSchedule: true,
+        peopleInvolved: true,
+        taskDurationHours: true,
+        currentAnnualHours: true,
+        monthlyHoursSaved: true,
+        ratingErrorReduction: true,
+        ratingProcessCriticality: true,
+        ratingInternalImpact: true,
+        ratingExternalImpact: true,
+        ratingCompliance: true,
+      },
+    }),
+  ]);
 
   const pres = new PptxGenJS();
   pres.layout = "LAYOUT_WIDE";
@@ -107,6 +201,10 @@ export async function buildDiagnosticDeck(companyId: string, actingUserId: strin
   // criamos um slide vazio nem lançamos erro — decisão explícita do Passo 8a).
   if (interviews.length > 0) {
     addInterviewsSlide(pres, interviews);
+  }
+  // Um slide por processo, na ordem determinística já definida na query.
+  for (const project of projects) {
+    addProjectSlide(pres, project);
   }
 
   // `nodebuffer` retorna um Buffer do Node nesta versão do pptxgenjs (4.x). A
@@ -414,6 +512,235 @@ function addInterviewsSlide(pres: PptxGenJS, interviews: Interviews): void {
   ]);
 
   addSlideTable(slide, [header, ...rows], [4.5, 3.5, 2.5, 2]);
+}
+
+// ---------------------------------------------------------------------------
+// Slide por processo (Passo 8b) — "tradução" do card React
+// `src/shared/components/project-executive-slide.tsx` para as primitivas
+// nativas do pptxgenjs (texto + tabela + radar chart), reutilizando EXATAMENTE
+// os mesmos campos, rótulos e fórmulas do componente de referência. Nenhum
+// texto novo é gerado: só os campos já preenchidos são reaproveitados.
+// ---------------------------------------------------------------------------
+
+// Igual ao `NOT_QUANTIFIED_LABEL` do componente React: Colaboradores/Duração vêm
+// da entrevista e uma lacuna aqui NÃO some da tabela — mostra rótulo neutro.
+const NOT_QUANTIFIED_LABEL = "Não quantificado nesta reunião";
+
+// Réplica de `roundHours` do componente React (evita floats longos ao converter
+// horas anuais em mensais; usa vírgula decimal, pt-BR).
+function roundHours(hours: number): string {
+  return (Math.round(hours * 10) / 10).toString().replace(".", ",");
+}
+
+// Extrai as chaves de benefícios do campo Json de forma segura (mesma leitura
+// que o componente React faz sobre `project.benefits`, que é `string[]`).
+function benefitKeysOf(benefits: unknown): string[] {
+  if (!Array.isArray(benefits)) return [];
+  return benefits.filter((b): b is string => typeof b === "string");
+}
+
+type QuantitativeLine = { label: string; value: string; isGap?: boolean; isSaving?: boolean };
+
+// Monta as linhas da tabela quantitativa com a MESMA regra do componente React:
+// linhas com valor null/vazio são puladas (buildLabeledLines), EXCETO
+// Colaboradores/Duração, que sempre aparecem (com rótulo neutro quando ausentes).
+function buildQuantitativeLines(project: ProjectDeckRow): QuantitativeLine[] {
+  const lines: QuantitativeLine[] = [];
+
+  const periodicidade = resolveLabel(project.processFrequency, PROCESS_FREQUENCIES);
+  if (periodicidade) lines.push({ label: "Periodicidade do processo", value: periodicidade });
+  if (project.robotSchedule) lines.push({ label: "Rodagem do bot", value: project.robotSchedule });
+
+  lines.push({
+    label: "Colaboradores",
+    value: project.peopleInvolved != null ? String(project.peopleInvolved) : NOT_QUANTIFIED_LABEL,
+    isGap: project.peopleInvolved == null,
+  });
+  lines.push({
+    label: "Duração por execução",
+    value: project.taskDurationHours != null ? `${project.taskDurationHours}h` : NOT_QUANTIFIED_LABEL,
+    isGap: project.taskDurationHours == null,
+  });
+
+  if (project.currentAnnualHours != null) {
+    lines.push({ label: "Horas anuais", value: `${project.currentAnnualHours}h` });
+    lines.push({
+      label: "Horas totais gastas por mês",
+      value: `${roundHours(project.currentAnnualHours / 12)}h`,
+    });
+  }
+
+  if (project.monthlyHoursSaved != null) {
+    lines.push({
+      label: "Economia estimada",
+      value: `${project.monthlyHoursSaved}h/mês`,
+      isSaving: true,
+    });
+  }
+
+  return lines;
+}
+
+function addSectionLabel(slide: Slide, text: string, x: number, y: number, w: number): void {
+  slide.addText(text.toUpperCase(), {
+    x,
+    y,
+    w,
+    h: 0.3,
+    fontSize: 10,
+    bold: true,
+    color: COLOR_PRIMARY,
+    charSpacing: 1,
+  });
+}
+
+function addProjectSlide(pres: PptxGenJS, project: ProjectDeckRow): void {
+  const slide = addTitledSlide(pres, project.title);
+
+  // ----- Coluna esquerda: textos (só campos já preenchidos) -----
+  const leftX = 0.5;
+  const leftW = 6.2;
+  let leftY = 1.1;
+
+  if (project.description) {
+    addSectionLabel(slide, "O processo hoje", leftX, leftY, leftW);
+    slide.addText(project.description, {
+      x: leftX,
+      y: leftY + 0.32,
+      w: leftW,
+      h: 1.9,
+      fontSize: 11,
+      color: COLOR_PRIMARY,
+      valign: "top",
+      fit: "shrink",
+    });
+    leftY += 2.35;
+  }
+
+  if (project.architectNotes) {
+    const boxH = 1.7;
+    // Borda teal à esquerda (rect fino) + caixa de fundo slate, replicando o
+    // destaque `border-l-4 border-teal-500 bg-slate-50` do card React.
+    slide.addShape("rect", {
+      x: leftX,
+      y: leftY,
+      w: 0.06,
+      h: boxH,
+      fill: { color: COLOR_TEAL },
+    });
+    slide.addText(
+      [
+        {
+          text: "Principais ações da automação",
+          options: { bold: true, fontSize: 9, color: COLOR_PRIMARY, charSpacing: 1, breakLine: true },
+        },
+        { text: project.architectNotes, options: { fontSize: 11, color: COLOR_PRIMARY } },
+      ],
+      {
+        x: leftX + 0.06,
+        y: leftY,
+        w: leftW - 0.06,
+        h: boxH,
+        fill: { color: COLOR_HIGHLIGHT_BG },
+        valign: "top",
+        margin: 6,
+        fit: "shrink",
+      }
+    );
+    leftY += boxH + 0.25;
+  }
+
+  const benefitLabels = benefitKeysOf(project.benefits).map(
+    (key) => BENEFIT_OPTIONS.find((b) => b.key === key)?.label ?? key
+  );
+  if (benefitLabels.length > 0) {
+    addSectionLabel(slide, "Benefícios esperados", leftX, leftY, leftW);
+    slide.addText(benefitLabels.join(" · "), {
+      x: leftX,
+      y: leftY + 0.32,
+      w: leftW,
+      h: 1.3,
+      fontSize: 11,
+      color: COLOR_PRIMARY,
+      valign: "top",
+      fit: "shrink",
+    });
+  }
+
+  // ----- Coluna direita: tabela quantitativa + radar qualitativo -----
+  const rightX = 7.0;
+  const rightW = 5.8;
+
+  const quantitativeLines = buildQuantitativeLines(project);
+  addSectionLabel(slide, "Avaliação Quantitativa", rightX, 1.1, rightW);
+
+  if (quantitativeLines.length > 0) {
+    const rows: TableRow[] = quantitativeLines.map((line) => [
+      {
+        text: line.label,
+        options: { bold: true, color: COLOR_TEAL, fill: { color: COLOR_TEAL_BG } },
+      },
+      {
+        text: line.value,
+        options: {
+          color: line.isSaving ? COLOR_SAVING : line.isGap ? COLOR_MUTED : COLOR_PRIMARY,
+          italic: line.isGap,
+          bold: line.isSaving,
+        },
+      },
+    ]);
+    slide.addTable(rows, {
+      x: rightX,
+      y: 1.45,
+      w: rightW,
+      colW: [2.6, rightW - 2.6],
+      fontSize: 10,
+      border: { type: "solid", pt: 1, color: COLOR_TABLE_BORDER },
+      valign: "middle",
+    });
+  }
+
+  // Radar: 5 eixos = os 5 critérios, com DEFAULT_RATING=3 de fallback (mesma
+  // regra do componente React). ratingPercent = média/5*100 arredondado.
+  const ratingValues = RATING_AXES.map((axis) => project[axis.key] ?? DEFAULT_RATING);
+  const ratingAverage = ratingValues.reduce((sum, v) => sum + v, 0) / ratingValues.length;
+  const ratingPercent = Math.round((ratingAverage / 5) * 100);
+  const ratingAverageLabel = ratingAverage.toFixed(1).replace(".", ",");
+
+  slide.addText(
+    [
+      { text: "AVALIAÇÃO QUALITATIVA   ", options: { bold: true, fontSize: 10, color: COLOR_PRIMARY, charSpacing: 1 } },
+      { text: `${ratingPercent}% (${ratingAverageLabel})`, options: { bold: true, fontSize: 14, color: COLOR_TEAL } },
+    ],
+    { x: rightX, y: 4.55, w: rightW, h: 0.4, valign: "middle" }
+  );
+
+  slide.addChart(
+    "radar",
+    [
+      {
+        name: "Avaliação qualitativa",
+        labels: RATING_AXES.map((axis) => axis.label),
+        values: ratingValues,
+      },
+    ],
+    {
+      x: rightX,
+      y: 4.95,
+      w: rightW,
+      h: 2.3,
+      radarStyle: "filled",
+      showLegend: false,
+      showTitle: false,
+      chartColors: ["4F46E5"],
+      chartColorsOpacity: 32,
+      catAxisLabelColor: COLOR_PRIMARY,
+      catAxisLabelFontSize: 9,
+      valAxisMinVal: 0,
+      valAxisMaxVal: 5,
+      valAxisHidden: true,
+    }
+  );
 }
 
 // ---------------------------------------------------------------------------
