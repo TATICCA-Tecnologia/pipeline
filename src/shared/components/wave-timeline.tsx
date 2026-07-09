@@ -29,10 +29,10 @@ export type WaveTimelineItem = {
   /** Opcional: usada só para colorir a barra por área (cor cíclica, não requisito rígido). */
   areaName?: string | null;
   /**
-   * `false` quando a duração veio do fallback de 1 dia de `computeWaveSchedule`
-   * (esforço ainda não estimado pelo arquiteto), não de um
-   * `implementationEffortDays` real — a barra recebe uma indicação visual
-   * diferente para não ser confundida com uma estimativa real de 1 dia.
+   * `false` quando a duração veio do fallback de 160h/20 dias úteis de
+   * `computeWaveSchedule` (esforço ainda não estimado pelo arquiteto), não de
+   * um `implementationEffortDays` real — a barra recebe uma indicação visual
+   * diferente para não ser confundida com uma estimativa real do arquiteto.
    * Omitido/`undefined` é tratado como `true` (barra "normal").
    */
   effortEstimated?: boolean;
@@ -130,10 +130,10 @@ export function WaveTimeline({
           const color = item.areaName
             ? (areaColorMap.get(item.areaName) ?? "var(--color-chart-1)")
             : "var(--color-chart-1)";
-          // effortEstimated === false: duração veio do fallback de 1 dia
-          // (esforço ainda não estimado), não de um valor real — sinalizar
-          // com borda tracejada + opacidade reduzida + "?" no rótulo, para
-          // não parecer uma estimativa real de 1 dia.
+          // effortEstimated === false: duração veio do fallback de 160h/20
+          // dias úteis (esforço ainda não estimado), não de um valor real —
+          // sinalizar com borda tracejada + opacidade reduzida + "?" no
+          // rótulo, para não parecer uma estimativa real do arquiteto.
           const isFallback = item.effortEstimated === false;
           // +1 porque o próprio dia final conta como dia de trabalho.
           const durationBusinessDays = differenceInBusinessDays(item.endDate, item.startDate) + 1;
@@ -153,7 +153,7 @@ export function WaveTimeline({
                 style={{ left: `${left}%`, width: `${width}%`, backgroundColor: color }}
                 title={
                   `${item.title}: ${format(item.startDate, "dd/MM/yyyy")} – ${format(item.endDate, "dd/MM/yyyy")}` +
-                  (isFallback ? " (esforço ainda não estimado — assumido 1 dia)" : "")
+                  (isFallback ? " (esforço ainda não estimado — assumido 160h/20 dias úteis)" : "")
                 }
               >
                 <span className="truncate">

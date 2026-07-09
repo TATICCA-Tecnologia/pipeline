@@ -24,25 +24,28 @@ export type WaveScheduleItem = {
   startDate: Date;
   endDate: Date;
   /**
-   * `false` quando `implementationEffortDays` era `null` e o fallback de 1
-   * dia foi usado — permite que a UI distinga "estimado em 1 dia" de "ainda
-   * não estimado" em vez de renderizar as duas situações de forma idêntica.
+   * `false` quando `implementationEffortDays` era `null` e o fallback de 160h
+   * (20 dias úteis) foi usado — permite que a UI distinga uma estimativa real
+   * do arquiteto de "ainda não estimado" em vez de renderizar as duas
+   * situações de forma idêntica.
    */
   effortEstimated: boolean;
 };
 
 /**
- * Fallback de esforço quando `implementationEffortDays` é `null`: assume 1
- * dia útil. Decisão: preferimos manter o projeto agendado (mesmo que a
- * duração real ainda não tenha sido estimada pelo arquiteto) a excluí-lo do
- * cronograma — excluir silenciosamente esconderia o robô da timeline sem
- * nenhum aviso, o que é pior para o caso de uso ("ver a sequência completa
- * da onda"). 1 dia é o menor incremento útil e não distorce muito a soma
- * cumulativa para os poucos projetos que ainda não têm esforço estimado.
- * `WaveScheduleItem.effortEstimated` sinaliza quando esse fallback foi usado,
- * para a UI conseguir diferenciar visualmente.
+ * Fallback de esforço quando `implementationEffortDays` é `null`: assume 160
+ * horas (20 dias úteis de 8h) por robô — estimativa padrão da TATICCA para um
+ * robô "médio" na ausência de uma estimativa específica do arquiteto. Decisão:
+ * preferimos manter o projeto agendado (mesmo que a duração real ainda não
+ * tenha sido estimada) a excluí-lo do cronograma — excluir silenciosamente
+ * esconderia o robô da timeline sem nenhum aviso, o que é pior para o caso de
+ * uso ("ver a sequência completa da onda"). `WaveScheduleItem.effortEstimated`
+ * sinaliza quando esse fallback foi usado, para a UI conseguir diferenciar
+ * visualmente (borda tracejada + "(?)" no rótulo).
  */
-const FALLBACK_EFFORT_DAYS = 1;
+const FALLBACK_EFFORT_HOURS = 160;
+const HOURS_PER_BUSINESS_DAY = 8;
+const FALLBACK_EFFORT_DAYS = FALLBACK_EFFORT_HOURS / HOURS_PER_BUSINESS_DAY;
 
 /**
  * Calcula o cronograma sequencial de uma onda de implementação.
@@ -81,7 +84,8 @@ export function computeWaveSchedule(
     // como primeiro dia — por isso o fim é cursor + (effortDays - 1) dias úteis.
     // Math.max(1, effortDays) também protege contra um `implementationEffortDays`
     // explícito de 0 (ou negativo), evitando uma chamada "para trás" de
-    // addBusinessDays — tratado como 1 dia, igual ao fallback de null.
+    // addBusinessDays — tratado como 1 dia (caso diferente do fallback de
+    // null acima, que é 20 dias).
     const projectStart = cursor;
     const projectEnd = addBusinessDays(projectStart, Math.max(1, effortDays) - 1);
 
