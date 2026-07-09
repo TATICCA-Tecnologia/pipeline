@@ -1,4 +1,6 @@
-import { addBusinessDays, differenceInCalendarDays } from "date-fns";
+import fs from "node:fs";
+import path from "node:path";
+import { addBusinessDays, differenceInBusinessDays, differenceInCalendarDays } from "date-fns";
 import PptxGenJS from "pptxgenjs";
 import { db } from "@/server/db";
 import { createCaller } from "@/server/trpc/root";
@@ -40,6 +42,21 @@ const COLOR_MUTED = "64748B"; // slate-500
 const COLOR_HEADER_BG = "1E293B";
 const COLOR_HEADER_TEXT = "FFFFFF";
 const COLOR_TABLE_BORDER = "E2E8F0";
+
+// Logo carregado uma única vez no module scope (não recarregado por slide).
+// Se o arquivo não existir por algum motivo em produção, a capa é gerada sem
+// logo — nunca falha o export inteiro por causa de um asset estático.
+const LOGO_ASPECT_RATIO = 2500 / 981; // largura/altura original do PNG
+const LOGO_DATA_URI: string | null = (() => {
+  try {
+    const buf = fs.readFileSync(
+      path.join(process.cwd(), "public", "taticca-logo-horizontal.png")
+    );
+    return `data:image/png;base64,${buf.toString("base64")}`;
+  } catch {
+    return null;
+  }
+})();
 
 const TABLE_HEADER_OPTS = {
   bold: true,
@@ -197,6 +214,7 @@ export async function buildDiagnosticDeck(companyId: string, actingUserId: strin
   addRankingSlide(pres, "Ranking combinado", rankingCombinado, "combinado");
   addScheduleSlide(pres, rankingCombinado, settings.wave1StartDate);
   addPaybackSlide(pres, rankingCombinado, settings);
+  addPaybackCompositionSlide(pres, rankingCombinado, settings);
   // Entrevistas: se não houver nenhuma, o slide é pulado inteiramente (não
   // criamos um slide vazio nem lançamos erro — decisão explícita do Passo 8a).
   if (interviews.length > 0) {
@@ -219,6 +237,16 @@ export async function buildDiagnosticDeck(companyId: string, actingUserId: strin
 
 function addCoverSlide(pres: PptxGenJS, companyName: string): void {
   const slide = pres.addSlide();
+  if (LOGO_DATA_URI) {
+    const width = 2.8;
+    slide.addImage({
+      data: LOGO_DATA_URI,
+      x: 0.6,
+      y: 0.6,
+      w: width,
+      h: width / LOGO_ASPECT_RATIO,
+    });
+  }
   slide.addText("Diagnóstico de robotização", {
     x: 0.6,
     y: 2.2,
@@ -492,6 +520,57 @@ function addPaybackSlide(
     lineDataSymbol: "none",
     chartColors: [COLOR_MUTED, COLOR_ACCENT],
   });
+}
+
+// Uma linha por robô com os números que alimentam a curva do slide anterior
+// (mesma tabela "Composição do cálculo" da aba Payback em /admin/empresas/
+// [id]/priorizacao) — autoPage/autoPageRepeatHeader de addSlideTable cobre
+// decks com muitos robôs sem estourar o slide.
+function addPaybackCompositionSlide(
+  pres: PptxGenJS,
+  ranking: Ranking,
+  settings: { developerDailyRateBRL: number | null; wave1StartDate: Date | null }
+): void {
+  const { wave1, wave2 } = computeWaveSchedules(ranking, settings.wave1StartDate);
+  const withWave = [
+    ...wave1.map((item) => ({ ...item, wave: 1 as const })),
+    ...wave2.map((item) => ({ ...item, wave: 2 as const })),
+  ];
+
+  if (withWave.length === 0) return;
+
+  const slide = addTitledSlide(pres, "Composição do payback");
+  const savingByProjectId = new Map(
+    ranking.map((row) => [row.id, row.estimatedAnnualSavingBRL ?? 0])
+  );
+  const dailyRate = settings.developerDailyRateBRL ?? 0;
+
+  const header: TableRow = [
+    { text: "Processo", options: TABLE_HEADER_OPTS },
+    { text: "Onda", options: TABLE_HEADER_OPTS },
+    { text: "Entrega", options: TABLE_HEADER_OPTS },
+    { text: "Dias úteis", options: TABLE_HEADER_OPTS },
+    { text: "Custo de dev.", options: TABLE_HEADER_OPTS },
+    { text: "Economia/mês", options: TABLE_HEADER_OPTS },
+    { text: "Economia/ano", options: TABLE_HEADER_OPTS },
+  ];
+
+  const rows: TableRow[] = withWave.map((item) => {
+    const businessDays = differenceInBusinessDays(item.endDate, item.startDate) + 1;
+    const developmentCostBRL = businessDays * dailyRate;
+    const annualSavingBRL = savingByProjectId.get(item.projectId) ?? 0;
+    return [
+      { text: item.title },
+      { text: `Onda ${item.wave}` },
+      { text: formatDate(item.endDate) },
+      { text: String(businessDays) },
+      { text: formatCurrency(developmentCostBRL) },
+      { text: formatCurrency(annualSavingBRL / 12) },
+      { text: formatCurrency(annualSavingBRL) },
+    ];
+  });
+
+  addSlideTable(slide, [header, ...rows], [4.1, 1.1, 1.5, 1.1, 1.6, 1.5, 1.4]);
 }
 
 function addInterviewsSlide(pres: PptxGenJS, interviews: Interviews): void {
