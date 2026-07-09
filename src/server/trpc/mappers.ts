@@ -35,6 +35,19 @@ const PRISMA_TO_FRONTEND_ROLE: Record<PrismaUserRole, FrontendUserRole> = {
   SUPER_ADMIN: "super_admin",
 };
 
+/** Roles atribuíveis na criação de um usuário — super_admin só via promoção explícita. */
+export type CreatableUserRole = "client" | "developer" | "admin";
+
+const CREATABLE_TO_PRISMA_ROLE: Record<CreatableUserRole, PrismaUserRole> = {
+  client: "CLIENT",
+  developer: "DEVELOPER",
+  admin: "ADMIN",
+};
+
+export function toPrismaRole(role: CreatableUserRole): PrismaUserRole {
+  return CREATABLE_TO_PRISMA_ROLE[role];
+}
+
 export function toFrontendStatus(status: PrismaProjectStatus): FrontendProjectStatus {
   return PRISMA_TO_FRONTEND_STATUS[status];
 }

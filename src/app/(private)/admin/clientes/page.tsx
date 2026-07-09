@@ -2,13 +2,20 @@
 
 import { useState } from "react";
 import { useQueryState, parseAsString } from "nuqs";
-import { useClients } from "@/shared/context/clients-context";
+import { useClients, type CreatableRole } from "@/shared/context/clients-context";
 import { useProjects } from "@/shared/context/projects-context";
 import { trpc } from "@/shared/trpc/client";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/src/shared/components/ui/card";
 import { Button } from "@/src/shared/components/ui/button";
 import { Input } from "@/src/shared/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/src/shared/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -47,9 +54,20 @@ import {
 import type { User } from "@/shared/types";
 import { ManageCompaniesDialog } from "./_components/manage-companies-dialog";
 
+const NO_COMPANY_VALUE = "__none__";
+const NEW_COMPANY_VALUE = "__new__";
+
+const ROLE_LABEL: Record<string, string> = {
+  client: "Cliente",
+  developer: "Desenvolvedor",
+  admin: "Admin",
+  super_admin: "Super Admin",
+};
+
 export default function ClientesPage() {
   const { clients, addClient, updateClient, deleteClient, refetch } = useClients();
   const { projects } = useProjects();
+  const { data: companies = [] } = trpc.company.list.useQuery();
   const [search, setSearch] = useQueryState(
     "q",
     parseAsString.withDefault("").withOptions({ clearOnDefault: true })
@@ -68,7 +86,9 @@ export default function ClientesPage() {
   const [formData, setFormData] = useState({
     name: "",
     email: "",
-    company: "",
+    role: "client" as CreatableRole,
+    companyId: NO_COMPANY_VALUE,
+    newCompanyName: "",
   });
 
   const promoteMutation = trpc.user.promoteToSuperAdmin.useMutation({
@@ -114,11 +134,19 @@ export default function ClientesPage() {
       setFormData({
         name: client.name,
         email: client.email,
-        company: client.company || "",
+        role: "client",
+        companyId: NO_COMPANY_VALUE,
+        newCompanyName: "",
       });
     } else {
       setEditingClient(null);
-      setFormData({ name: "", email: "", company: "" });
+      setFormData({
+        name: "",
+        email: "",
+        role: "client",
+        companyId: NO_COMPANY_VALUE,
+        newCompanyName: "",
+      });
     }
     setIsDialogOpen(true);
   };
@@ -127,13 +155,25 @@ export default function ClientesPage() {
     if (!formData.name || !formData.email) return;
 
     if (editingClient) {
-      updateClient(editingClient.id, formData);
+      updateClient(editingClient.id, { name: formData.name, email: formData.email });
     } else {
-      addClient(formData);
+      addClient({
+        name: formData.name,
+        email: formData.email,
+        role: formData.role,
+        companyId:
+          formData.companyId !== NO_COMPANY_VALUE && formData.companyId !== NEW_COMPANY_VALUE
+            ? formData.companyId
+            : undefined,
+        newCompanyName:
+          formData.companyId === NEW_COMPANY_VALUE
+            ? formData.newCompanyName.trim() || undefined
+            : undefined,
+      });
     }
 
     setIsDialogOpen(false);
-    setFormData({ name: "", email: "", company: "" });
+    setFormData({ name: "", email: "", role: "client", companyId: NO_COMPANY_VALUE, newCompanyName: "" });
     setEditingClient(null);
   };
 
@@ -268,6 +308,7 @@ export default function ClientesPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Cliente</TableHead>
+                <TableHead>Role</TableHead>
                 <TableHead>Empresa</TableHead>
                 <TableHead>Projetos</TableHead>
                 <TableHead>Cadastro</TableHead>
@@ -278,7 +319,7 @@ export default function ClientesPage() {
               {filteredClients.length === 0 ? (
                 <TableRow>
                   <TableCell
-                    colSpan={5}
+                    colSpan={6}
                     className="h-24 text-center text-muted-foreground"
                   >
                     Nenhum cliente encontrado.
@@ -302,6 +343,11 @@ export default function ClientesPage() {
                           </p>
                         </div>
                       </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className="text-xs font-normal">
+                        {ROLE_LABEL[client.role] ?? client.role}
+                      </Badge>
                     </TableCell>
                     <TableCell>
                       {client.companies && client.companies.length > 0 ? (
@@ -403,16 +449,60 @@ export default function ClientesPage() {
                 placeholder="email@exemplo.com"
               />
             </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Empresa (opcional)</label>
-              <Input
-                value={formData.company}
-                onChange={(e) =>
-                  setFormData({ ...formData, company: e.target.value })
-                }
-                placeholder="Nome da empresa"
-              />
-            </div>
+            {!editingClient && (
+              <>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Tipo de acesso</label>
+                  <Select
+                    value={formData.role}
+                    onValueChange={(v) =>
+                      setFormData({ ...formData, role: v as CreatableRole })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="client">Cliente</SelectItem>
+                      <SelectItem value="developer">Desenvolvedor</SelectItem>
+                      <SelectItem value="admin">Admin</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Empresa (opcional)</label>
+                  <Select
+                    value={formData.companyId}
+                    onValueChange={(v) => setFormData({ ...formData, companyId: v })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Nenhuma" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={NO_COMPANY_VALUE}>Nenhuma</SelectItem>
+                      {companies.map((c) => (
+                        <SelectItem key={c.id} value={c.id}>
+                          {c.name}
+                        </SelectItem>
+                      ))}
+                      <SelectItem value={NEW_COMPANY_VALUE}>
+                        + Criar nova empresa...
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {formData.companyId === NEW_COMPANY_VALUE && (
+                    <Input
+                      value={formData.newCompanyName}
+                      onChange={(e) =>
+                        setFormData({ ...formData, newCompanyName: e.target.value })
+                      }
+                      placeholder="Nome da nova empresa"
+                      autoFocus
+                    />
+                  )}
+                </div>
+              </>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsDialogOpen(false)}>

@@ -41,7 +41,7 @@ export function ManageCompaniesDialog({
   const addMutation = trpc.user.addCompanyToUser.useMutation({
     onSuccess: () => {
       refetchUserCompanies();
-      utils.user.listClients.invalidate();
+      utils.user.list.invalidate();
     },
     onError: (error) => toast.error(`Erro ao vincular empresa: ${error.message}`),
   });
@@ -49,7 +49,7 @@ export function ManageCompaniesDialog({
   const removeMutation = trpc.user.removeCompanyFromUser.useMutation({
     onSuccess: () => {
       refetchUserCompanies();
-      utils.user.listClients.invalidate();
+      utils.user.list.invalidate();
     },
     onError: (error) => toast.error(`Erro ao remover empresa: ${error.message}`),
   });

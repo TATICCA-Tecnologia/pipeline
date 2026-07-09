@@ -9,11 +9,25 @@ import {
 import type { User } from "@/shared/types";
 import { trpc } from "@/shared/trpc/client";
 import { useAuth } from "@/shared/context/auth-context";
+import { toast } from "sonner";
+
+/** Roles atribuíveis na criação de um usuário — super_admin só via promoção. */
+export type CreatableRole = "client" | "developer" | "admin";
+
+export interface NewUserInput {
+  name: string;
+  email: string;
+  role: CreatableRole;
+  /** Vincula a uma empresa já existente. Ignorado se newCompanyName for informado. */
+  companyId?: string;
+  /** Cria e vincula uma empresa nova em vez de escolher uma existente. */
+  newCompanyName?: string;
+}
 
 interface ClientsContextType {
   clients: User[];
   isLoading: boolean;
-  addClient: (client: Omit<User, "id" | "createdAt" | "role">) => void;
+  addClient: (input: NewUserInput) => void;
   updateClient: (id: string, updates: Partial<User>) => void;
   deleteClient: (id: string) => void;
   getClientById: (id: string) => User | undefined;
@@ -43,18 +57,20 @@ function mapUser(u: {
 export function ClientsProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const utils = trpc.useUtils();
-  const { data: clientsData = [], isLoading } = trpc.user.listClients.useQuery(
+  const { data: clientsData = [], isLoading } = trpc.user.list.useQuery(
     undefined,
     { enabled: !!user?.id }
   );
-  const createClientMutation = trpc.user.createClient.useMutation({
-    onSuccess: () => utils.user.listClients.invalidate(),
+  const createClientMutation = trpc.user.create.useMutation({
+    onSuccess: () => utils.user.list.invalidate(),
+    onError: (error) => toast.error(`Erro ao criar usuário: ${error.message}`),
   });
   const updateClientMutation = trpc.user.update.useMutation({
-    onSuccess: () => utils.user.listClients.invalidate(),
+    onSuccess: () => utils.user.list.invalidate(),
+    onError: (error) => toast.error(`Erro ao salvar: ${error.message}`),
   });
   const deleteClientMutation = trpc.user.delete.useMutation({
-    onSuccess: () => utils.user.listClients.invalidate(),
+    onSuccess: () => utils.user.list.invalidate(),
   });
 
   const clients: User[] = Array.isArray(clientsData)
@@ -64,11 +80,8 @@ export function ClientsProvider({ children }: { children: ReactNode }) {
     : [];
 
   const addClient = useCallback(
-    (client: Omit<User, "id" | "createdAt" | "role">) => {
-      createClientMutation.mutate({
-        name: client.name,
-        email: client.email,
-      });
+    (input: NewUserInput) => {
+      createClientMutation.mutate(input);
     },
     [createClientMutation]
   );
@@ -97,7 +110,7 @@ export function ClientsProvider({ children }: { children: ReactNode }) {
   );
 
   const refetch = useCallback(() => {
-    void utils.user.listClients.invalidate();
+    void utils.user.list.invalidate();
   }, [utils]);
 
   return (
