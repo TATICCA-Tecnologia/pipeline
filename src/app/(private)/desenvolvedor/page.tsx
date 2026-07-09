@@ -38,7 +38,7 @@ const DEVELOPER_COLUMNS: ProjectStatus[] = [
 ];
 
 export default function DesenvolvedorDashboard() {
-  const { user } = useAuth();
+  const { user, isSuperAdmin } = useAuth();
   const { projects, moveProject } = useProjects();
   const { openModal } = useModal();
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
@@ -46,11 +46,15 @@ export default function DesenvolvedorDashboard() {
 
   const scopedProjects = filterProjectsByCompany(projects, companyFilter);
 
+  // Super admin "visualizando como Desenvolvedor" continua logado com o
+  // próprio id (não o de um developer real) — filtrar por developerId
+  // nesse caso esconderia o backlog e zeraria as estatísticas de todo mundo.
+  // Super admin enxerga tudo, independente de estar "atribuído".
+  const isAssignedToUser = (p: Project) =>
+    isSuperAdmin || (user?.id != null && p.developerId === user.id);
+
   const assignedBacklog = scopedProjects.filter(
-    (p) =>
-      p.status === "backlog" &&
-      user?.id != null &&
-      p.developerId === user.id
+    (p) => p.status === "backlog" && isAssignedToUser(p)
   );
 
   const hasAssignedBacklog = assignedBacklog.length > 0;
@@ -64,12 +68,12 @@ export default function DesenvolvedorDashboard() {
   ];
 
   const stats = {
-    assigned: scopedProjects.filter((p) => p.developerId === user?.id).length,
+    assigned: scopedProjects.filter(isAssignedToUser).length,
     inProgress: scopedProjects.filter(
-      (p) => p.developerId === user?.id && p.status === "in-progress"
+      (p) => isAssignedToUser(p) && p.status === "in-progress"
     ).length,
     review: scopedProjects.filter(
-      (p) => p.developerId === user?.id && p.status === "review"
+      (p) => isAssignedToUser(p) && p.status === "review"
     ).length,
   };
 
@@ -129,8 +133,8 @@ export default function DesenvolvedorDashboard() {
         <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0 text-amber-500/70" />
         <span>
           Arraste os cards entre as colunas para atualizar o status. A coluna
-          Backlog mostra apenas projetos atribuídos a você; sair do Backlog
-          continua sendo feito pelo administrador.
+          Backlog mostra {isSuperAdmin ? "todos os projetos em backlog" : "apenas projetos atribuídos a você"};
+          sair do Backlog continua sendo feito pelo administrador.
         </span>
       </p>
 
