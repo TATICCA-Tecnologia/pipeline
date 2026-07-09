@@ -36,7 +36,8 @@ interface Props {
 
 export default function DevEspecificacaoPage({ params }: Props) {
   const { id: projectId } = use(params);
-  const { user } = useAuth();
+  const { user, isSuperAdmin } = useAuth();
+  const canCreateSpecification = isSuperAdmin || user?.role === "admin";
 
   const { data: phases, refetch } = trpc.specification.getByProject.useQuery({ projectId });
   const { data: project } = trpc.project.byId.useQuery({ id: projectId });
@@ -116,8 +117,15 @@ export default function DevEspecificacaoPage({ params }: Props) {
           <BarChart3 className="mb-3 h-10 w-10 text-muted-foreground/40" />
           <p className="font-medium">Especificação ainda não criada</p>
           <p className="mt-1 text-sm text-muted-foreground">
-            O administrador precisa criar as fases e tarefas do projeto.
+            {canCreateSpecification
+              ? "Crie as fases e tarefas do projeto (manualmente ou com IA)."
+              : "O administrador precisa criar as fases e tarefas do projeto."}
           </p>
+          {canCreateSpecification && (
+            <Link href={`/admin/projetos/${projectId}/especificacao`} className="mt-4">
+              <Button>Criar especificação</Button>
+            </Link>
+          )}
         </Card>
       </div>
     );
@@ -136,6 +144,11 @@ export default function DevEspecificacaoPage({ params }: Props) {
           <h1 className="text-xl font-bold truncate">{project?.title ?? "Projeto"}</h1>
           <p className="text-sm text-muted-foreground">Especificação de desenvolvimento</p>
         </div>
+        {canCreateSpecification && (
+          <Link href={`/admin/projetos/${projectId}/especificacao`}>
+            <Button variant="outline" size="sm">Editar fases e tarefas</Button>
+          </Link>
+        )}
       </div>
 
       {/* Cards de métricas */}
