@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import {
   addDays,
+  differenceInBusinessDays,
   differenceInCalendarDays,
   eachMonthOfInterval,
   endOfMonth,
@@ -41,6 +42,8 @@ interface WaveTimelineProps {
   items: WaveTimelineItem[];
   emptyMessage?: string;
   className?: string;
+  /** Opcional: torna cada barra clicável (ex.: abrir o projeto para edição). */
+  onItemClick?: (projectId: string) => void;
 }
 
 const AREA_COLOR_VARS = [
@@ -66,6 +69,7 @@ export function WaveTimeline({
   items,
   emptyMessage = "Nenhum robô agendado para esta onda.",
   className,
+  onItemClick,
 }: WaveTimelineProps) {
   const { rangeStart, rangeEnd, totalDays, monthTicks, areaColorMap } = useMemo(() => {
     if (items.length === 0) {
@@ -119,7 +123,7 @@ export function WaveTimeline({
       </div>
 
       {/* Barras, uma linha por robô */}
-      <div className="space-y-2">
+      <div className="space-y-3.5">
         {items.map((item) => {
           const left = pctOf(item.startDate);
           const width = Math.max(pctOf(addDays(item.endDate, 1)) - left, 1.5);
@@ -131,13 +135,20 @@ export function WaveTimeline({
           // com borda tracejada + opacidade reduzida + "?" no rótulo, para
           // não parecer uma estimativa real de 1 dia.
           const isFallback = item.effortEstimated === false;
+          // +1 porque o próprio dia final conta como dia de trabalho.
+          const durationBusinessDays = differenceInBusinessDays(item.endDate, item.startDate) + 1;
+          const dateRangeLabel = `${format(item.startDate, "dd/MM/yy")} – ${format(item.endDate, "dd/MM/yy")} (${durationBusinessDays}d úteis)`;
 
           return (
-            <div key={item.projectId} className="relative h-9">
-              <div
+            <div key={item.projectId} className="relative h-9 mb-4">
+              <button
+                type="button"
+                disabled={!onItemClick}
+                onClick={() => onItemClick?.(item.projectId)}
                 className={cn(
-                  "absolute h-9 rounded-md flex items-center px-2 text-xs font-medium text-white shadow-sm overflow-hidden whitespace-nowrap",
-                  isFallback && "border-2 border-dashed border-white/70 opacity-70"
+                  "absolute h-9 rounded-md flex items-center px-2 text-xs font-medium text-white shadow-sm overflow-hidden whitespace-nowrap text-left",
+                  isFallback && "border-2 border-dashed border-white/70 opacity-70",
+                  onItemClick && "cursor-pointer hover:brightness-110"
                 )}
                 style={{ left: `${left}%`, width: `${width}%`, backgroundColor: color }}
                 title={
@@ -149,7 +160,13 @@ export function WaveTimeline({
                   {item.title}
                   {isFallback && " (?)"}
                 </span>
-              </div>
+              </button>
+              <span
+                className="absolute top-9 mt-0.5 text-[10px] text-muted-foreground whitespace-nowrap"
+                style={{ left: `${left}%` }}
+              >
+                {dateRangeLabel}
+              </span>
             </div>
           );
         })}

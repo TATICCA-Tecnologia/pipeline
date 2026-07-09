@@ -2,7 +2,13 @@
 
 import { use, useMemo, useState } from "react";
 import Link from "next/link";
-import { addBusinessDays, differenceInCalendarDays } from "date-fns";
+import { useRouter } from "next/navigation";
+import {
+  addBusinessDays,
+  differenceInBusinessDays,
+  differenceInCalendarDays,
+  format,
+} from "date-fns";
 import {
   Bar,
   ComposedChart,
@@ -118,8 +124,30 @@ function RankingTooltip({
   );
 }
 
+/**
+ * `computeWaveSchedule` agenda sequencialmente sem folgas (próximo item
+ * sempre começa no 1º dia útil após o fim do anterior) — um gap de calendário
+ * maior que um fim de semana normal (~3 dias) entre itens consecutivos indica
+ * dado inconsistente (ex.: esforço em dias não-inteiro, id fora de ordem).
+ */
+function findScheduleGaps(
+  schedule: { projectId: string; title: string; startDate: Date; endDate: Date }[]
+): { fromTitle: string; toTitle: string; gapDays: number }[] {
+  const gaps: { fromTitle: string; toTitle: string; gapDays: number }[] = [];
+  for (let i = 1; i < schedule.length; i++) {
+    const prev = schedule[i - 1];
+    const curr = schedule[i];
+    const gapDays = differenceInCalendarDays(curr.startDate, prev.endDate);
+    if (gapDays > 3) {
+      gaps.push({ fromTitle: prev.title, toTitle: curr.title, gapDays });
+    }
+  }
+  return gaps;
+}
+
 export default function PriorizacaoPage({ params }: Props) {
   const { id: companyId } = use(params);
+  const router = useRouter();
   const [sortBy, setSortBy] = useState<SortBy>("combinado");
 
   const utils = trpc.useUtils();
@@ -215,6 +243,13 @@ export default function PriorizacaoPage({ params }: Props) {
     [wave2Projects, wave2StartDate]
   );
 
+  const wave1Gaps = useMemo(() => findScheduleGaps(wave1Schedule), [wave1Schedule]);
+  const wave2Gaps = useMemo(() => findScheduleGaps(wave2Schedule), [wave2Schedule]);
+
+  function goToProject(projectId: string) {
+    router.push(`/admin/projetos/${projectId}/especificacao`);
+  }
+
   const areaNameByProjectId = useMemo(
     () => new Map(ranking.map((row) => [row.id, row.areaName])),
     [ranking]
@@ -247,6 +282,31 @@ export default function PriorizacaoPage({ params }: Props) {
   );
 
   const paybackDate = useMemo(() => findPaybackDate(paybackCurve), [paybackCurve]);
+
+  // Composição do payback: uma linha por robô, com os números que alimentam
+  // a curva acima (facilita conferir/auditar de onde vêm custo e economia).
+  const paybackComposition = useMemo(() => {
+    const withWave = [
+      ...wave1Schedule.map((item) => ({ ...item, wave: 1 as const })),
+      ...wave2Schedule.map((item) => ({ ...item, wave: 2 as const })),
+    ];
+    return withWave.map((item) => {
+      const businessDays = differenceInBusinessDays(item.endDate, item.startDate) + 1;
+      const developmentCostBRL = businessDays * developerDailyRateBRL;
+      const annualSavingBRL = savingByProjectId.get(item.projectId) ?? 0;
+      return {
+        projectId: item.projectId,
+        title: item.title,
+        wave: item.wave,
+        startDate: item.startDate,
+        endDate: item.endDate,
+        businessDays,
+        developmentCostBRL,
+        monthlySavingBRL: annualSavingBRL / 12,
+        annualSavingBRL,
+      };
+    });
+  }, [wave1Schedule, wave2Schedule, savingByProjectId, developerDailyRateBRL]);
 
   // "Data de início do cronograma": a menor startDate entre os dois schedules
   // combinados (equivale a wave1StartDate quando a onda 1 tem projetos; cai
@@ -460,7 +520,12 @@ export default function PriorizacaoPage({ params }: Props) {
                           {index + 1}
                         </TableCell>
                         <TableCell className="font-medium max-w-[260px] truncate">
-                          {row.title}
+                          <Link
+                            href={`/admin/projetos/${row.id}/especificacao`}
+                            className="hover:text-primary hover:underline"
+                          >
+                            {row.title}
+                          </Link>
                         </TableCell>
                         <TableCell className="text-muted-foreground">
                           {row.areaName ?? "-"}
@@ -534,6 +599,16 @@ export default function PriorizacaoPage({ params }: Props) {
               </p>
             </CardHeader>
             <CardContent>
+              {wave1Gaps.length > 0 && (
+                <div className="mb-3 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
+                  {wave1Gaps.map((gap, i) => (
+                    <p key={i}>
+                      Salto de {gap.gapDays} dias corridos entre &quot;{gap.fromTitle}&quot; e
+                      &quot;{gap.toTitle}&quot; — confira o esforço (dias úteis) desses projetos.
+                    </p>
+                  ))}
+                </div>
+              )}
               {isLoading ? (
                 <p className="text-sm text-muted-foreground py-10 text-center">Carregando...</p>
               ) : (
@@ -543,6 +618,7 @@ export default function PriorizacaoPage({ params }: Props) {
                     areaName: areaNameByProjectId.get(item.projectId) ?? null,
                   }))}
                   emptyMessage="Nenhum projeto marcado na onda 1."
+                  onItemClick={goToProject}
                 />
               )}
             </CardContent>
@@ -557,6 +633,16 @@ export default function PriorizacaoPage({ params }: Props) {
               </p>
             </CardHeader>
             <CardContent>
+              {wave2Gaps.length > 0 && (
+                <div className="mb-3 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
+                  {wave2Gaps.map((gap, i) => (
+                    <p key={i}>
+                      Salto de {gap.gapDays} dias corridos entre &quot;{gap.fromTitle}&quot; e
+                      &quot;{gap.toTitle}&quot; — confira o esforço (dias úteis) desses projetos.
+                    </p>
+                  ))}
+                </div>
+              )}
               {isLoading ? (
                 <p className="text-sm text-muted-foreground py-10 text-center">Carregando...</p>
               ) : (
@@ -566,6 +652,7 @@ export default function PriorizacaoPage({ params }: Props) {
                     areaName: areaNameByProjectId.get(item.projectId) ?? null,
                   }))}
                   emptyMessage="Nenhum projeto marcado na onda 2."
+                  onItemClick={goToProject}
                 />
               )}
             </CardContent>
@@ -594,6 +681,69 @@ export default function PriorizacaoPage({ params }: Props) {
               ) : (
                 <PaybackChart curve={paybackCurve} paybackDate={paybackDate} />
               )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">Composição do cálculo</CardTitle>
+              <p className="text-xs text-muted-foreground">
+                Um robô por linha, com os números que alimentam a curva acima — custo de
+                desenvolvimento = dias úteis × taxa diária do desenvolvedor; economia = saving
+                estimado anual do projeto.
+              </p>
+            </CardHeader>
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Título</TableHead>
+                    <TableHead>Onda</TableHead>
+                    <TableHead>Entrega</TableHead>
+                    <TableHead className="text-right">Dias úteis</TableHead>
+                    <TableHead className="text-right">Custo de dev.</TableHead>
+                    <TableHead className="text-right">Economia/mês</TableHead>
+                    <TableHead className="text-right">Economia/ano</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {paybackComposition.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
+                        Nenhum robô nas ondas 1/2 ainda.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    paybackComposition.map((item) => (
+                      <TableRow
+                        key={item.projectId}
+                        className="cursor-pointer hover:bg-muted/40"
+                        onClick={() => goToProject(item.projectId)}
+                      >
+                        <TableCell className="font-medium max-w-[260px] truncate hover:text-primary hover:underline">
+                          {item.title}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">Onda {item.wave}</TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {format(item.endDate, "dd/MM/yyyy")}
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums">
+                          {item.businessDays}
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums">
+                          {formatCurrency(item.developmentCostBRL)}
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums">
+                          {formatCurrency(item.monthlySavingBRL)}
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums">
+                          {formatCurrency(item.annualSavingBRL)}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
             </CardContent>
           </Card>
         </TabsContent>
