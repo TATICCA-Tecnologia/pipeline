@@ -193,6 +193,7 @@ export const projectRouter = router({
         currentAnnualHours: project.currentAnnualHours ?? undefined,
         complexity: project.complexity ?? undefined,
         robotSchedule: project.robotSchedule ?? undefined,
+        hourlyRateBRL: project.hourlyRateBRL ?? undefined,
         estimatedAnnualSavingBRL: project.estimatedAnnualSavingBRL ?? undefined,
         implementationEffortDays: project.implementationEffortDays ?? undefined,
         implementationWave: project.implementationWave ?? undefined,
@@ -379,6 +380,7 @@ export const projectRouter = router({
         processFrequency: z.string().nullable().optional(),
         complexity: complexitySchema.nullable().optional(),
         robotSchedule: z.string().nullable().optional(),
+        hourlyRateBRL: z.number().min(0).nullable().optional(),
         estimatedAnnualSavingBRL: z.number().nullable().optional(),
         implementationEffortDays: z.number().int().min(0).nullable().optional(),
         implementationWave: z.number().int().min(0).nullable().optional(),
@@ -402,6 +404,7 @@ export const projectRouter = router({
       if (rest.architectNotes !== undefined) data.architectNotes = rest.architectNotes;
       if (rest.complexity !== undefined) data.complexity = rest.complexity;
       if (rest.robotSchedule !== undefined) data.robotSchedule = rest.robotSchedule;
+      if (rest.hourlyRateBRL !== undefined) data.hourlyRateBRL = rest.hourlyRateBRL;
       if (rest.estimatedAnnualSavingBRL !== undefined)
         data.estimatedAnnualSavingBRL = rest.estimatedAnnualSavingBRL;
       if (rest.implementationEffortDays !== undefined)

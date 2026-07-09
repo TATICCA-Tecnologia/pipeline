@@ -179,7 +179,8 @@ model Project {
   // Diagnostico de processo - tecnico/financeiro (preenchido pelo arquiteto, nunca exposto ao cliente)
   complexity               String? // "baixa" | "media" | "alta"
   robotSchedule            String? // texto livre curto, ex.: "Hora fixa, uma vez por dia"
-  estimatedAnnualSavingBRL Float?  // saving estimado anual em reais
+  hourlyRateBRL            Float?  // taxa horária usada no cálculo do saving; null = usa SystemSettings.defaultHourlyRateBRL
+  estimatedAnnualSavingBRL Float?  // saving estimado anual em reais = monthlyHoursSaved * 12 * taxa horária efetiva
 
   // Esforço de implementação (preenchido pelo arquiteto, nunca exposto ao cliente)
   implementationEffortDays Int? // dias úteis estimados de desenvolvimento do robô
@@ -546,6 +547,10 @@ model SystemSettings {
   // Premissas de implementação (usadas em timeline e payback)
   developerDailyRateBRL Float?
   wave1StartDate        DateTime?
+
+  // Taxa horária padrão usada para calcular estimatedAnnualSavingBRL a partir
+  // de monthlyHoursSaved, quando o projeto não tem hourlyRateBRL próprio.
+  defaultHourlyRateBRL Float @default(90)
 
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt

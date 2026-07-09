@@ -125,6 +125,7 @@ export default function AdminConfiguracoesPage() {
   // Premissas de implementação (taxa diária do desenvolvedor, data de início da onda 1).
   const [developerDailyRateBRL, setDeveloperDailyRateBRL] = useState<string>("");
   const [wave1StartDate, setWave1StartDate] = useState<string>("");
+  const [defaultHourlyRateBRL, setDefaultHourlyRateBRL] = useState<string>("");
 
   // Semeia os inputs a partir dos valores reais quando a query resolve.
   useEffect(() => {
@@ -146,6 +147,7 @@ export default function AdminConfiguracoesPage() {
     setWave1StartDate(
       s.wave1StartDate ? new Date(s.wave1StartDate).toISOString().slice(0, 10) : ""
     );
+    setDefaultHourlyRateBRL(String(s.defaultHourlyRateBRL));
   }, [settingsQuery.data]);
 
   const qualSum = sumWeights(
@@ -163,6 +165,7 @@ export default function AdminConfiguracoesPage() {
   function handleSaveWeights() {
     if (!weightsValid) return;
     const parsedRate = Number(developerDailyRateBRL);
+    const parsedHourlyRate = Number(defaultHourlyRateBRL);
     updateWeights.mutate({
       qualWeightErrorReduction: Number(weights.qualWeightErrorReduction),
       qualWeightProcessCriticality: Number(weights.qualWeightProcessCriticality),
@@ -177,6 +180,10 @@ export default function AdminConfiguracoesPage() {
           ? parsedRate
           : null,
       wave1StartDate: wave1StartDate ? new Date(wave1StartDate) : null,
+      defaultHourlyRateBRL:
+        defaultHourlyRateBRL.trim() !== "" && !Number.isNaN(parsedHourlyRate) && parsedHourlyRate >= 0
+          ? parsedHourlyRate
+          : undefined,
     });
   }
 
@@ -705,6 +712,33 @@ export default function AdminConfiguracoesPage() {
                       type="date"
                       value={wave1StartDate}
                       onChange={(e) => setWave1StartDate(e.target.value)}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* Bloco 4: taxa horária padrão usada no cálculo do saving estimado anual */}
+              <div className="space-y-3">
+                <p className="text-sm font-semibold">Saving estimado anual</p>
+                <p className="text-xs text-muted-foreground">
+                  Taxa horária padrão usada para calcular o saving de cada projeto
+                  automaticamente (horas economizadas/mês × 12 × taxa). Pode ser
+                  sobrescrita por projeto na aba de Arquitetura.
+                </p>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">
+                      Taxa horária padrão (R$/h)
+                    </label>
+                    <Input
+                      type="number"
+                      min={0}
+                      step="any"
+                      value={defaultHourlyRateBRL}
+                      onChange={(e) => setDefaultHourlyRateBRL(e.target.value)}
+                      placeholder="Ex.: 90"
                     />
                   </div>
                 </div>

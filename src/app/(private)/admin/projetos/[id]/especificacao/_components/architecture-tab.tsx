@@ -23,6 +23,8 @@ import {
   EXECUTION_STRATEGIES,
 } from "../_constants/architecture";
 import { COMPLEXITY_LEVELS } from "@/shared/constants/project-taxonomy";
+import { computeAnnualSavingBRL } from "@/shared/lib/savings";
+import { formatCurrency } from "@/shared/utils";
 
 const UNASSIGNED = "__unassigned__";
 
@@ -35,6 +37,8 @@ export function ArchitectureTab({ projectId }: ArchitectureTabProps) {
   const { data: project } = trpc.project.byId.useQuery({ id: projectId });
   const { data: phases = [] } = trpc.specification.getByProject.useQuery({ projectId });
   const { data: developers = [] } = trpc.user.listDevelopers.useQuery();
+  const { data: settings } = trpc.settings.getSettings.useQuery();
+  const defaultHourlyRateBRL = settings?.defaultHourlyRateBRL ?? 90;
 
   const updateProject = trpc.project.update.useMutation({
     onSuccess: () => {
@@ -63,6 +67,7 @@ export function ArchitectureTab({ projectId }: ArchitectureTabProps) {
   const [architectNotes, setArchitectNotes] = useState<string>("");
   const [complexity, setComplexity] = useState<string>("");
   const [robotSchedule, setRobotSchedule] = useState<string>("");
+  const [hourlyRateBRL, setHourlyRateBRL] = useState<string>("");
   const [estimatedAnnualSavingBRL, setEstimatedAnnualSavingBRL] = useState<string>("");
   const [implementationEffortDays, setImplementationEffortDays] = useState<string>("");
   const [implementationWave, setImplementationWave] = useState<string>("");
@@ -76,11 +81,18 @@ export function ArchitectureTab({ projectId }: ArchitectureTabProps) {
       setArchitectNotes(project.architectNotes ?? "");
       setComplexity(project.complexity ?? "");
       setRobotSchedule(project.robotSchedule ?? "");
-      setEstimatedAnnualSavingBRL(
-        project.estimatedAnnualSavingBRL != null
-          ? String(project.estimatedAnnualSavingBRL)
-          : ""
+      setHourlyRateBRL(
+        project.hourlyRateBRL != null ? String(project.hourlyRateBRL) : ""
       );
+      if (project.estimatedAnnualSavingBRL != null) {
+        setEstimatedAnnualSavingBRL(String(project.estimatedAnnualSavingBRL));
+      } else {
+        // Nenhum saving salvo ainda — pré-preenche com o cálculo automático
+        // (horas economizadas/mês reportadas × 12 × taxa efetiva), se der pra calcular.
+        const rate = project.hourlyRateBRL ?? defaultHourlyRateBRL;
+        const computed = computeAnnualSavingBRL(project.monthlyHoursSaved, rate);
+        setEstimatedAnnualSavingBRL(computed != null ? String(computed) : "");
+      }
       setImplementationEffortDays(
         project.implementationEffortDays != null
           ? String(project.implementationEffortDays)
@@ -91,7 +103,32 @@ export function ArchitectureTab({ projectId }: ArchitectureTabProps) {
       );
       setWaveOrder(project.waveOrder != null ? String(project.waveOrder) : "");
     }
-  }, [project]);
+    // defaultHourlyRateBRL só é usado no fallback (saving ainda não salvo) —
+    // recalcula esse fallback quando a taxa padrão chega da query de settings.
+  }, [project, defaultHourlyRateBRL]);
+
+  // Taxa horária muda -> recalcula o saving exibido a partir das horas já
+  // reportadas no projeto. Editar o campo de saving diretamente ainda
+  // sobrescreve manualmente até a taxa mudar de novo.
+  const handleHourlyRateChange = (value: string) => {
+    setHourlyRateBRL(value);
+    if (!project || project.monthlyHoursSaved == null) return;
+    const trimmed = value.trim();
+    const parsedRate = trimmed !== "" ? parseFloat(trimmed) : defaultHourlyRateBRL;
+    if (Number.isNaN(parsedRate) || parsedRate < 0) return;
+    const computed = computeAnnualSavingBRL(project.monthlyHoursSaved, parsedRate);
+    if (computed != null) setEstimatedAnnualSavingBRL(String(computed));
+  };
+
+  const liveEffectiveRate = (() => {
+    const trimmed = hourlyRateBRL.trim();
+    if (trimmed === "") return defaultHourlyRateBRL;
+    const parsed = parseFloat(trimmed);
+    return Number.isNaN(parsed) || parsed < 0 ? defaultHourlyRateBRL : parsed;
+  })();
+  const liveComputedSaving = project
+    ? computeAnnualSavingBRL(project.monthlyHoursSaved, liveEffectiveRate)
+    : null;
 
   const toggleSolutionType = (value: string, checked: boolean | "indeterminate") => {
     const isChecked = checked === true;
@@ -106,6 +143,7 @@ export function ArchitectureTab({ projectId }: ArchitectureTabProps) {
       .replace(/\.(?=\d{3}(\D|$))/g, "")
       .replace(",", ".");
     const parsedSaving = parseFloat(normalizedSaving);
+    const parsedHourlyRate = parseFloat(hourlyRateBRL.trim().replace(",", "."));
     const parsedEffortDays = parseInt(implementationEffortDays, 10);
     const parsedWave = parseInt(implementationWave, 10);
     const parsedWaveOrder = parseInt(waveOrder, 10);
@@ -117,6 +155,8 @@ export function ArchitectureTab({ projectId }: ArchitectureTabProps) {
       architectNotes: architectNotes || null,
       complexity: (complexity || null) as "baixa" | "media" | "alta" | null,
       robotSchedule: robotSchedule || null,
+      hourlyRateBRL:
+        !Number.isNaN(parsedHourlyRate) && parsedHourlyRate >= 0 ? parsedHourlyRate : null,
       estimatedAnnualSavingBRL:
         !Number.isNaN(parsedSaving) && parsedSaving >= 0 ? parsedSaving : null,
       implementationEffortDays:
@@ -203,7 +243,7 @@ export function ArchitectureTab({ projectId }: ArchitectureTabProps) {
             </div>
           </div>
 
-          <div className="grid gap-5 sm:grid-cols-3">
+          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
             <div className="space-y-2">
               <Label>Complexidade</Label>
               <Select value={complexity} onValueChange={setComplexity}>
@@ -230,6 +270,21 @@ export function ArchitectureTab({ projectId }: ArchitectureTabProps) {
             </div>
 
             <div className="space-y-2">
+              <Label>Taxa horária (R$/h)</Label>
+              <Input
+                type="number"
+                min={0}
+                step="any"
+                value={hourlyRateBRL}
+                onChange={(e) => handleHourlyRateChange(e.target.value)}
+                placeholder={`Padrão: ${defaultHourlyRateBRL}`}
+              />
+              <p className="text-xs text-muted-foreground">
+                Vazio = usa a taxa padrão configurada em Configurações ({formatCurrency(defaultHourlyRateBRL)}/h).
+              </p>
+            </div>
+
+            <div className="space-y-2">
               <Label>Saving estimado anual (R$)</Label>
               <Input
                 type="number"
@@ -240,6 +295,9 @@ export function ArchitectureTab({ projectId }: ArchitectureTabProps) {
                 placeholder="Ex.: 12480"
               />
               <p className="text-xs text-muted-foreground">
+                {liveComputedSaving != null
+                  ? `Calculado: ${formatCurrency(liveComputedSaving)}/ano (${project?.monthlyHoursSaved}h/mês × 12 × ${formatCurrency(liveEffectiveRate)}/h). Editável manualmente.`
+                  : "Sem horas economizadas/mês reportadas — não é possível calcular automaticamente."}{" "}
                 Só aparece nesta tela de administração — nunca é exibido ao cliente.
               </p>
             </div>

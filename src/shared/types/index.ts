@@ -71,6 +71,7 @@ export interface Project {
   // Diagnostico de processo - tecnico/financeiro (admin/arquiteto, nunca exposto ao cliente)
   complexity?: string;
   robotSchedule?: string;
+  hourlyRateBRL?: number;
   estimatedAnnualSavingBRL?: number;
   solutionTypes?: string[];
   mainTool?: string;
