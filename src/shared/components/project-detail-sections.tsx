@@ -2,8 +2,8 @@
 
 import type { Project, UserRole } from "@/shared/types";
 import { STATUS_CONFIG, PRIORITY_CONFIG } from "@/shared/types";
-import { Card, CardContent, CardHeader, CardTitle } from "@/src/shared/components/ui/card";
 import { formatDate, formatCurrency } from "@/shared/utils";
+import { DetailSection, FieldRow } from "@/shared/components/detail-section";
 import {
   HAS_EXISTING_SYSTEM_OPTIONS,
   HAS_CURRENT_APPLICATION_OPTIONS,
@@ -18,53 +18,6 @@ import {
   MAIN_TOOLS,
   EXECUTION_STRATEGIES,
 } from "@/src/app/(private)/admin/projetos/[id]/especificacao/_constants/architecture";
-
-type FieldValue = string | number | string[] | null | undefined;
-
-function FieldValueDisplay({ value }: { value: FieldValue }) {
-  if (value === null || value === undefined || value === "") {
-    return <p className="text-sm italic text-muted-foreground">Não informado</p>;
-  }
-  if (Array.isArray(value)) {
-    if (value.length === 0) {
-      return <p className="text-sm italic text-muted-foreground">Não informado</p>;
-    }
-    return (
-      <ul className="list-disc space-y-0.5 pl-4 text-sm">
-        {value.map((item, i) => (
-          <li key={i}>{item}</li>
-        ))}
-      </ul>
-    );
-  }
-  return <p className="whitespace-pre-wrap text-sm font-medium">{value}</p>;
-}
-
-function FieldRow({ label, value }: { label: string; value: FieldValue }) {
-  return (
-    <div className="space-y-0.5">
-      <p className="text-xs text-muted-foreground">{label}</p>
-      <FieldValueDisplay value={value} />
-    </div>
-  );
-}
-
-function DetailSection({
-  title,
-  children,
-}: {
-  title: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base">{title}</CardTitle>
-      </CardHeader>
-      <CardContent className="grid gap-4 sm:grid-cols-2">{children}</CardContent>
-    </Card>
-  );
-}
 
 function formatRating(value: number | null | undefined): string | undefined {
   return value != null ? `${value}/5` : undefined;
