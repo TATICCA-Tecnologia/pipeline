@@ -143,7 +143,12 @@ export default function ProjetoPage({ params }: ProjetoPageProps) {
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Coluna Principal */}
         <div className="lg:col-span-2 space-y-6">
-          <ProjectDetailSections project={project} viewerRole={user?.role} />
+          <ProjectDetailSections
+            project={project}
+            viewerRole={user?.role}
+            currentUserId={user?.id}
+            allowEdit
+          />
 
           {/* Funcionalidades */}
           <Card>

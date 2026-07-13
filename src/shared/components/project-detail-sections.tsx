@@ -4,6 +4,10 @@ import type { Project, UserRole } from "@/shared/types";
 import { STATUS_CONFIG, PRIORITY_CONFIG } from "@/shared/types";
 import { formatDate, formatCurrency } from "@/shared/utils";
 import { DetailSection, FieldRow } from "@/shared/components/detail-section";
+import { useState } from "react";
+import { Button } from "@/src/shared/components/ui/button";
+import { Pencil } from "lucide-react";
+import { ProjectRequestEditForm } from "@/shared/components/project-request-edit-form";
 import {
   HAS_EXISTING_SYSTEM_OPTIONS,
   HAS_CURRENT_APPLICATION_OPTIONS,
@@ -26,14 +30,39 @@ function formatRating(value: number | null | undefined): string | undefined {
 export function ProjectDetailSections({
   project,
   viewerRole,
+  currentUserId,
+  allowEdit = false,
 }: {
   project: Project;
   viewerRole: UserRole | undefined;
+  currentUserId?: string;
+  allowEdit?: boolean;
 }) {
+  const [isEditing, setIsEditing] = useState(false);
   const statusConfig = STATUS_CONFIG[project.status];
   const priorityConfig = PRIORITY_CONFIG[project.priority];
   const canSeeTechnical =
     viewerRole === "admin" || viewerRole === "developer" || viewerRole === "super_admin";
+  const isArchitect = viewerRole === "admin" || viewerRole === "super_admin";
+  const isOwner = !!currentUserId && project.clientId === currentUserId;
+  // `ProjectStatus` (shared/types) doesn't include "cancelled" yet, even though the
+  // backend (server/trpc/mappers.ts FrontendProjectStatus) already supports it — widen
+  // to string here rather than expanding the shared union as part of this task.
+  const projectStatus = project.status as string;
+  const canEdit =
+    allowEdit &&
+    (isArchitect || (isOwner && projectStatus !== "completed" && projectStatus !== "cancelled"));
+
+  if (isEditing) {
+    return (
+      <ProjectRequestEditForm
+        project={project}
+        viewerRole={viewerRole}
+        onCancel={() => setIsEditing(false)}
+        onSaved={() => setIsEditing(false)}
+      />
+    );
+  }
 
   const benefitLabels = (project.benefits ?? []).map(
     (key) => BENEFIT_OPTIONS.find((b) => b.key === key)?.label ?? key
@@ -44,6 +73,15 @@ export function ProjectDetailSections({
 
   return (
     <div className="space-y-6">
+      {canEdit && (
+        <div className="flex justify-end">
+          <Button variant="outline" size="sm" onClick={() => setIsEditing(true)}>
+            <Pencil className="mr-1.5 h-3.5 w-3.5" />
+            Editar
+          </Button>
+        </div>
+      )}
+
       <DetailSection title="Básico">
         <FieldRow label="ID do projeto" value={project.id} />
         <FieldRow label="Título" value={project.title} />
