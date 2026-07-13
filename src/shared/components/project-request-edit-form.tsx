@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { trpc } from "@/shared/trpc/client";
 import type { Project, UserRole } from "@/shared/types";
@@ -86,7 +86,7 @@ export function ProjectRequestEditForm({
   onSaved,
 }: ProjectRequestEditFormProps) {
   const utils = trpc.useUtils();
-  const { areas, themesByArea } = useTaxonomy();
+  const { areas, themesByArea, isLoading: isTaxonomyLoading } = useTaxonomy();
   const canSeeTechnical =
     viewerRole === "admin" || viewerRole === "developer" || viewerRole === "super_admin";
 
@@ -123,6 +123,24 @@ export function ProjectRequestEditForm({
     additionalInfo: project.additionalInfo ?? "",
   });
 
+  // Área/Tema são carregados via useTaxonomy(), que começa em isLoading=true e usa
+  // dados de fallback (com id: undefined) até o banco responder. O useState acima só
+  // roda uma vez, então recalculamos a seleção inicial assim que os dados reais chegam
+  // (isLoading passa de true -> false uma única vez no ciclo de vida normal).
+  useEffect(() => {
+    if (!isTaxonomyLoading) {
+      const resolvedAreaSlug = areas.find((a) => a.id === project.areaId)?.value ?? "";
+      const resolvedThemeSlug =
+        (themesByArea[resolvedAreaSlug] ?? []).find((t) => t.id === project.themeId)?.value ?? "";
+      setForm((prev) => ({
+        ...prev,
+        areaSlug: resolvedAreaSlug,
+        themeSlug: resolvedThemeSlug,
+      }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isTaxonomyLoading]);
+
   function set<K extends keyof EditFormState>(key: K, value: EditFormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
@@ -157,7 +175,7 @@ export function ProjectRequestEditForm({
     updateMutation.mutate({
       id: project.id,
       title: form.title,
-      description: form.description || undefined,
+      description: form.description,
       areaId: selectedArea?.id ?? null,
       themeId: selectedTheme?.id ?? null,
       targetAudience: form.targetAudience || null,
