@@ -41,6 +41,80 @@ const projectStatusSchema = z.enum([
 
 const complexitySchema = z.enum(["baixa", "media", "alta"]);
 
+// Campos que só admin/super_admin (o "arquiteto" do sistema — não existe role
+// separado) pode alterar via project.update. Um cliente que tentar enviar
+// qualquer uma dessas chaves recebe FORBIDDEN.
+const ARCHITECT_ONLY_FIELDS = new Set([
+  "status",
+  "priority",
+  "developerId",
+  "companyId",
+  "solutionTypes",
+  "mainTool",
+  "executionStrategy",
+  "architectNotes",
+  "complexity",
+  "robotSchedule",
+  "hourlyRateBRL",
+  "estimatedAnnualSavingBRL",
+  "implementationEffortDays",
+  "implementationWave",
+  "waveOrder",
+]);
+
+// Rótulos em pt-BR dos campos "de solicitação" editáveis por cliente-dono e
+// arquiteto, usados para descrever no ActivityLog quais campos mudaram.
+const SOLICITATION_FIELD_LABELS: Record<string, string> = {
+  title: "Título",
+  description: "Descrição",
+  estimatedDeadline: "Prazo limite",
+  areaId: "Área",
+  themeId: "Tema",
+  targetAudience: "Público-alvo",
+  expectedUsers: "Usuários esperados",
+  urgency: "Urgência",
+  additionalInfo: "Informações adicionais",
+  hasExistingSystem: "Processo/sistema existente",
+  existingSystemDetails: "Detalhes do processo atual",
+  hasCurrentApplication: "Aplicação existente hoje",
+  currentApplicationDetails: "Detalhes da aplicação existente",
+  projectNarrative: "Narrativa do processo",
+  benefits: "Benefícios esperados",
+  benefitsDetails: "Detalhes dos benefícios",
+  monthlyHoursSaved: "Horas economizadas por mês",
+  ratingErrorReduction: "Avaliação: redução de erros",
+  ratingProcessCriticality: "Avaliação: criticidade do processo",
+  ratingInternalImpact: "Avaliação: impacto interno",
+  ratingExternalImpact: "Avaliação: impacto externo",
+  ratingCompliance: "Avaliação: atendimento a políticas",
+  peopleInvolved: "Colaboradores envolvidos",
+  peopleInvolvedDetails: "Detalhes dos colaboradores",
+  taskDurationHours: "Duração por execução",
+  processFrequency: "Periodicidade",
+};
+
+// Compara os valores enviados (rest) contra o estado atual do projeto (current,
+// linha crua do Prisma) e devolve os rótulos dos campos que de fato mudaram —
+// usado só para descrever a entrada do ActivityLog, não afeta o que é salvo.
+function describeChangedFields(
+  rest: Record<string, unknown>,
+  current: Record<string, unknown>
+): string[] {
+  const changed: string[] = [];
+  for (const [key, label] of Object.entries(SOLICITATION_FIELD_LABELS)) {
+    if (!(key in rest) || rest[key] === undefined) continue;
+    const currentKey = key === "estimatedDeadline" ? "deadline" : key;
+    const before = current[currentKey];
+    const after = rest[key];
+    const beforeStr =
+      before instanceof Date ? before.toISOString() : JSON.stringify(before ?? null);
+    const afterStr =
+      after instanceof Date ? after.toISOString() : JSON.stringify(after ?? null);
+    if (beforeStr !== afterStr) changed.push(label);
+  }
+  return changed;
+}
+
 function computeCurrentAnnualHours(
   duration: number | null | undefined,
   frequency: string | null | undefined
@@ -372,12 +446,15 @@ export const projectRouter = router({
         priority: z.enum(["low", "medium", "high", "urgent"]).optional(),
         developerId: z.string().nullable().optional(),
         companyId: z.string().nullable().optional(),
+        areaId: z.string().nullable().optional(),
+        themeId: z.string().nullable().optional(),
         estimatedDeadline: z.date().nullable().optional(),
         solutionTypes: z.array(z.string()).optional(),
         mainTool: z.string().nullable().optional(),
         executionStrategy: z.string().nullable().optional(),
         architectNotes: z.string().nullable().optional(),
         peopleInvolved: z.number().int().min(0).nullable().optional(),
+        peopleInvolvedDetails: z.string().nullable().optional(),
         taskDurationHours: z.number().min(0).nullable().optional(),
         processFrequency: z.string().nullable().optional(),
         complexity: complexitySchema.nullable().optional(),
@@ -388,10 +465,66 @@ export const projectRouter = router({
         implementationWave: z.number().int().min(0).nullable().optional(),
         waveOrder: z.number().int().min(0).nullable().optional(),
         hasCurrentApplication: z.string().nullable().optional(),
+        targetAudience: z.string().nullable().optional(),
+        expectedUsers: z.string().nullable().optional(),
+        urgency: z.string().nullable().optional(),
+        additionalInfo: z.string().nullable().optional(),
+        hasExistingSystem: z.string().nullable().optional(),
+        existingSystemDetails: z.string().nullable().optional(),
+        currentApplicationDetails: z.string().nullable().optional(),
+        projectNarrative: z.string().nullable().optional(),
+        benefits: z.array(z.string()).nullable().optional(),
+        benefitsDetails: z.string().nullable().optional(),
+        monthlyHoursSaved: z.number().nullable().optional(),
+        ratingErrorReduction: z.number().int().min(1).max(5).nullable().optional(),
+        ratingProcessCriticality: z.number().int().min(1).max(5).nullable().optional(),
+        ratingInternalImpact: z.number().int().min(1).max(5).nullable().optional(),
+        ratingExternalImpact: z.number().int().min(1).max(5).nullable().optional(),
+        ratingCompliance: z.number().int().min(1).max(5).nullable().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
       const { id, ...rest } = input;
+
+      const current = await ctx.db.project.findUnique({ where: { id } });
+      if (!current) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Projeto não encontrado" });
+      }
+
+      const caller = await ctx.db.user.findUnique({
+        where: { id: ctx.userId },
+        select: { role: true },
+      });
+      const isArchitect = caller?.role === "ADMIN" || caller?.role === "SUPER_ADMIN";
+      const isOwner = current.clientId === ctx.userId;
+
+      if (!isArchitect) {
+        if (!isOwner) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "Você não tem permissão para editar este projeto.",
+          });
+        }
+        if (current.status === "DONE" || current.status === "CANCELLED") {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message:
+              "Este projeto já foi concluído ou cancelado. Peça a um administrador para reabrir a edição.",
+          });
+        }
+        const forbiddenKey = Object.keys(rest).find(
+          (key) =>
+            ARCHITECT_ONLY_FIELDS.has(key) &&
+            (rest as Record<string, unknown>)[key] !== undefined
+        );
+        if (forbiddenKey) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "Este campo só pode ser alterado por um administrador.",
+          });
+        }
+      }
+
       const data: Record<string, unknown> = {};
       if (rest.title != null) data.title = rest.title;
       if (rest.description != null) data.description = rest.description;
@@ -399,6 +532,8 @@ export const projectRouter = router({
       if (rest.priority != null) data.priority = rest.priority.toUpperCase();
       if (rest.developerId !== undefined) data.developerId = rest.developerId;
       if (rest.companyId !== undefined) data.companyId = rest.companyId;
+      if (rest.areaId !== undefined) data.areaId = rest.areaId;
+      if (rest.themeId !== undefined) data.themeId = rest.themeId;
       if (rest.estimatedDeadline !== undefined) data.deadline = rest.estimatedDeadline;
       if (rest.solutionTypes !== undefined) data.solutionTypes = rest.solutionTypes;
       if (rest.mainTool !== undefined) data.mainTool = rest.mainTool;
@@ -411,29 +546,49 @@ export const projectRouter = router({
         data.estimatedAnnualSavingBRL = rest.estimatedAnnualSavingBRL;
       if (rest.implementationEffortDays !== undefined)
         data.implementationEffortDays = rest.implementationEffortDays;
-      if (rest.implementationWave !== undefined)
-        data.implementationWave = rest.implementationWave;
+      if (rest.implementationWave !== undefined) data.implementationWave = rest.implementationWave;
       if (rest.waveOrder !== undefined) data.waveOrder = rest.waveOrder;
       if (rest.hasCurrentApplication !== undefined)
         data.hasCurrentApplication = rest.hasCurrentApplication;
+      if (rest.targetAudience !== undefined) data.targetAudience = rest.targetAudience;
+      if (rest.expectedUsers !== undefined) data.expectedUsers = rest.expectedUsers;
+      if (rest.urgency !== undefined) data.urgency = rest.urgency;
+      if (rest.additionalInfo !== undefined) data.additionalInfo = rest.additionalInfo;
+      if (rest.hasExistingSystem !== undefined) data.hasExistingSystem = rest.hasExistingSystem;
+      if (rest.existingSystemDetails !== undefined)
+        data.existingSystemDetails = rest.existingSystemDetails;
+      if (rest.currentApplicationDetails !== undefined)
+        data.currentApplicationDetails = rest.currentApplicationDetails;
+      if (rest.projectNarrative !== undefined) data.projectNarrative = rest.projectNarrative;
+      if (rest.benefits !== undefined) data.benefits = rest.benefits;
+      if (rest.benefitsDetails !== undefined) data.benefitsDetails = rest.benefitsDetails;
+      if (rest.monthlyHoursSaved !== undefined) data.monthlyHoursSaved = rest.monthlyHoursSaved;
+      if (rest.ratingErrorReduction !== undefined)
+        data.ratingErrorReduction = rest.ratingErrorReduction;
+      if (rest.ratingProcessCriticality !== undefined)
+        data.ratingProcessCriticality = rest.ratingProcessCriticality;
+      if (rest.ratingInternalImpact !== undefined)
+        data.ratingInternalImpact = rest.ratingInternalImpact;
+      if (rest.ratingExternalImpact !== undefined)
+        data.ratingExternalImpact = rest.ratingExternalImpact;
+      if (rest.ratingCompliance !== undefined) data.ratingCompliance = rest.ratingCompliance;
       if (rest.peopleInvolved !== undefined) data.peopleInvolved = rest.peopleInvolved;
+      if (rest.peopleInvolvedDetails !== undefined)
+        data.peopleInvolvedDetails = rest.peopleInvolvedDetails;
       if (rest.taskDurationHours !== undefined || rest.processFrequency !== undefined) {
-        const current = await ctx.db.project.findUnique({
-          where: { id },
-          select: { taskDurationHours: true, processFrequency: true },
-        });
         const nextDuration =
-          rest.taskDurationHours !== undefined
-            ? rest.taskDurationHours
-            : current?.taskDurationHours ?? null;
+          rest.taskDurationHours !== undefined ? rest.taskDurationHours : current.taskDurationHours;
         const nextFrequency =
-          rest.processFrequency !== undefined
-            ? rest.processFrequency
-            : current?.processFrequency ?? null;
+          rest.processFrequency !== undefined ? rest.processFrequency : current.processFrequency;
         data.taskDurationHours = nextDuration;
         data.processFrequency = nextFrequency;
         data.currentAnnualHours = computeCurrentAnnualHours(nextDuration, nextFrequency);
       }
+
+      const changedFieldLabels = describeChangedFields(
+        rest as Record<string, unknown>,
+        current as unknown as Record<string, unknown>
+      );
 
       const project = await ctx.db.project.update({
         where: { id },
@@ -443,7 +598,8 @@ export const projectRouter = router({
         data: {
           projectId: project.id,
           userId: ctx.userId,
-          action: "Projeto atualizado",
+          action: changedFieldLabels.length > 0 ? "Solicitação editada" : "Projeto atualizado",
+          details: changedFieldLabels.length > 0 ? changedFieldLabels.join(", ") : undefined,
         },
       });
       return {
