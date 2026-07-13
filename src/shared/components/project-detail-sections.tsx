@@ -39,7 +39,10 @@ export function ProjectDetailSections({
   allowEdit?: boolean;
 }) {
   const [isEditing, setIsEditing] = useState(false);
-  const statusConfig = STATUS_CONFIG[project.status];
+  const statusConfig = STATUS_CONFIG[project.status] ?? {
+    label: project.status,
+    color: "bg-muted",
+  };
   const priorityConfig = PRIORITY_CONFIG[project.priority];
   const canSeeTechnical =
     viewerRole === "admin" || viewerRole === "developer" || viewerRole === "super_admin";

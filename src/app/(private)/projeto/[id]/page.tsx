@@ -95,7 +95,10 @@ export default function ProjetoPage({ params }: ProjetoPageProps) {
     );
   }
 
-  const statusConfig = STATUS_CONFIG[project.status as keyof typeof STATUS_CONFIG];
+  const statusConfig = STATUS_CONFIG[project.status as keyof typeof STATUS_CONFIG] ?? {
+    label: project.status,
+    color: "bg-muted",
+  };
   const priorityConfig = PRIORITY_CONFIG[project.priority as keyof typeof PRIORITY_CONFIG];
 
   // Calcular progresso baseado nas funcionalidades concluídas (fallback para status)

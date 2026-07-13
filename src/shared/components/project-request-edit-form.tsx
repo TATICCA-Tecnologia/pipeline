@@ -158,6 +158,7 @@ export function ProjectRequestEditForm({
     onSuccess: () => {
       utils.project.byId.invalidate({ id: project.id });
       utils.project.list.invalidate();
+      utils.activity.byProject.invalidate({ projectId: project.id });
       toast.success("Solicitação atualizada");
       onSaved();
     },
@@ -203,7 +204,10 @@ export function ProjectRequestEditForm({
     });
   }
 
-  const statusConfig = STATUS_CONFIG[project.status];
+  const statusConfig = STATUS_CONFIG[project.status] ?? {
+    label: project.status,
+    color: "bg-muted",
+  };
   const priorityConfig = PRIORITY_CONFIG[project.priority];
   const solutionTypeLabels = (project.solutionTypes ?? []).map(
     (key) => SOLUTION_TYPES.find((s) => s.value === key)?.label ?? key
