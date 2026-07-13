@@ -165,6 +165,8 @@ export const projectRouter = router({
         developerId: project.developerId ?? undefined,
         companyId: project.companyId ?? undefined,
         companyName: project.company?.name,
+        areaId: project.areaId ?? undefined,
+        themeId: project.themeId ?? undefined,
         projectType: project.platform ?? project.type,
         estimatedDeadline: project.deadline ?? undefined,
         createdAt: project.createdAt,
