@@ -77,9 +77,15 @@ export interface Project {
   mainTool?: string;
   executionStrategy?: string;
   architectNotes?: string;
+  // Operacao pos-entrega (admin escreve, cliente sempre ve)
+  operationalStatus?: RobotOperationalStatus;
+  accumulatedSavingBRL?: number;
+  operationalStatusUpdatedAt?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
+
+export type RobotOperationalStatus = "ACTIVE" | "PAUSED" | "ISSUE";
 
 // Tarefa dentro de um projeto
 export interface Task {
@@ -127,6 +133,7 @@ export interface Comment {
   userRole: UserRole;
   content: string;
   visibility: CommentVisibility;
+  isIncident?: boolean;
   attachments?: ProjectFile[];
   createdAt: Date;
   updatedAt?: Date;
@@ -217,5 +224,14 @@ export const PRIORITY_CONFIG: Record<
   medium: { label: "Média", color: "text-amber-500" },
   high: { label: "Alta", color: "text-destructive" },
   urgent: { label: "Urgente", color: "text-destructive font-semibold" },
+};
+
+export const ROBOT_OPERATIONAL_STATUS_CONFIG: Record<
+  RobotOperationalStatus,
+  { label: string; color: string }
+> = {
+  ACTIVE: { label: "Ativo", color: "bg-emerald-500/20 text-emerald-600" },
+  PAUSED: { label: "Pausado", color: "bg-muted text-muted-foreground" },
+  ISSUE: { label: "Com problema", color: "bg-destructive/20 text-destructive" },
 };
 
