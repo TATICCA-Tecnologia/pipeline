@@ -29,6 +29,9 @@ import {
   SelectValue,
 } from "@/src/shared/components/ui/select";
 import { HAS_CURRENT_APPLICATION_OPTIONS } from "@/shared/constants/project-taxonomy";
+import { ROBOT_OPERATIONAL_STATUS_CONFIG } from "@/shared/types";
+import type { RobotOperationalStatus } from "@/shared/types";
+import { Input } from "@/src/shared/components/ui/input";
 import { Loader2, Presentation } from "lucide-react";
 import { toast } from "sonner";
 import { ProjectExecutiveSlideModal } from "./project-executive-slide.modal";
@@ -83,6 +86,24 @@ export function ProjectDetailsModal({
     },
     onError: (error) => {
       toast.error(error.message || "Não foi possível atualizar o campo.");
+    },
+  });
+
+  // Status operacional pos-entrega — só admin edita, cliente ve em /cliente/robos.
+  const [pendingOperationalStatus, setPendingOperationalStatus] = useState<
+    RobotOperationalStatus | undefined
+  >(undefined);
+  const [pendingAccumulatedSaving, setPendingAccumulatedSaving] = useState<string>("");
+  const updateOperationalStatusMutation = trpc.project.update.useMutation({
+    onSuccess: () => {
+      utils.project.list.invalidate();
+      if (data?.project.id) utils.project.byId.invalidate({ id: data.project.id });
+      toast.success("Status operacional atualizado");
+      setPendingOperationalStatus(undefined);
+      setPendingAccumulatedSaving("");
+    },
+    onError: (error) => {
+      toast.error(error.message || "Não foi possível atualizar o status operacional.");
     },
   });
 
@@ -149,6 +170,63 @@ export function ProjectDetailsModal({
             </Button>
           </div>
         )}
+
+        {(user?.role === "admin" || user?.role === "super_admin") &&
+          project.status === "completed" &&
+          !isLoading && (
+            <div className="mb-5 flex flex-wrap items-center gap-3 rounded-md border border-dashed border-border p-3">
+              <Label htmlFor="operational-status" className="text-xs text-muted-foreground">
+                Status operacional:
+              </Label>
+              <Select
+                value={pendingOperationalStatus ?? project.operationalStatus ?? undefined}
+                onValueChange={(v) => setPendingOperationalStatus(v as RobotOperationalStatus)}
+              >
+                <SelectTrigger id="operational-status" className="h-8 w-40 text-xs">
+                  <SelectValue placeholder="Selecione" />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(ROBOT_OPERATIONAL_STATUS_CONFIG).map(([value, cfg]) => (
+                    <SelectItem key={value} value={value}>
+                      {cfg.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Label htmlFor="accumulated-saving" className="text-xs text-muted-foreground">
+                Economia acumulada (R$):
+              </Label>
+              <Input
+                id="accumulated-saving"
+                type="number"
+                min={0}
+                step="0.01"
+                className="h-8 w-32 text-xs"
+                value={
+                  pendingAccumulatedSaving ||
+                  project.accumulatedSavingBRL?.toString() ||
+                  ""
+                }
+                onChange={(e) => setPendingAccumulatedSaving(e.target.value)}
+              />
+              <Button
+                size="sm"
+                className="h-8"
+                disabled={updateOperationalStatusMutation.isPending}
+                onClick={() =>
+                  updateOperationalStatusMutation.mutate({
+                    id: project.id,
+                    operationalStatus: pendingOperationalStatus ?? project.operationalStatus,
+                    accumulatedSavingBRL: pendingAccumulatedSaving
+                      ? parseFloat(pendingAccumulatedSaving)
+                      : project.accumulatedSavingBRL,
+                  })
+                }
+              >
+                {updateOperationalStatusMutation.isPending ? "Salvando..." : "Salvar"}
+              </Button>
+            </div>
+          )}
 
         {isLoading && !fullProject ? (
           <div className="flex items-center justify-center py-10">
