@@ -75,6 +75,9 @@ function mapProject(p: {
   complexity?: string | null;
   robotSchedule?: string | null;
   estimatedAnnualSavingBRL?: number | null;
+  operationalStatus?: string | null;
+  accumulatedSavingBRL?: number | null;
+  operationalStatusUpdatedAt?: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }): Project {
@@ -116,6 +119,9 @@ function mapProject(p: {
     complexity: p.complexity ?? undefined,
     robotSchedule: p.robotSchedule ?? undefined,
     estimatedAnnualSavingBRL: p.estimatedAnnualSavingBRL ?? undefined,
+    operationalStatus: (p.operationalStatus as Project["operationalStatus"]) ?? undefined,
+    accumulatedSavingBRL: p.accumulatedSavingBRL ?? undefined,
+    operationalStatusUpdatedAt: p.operationalStatusUpdatedAt ?? undefined,
     createdAt: p.createdAt,
     updatedAt: p.updatedAt,
   };

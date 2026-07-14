@@ -12,7 +12,12 @@ import { trpc } from "@/shared/trpc/client";
 
 interface CommentsContextType {
   getCommentsByProject: (projectId: string) => Comment[];
-  addComment: (comment: Omit<Comment, "id" | "createdAt"> & { visibility?: CommentVisibility }) => void;
+  addComment: (
+    comment: Omit<Comment, "id" | "createdAt"> & {
+      visibility?: CommentVisibility;
+      isIncident?: boolean;
+    }
+  ) => void;
   updateComment: (id: string, content: string) => void;
   deleteComment: (id: string) => void;
 }
@@ -48,11 +53,17 @@ export function CommentsProvider({ children }: { children: ReactNode }) {
     []
   );
   const addComment = useCallback(
-    (comment: Omit<Comment, "id" | "createdAt"> & { visibility?: CommentVisibility }) => {
+    (
+      comment: Omit<Comment, "id" | "createdAt"> & {
+        visibility?: CommentVisibility;
+        isIncident?: boolean;
+      }
+    ) => {
       createComment.mutate({
         projectId: comment.projectId,
         content: comment.content,
         visibility: comment.visibility ?? "GLOBAL",
+        isIncident: comment.isIncident ?? false,
       });
     },
     [createComment]
@@ -93,6 +104,7 @@ function mapComment(c: Record<string, unknown>): Comment {
     userRole: c.userRole as Comment["userRole"],
     content: c.content as string,
     visibility: (c.visibility as CommentVisibility) ?? "GLOBAL",
+    isIncident: (c.isIncident as boolean) ?? false,
     createdAt: c.createdAt instanceof Date ? c.createdAt : new Date(c.createdAt as string),
     updatedAt: c.updatedAt
       ? c.updatedAt instanceof Date
