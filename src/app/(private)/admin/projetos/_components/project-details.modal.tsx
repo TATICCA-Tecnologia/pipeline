@@ -117,6 +117,13 @@ export function ProjectDetailsModal({
       }
     : cachedProject;
 
+  const operationalStatusChanged =
+    pendingOperationalStatus !== undefined &&
+    pendingOperationalStatus !== project.operationalStatus;
+  const accumulatedSavingChanged =
+    pendingAccumulatedSaving !== "" &&
+    parseFloat(pendingAccumulatedSaving) !== project.accumulatedSavingBRL;
+
   return (
     <div className="flex max-h-[85vh] flex-col overflow-hidden rounded-[8px] bg-white">
       <div className="flex items-center justify-between bg-primary px-5 py-5">
@@ -212,7 +219,10 @@ export function ProjectDetailsModal({
               <Button
                 size="sm"
                 className="h-8"
-                disabled={updateOperationalStatusMutation.isPending}
+                disabled={
+                  (!operationalStatusChanged && !accumulatedSavingChanged) ||
+                  updateOperationalStatusMutation.isPending
+                }
                 onClick={() =>
                   updateOperationalStatusMutation.mutate({
                     id: project.id,
