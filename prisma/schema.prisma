@@ -190,8 +190,8 @@ model Project {
   // Operacao pos-entrega (preenchido manualmente pelo admin, SEMPRE visivel ao cliente
   // — ao contrario dos campos tecnico/financeiro acima, que sao escondidos dele)
   operationalStatus          RobotOperationalStatus?
-  accumulatedSavingBRL        Float?
-  operationalStatusUpdatedAt  DateTime?
+  accumulatedSavingBRL       Float?
+  operationalStatusUpdatedAt DateTime?
 
   // Relacionamentos
   client       User             @relation("ProjectClient", fields: [clientId], references: [id])
