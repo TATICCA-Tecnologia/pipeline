@@ -187,6 +187,12 @@ model Project {
   implementationWave       Int? // 1 = onda 1 (priorizada), 2 = onda 2, null = não classificado ainda
   waveOrder                Int? // ordem de execução dentro da onda (menor = primeiro), null = ainda não sequenciado
 
+  // Operacao pos-entrega (preenchido manualmente pelo admin, SEMPRE visivel ao cliente
+  // — ao contrario dos campos tecnico/financeiro acima, que sao escondidos dele)
+  operationalStatus          RobotOperationalStatus?
+  accumulatedSavingBRL        Float?
+  operationalStatusUpdatedAt  DateTime?
+
   // Relacionamentos
   client       User             @relation("ProjectClient", fields: [clientId], references: [id])
   clientId     String
@@ -283,6 +289,12 @@ enum Priority {
   URGENT
 }
 
+enum RobotOperationalStatus {
+  ACTIVE
+  PAUSED
+  ISSUE
+}
+
 // ==========================================
 // FASES E TAREFAS DE ESPECIFICACAO
 // ==========================================
@@ -359,11 +371,12 @@ enum TaskStatus {
 // ==========================================
 
 model Comment {
-  id         String            @id @default(cuid())
-  content    String
-  visibility CommentVisibility @default(GLOBAL)
-  createdAt  DateTime          @default(now())
-  updatedAt  DateTime          @updatedAt
+  id          String            @id @default(cuid())
+  content     String
+  visibility  CommentVisibility @default(GLOBAL)
+  isIncident  Boolean           @default(false)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
 
   // Relacionamentos
   project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
