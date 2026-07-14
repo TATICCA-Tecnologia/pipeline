@@ -796,4 +796,77 @@ export const projectRouter = router({
 
       return ranked.sort((a, b) => b[sortKey] - a[sortKey]);
     }),
+
+  // Ranking de automações já existentes/entregues (hasCurrentApplication="sim"
+  // ou status DONE) — o inverso exato do filtro de getPrioritizedRanking.
+  // Reaproveita o motor de scoring de @/shared/lib/scoring, alimentado por
+  // accumulatedSavingBRL (economia acumulada real) em vez de
+  // estimatedAnnualSavingBRL — sem score de complexidade/combinado, que não
+  // faz sentido para algo que já foi entregue.
+  getExistingAutomationsRanking: adminProcedure
+    .input(
+      z.object({
+        companyId: z.string(),
+        sortBy: z.enum(["economia", "qualitativo"]),
+      })
+    )
+    .query(async ({ ctx, input }) => {
+      const [projects, settings] = await Promise.all([
+        ctx.db.project.findMany({
+          where: {
+            companyId: input.companyId,
+            OR: [{ hasCurrentApplication: "sim" }, { status: "DONE" }],
+          },
+          select: {
+            id: true,
+            title: true,
+            areaId: true,
+            area: { select: { name: true } },
+            ratingErrorReduction: true,
+            ratingProcessCriticality: true,
+            ratingInternalImpact: true,
+            ratingExternalImpact: true,
+            ratingCompliance: true,
+            accumulatedSavingBRL: true,
+            operationalStatus: true,
+          },
+        }),
+        ctx.db.systemSettings.findUnique({ where: { id: "default" } }),
+      ]);
+
+      const qualWeights: QualitativeWeights = settings
+        ? {
+            qualWeightErrorReduction: settings.qualWeightErrorReduction,
+            qualWeightProcessCriticality: settings.qualWeightProcessCriticality,
+            qualWeightInternalImpact: settings.qualWeightInternalImpact,
+            qualWeightExternalImpact: settings.qualWeightExternalImpact,
+            qualWeightCompliance: settings.qualWeightCompliance,
+          }
+        : DEFAULT_QUALITATIVE_WEIGHTS;
+
+      const maxSavingInSet = projects.reduce(
+        (max, p) => Math.max(max, p.accumulatedSavingBRL ?? 0),
+        0
+      );
+
+      const ranked = projects.map((p) => {
+        const qualitativeScorePercent = computeQualitativeScore(p, qualWeights);
+        const economiaScore = computeEconomiaScore(p.accumulatedSavingBRL, maxSavingInSet);
+
+        return {
+          id: p.id,
+          title: p.title,
+          areaName: p.area?.name ?? null,
+          qualitativeScorePercent,
+          accumulatedSavingBRL: p.accumulatedSavingBRL,
+          economiaScore,
+          operationalStatus: p.operationalStatus,
+        };
+      });
+
+      const sortKey =
+        input.sortBy === "economia" ? ("economiaScore" as const) : ("qualitativeScorePercent" as const);
+
+      return ranked.sort((a, b) => b[sortKey] - a[sortKey]);
+    }),
 });
