@@ -38,6 +38,9 @@ export default function EmpresasPage() {
 
   const [search, setSearch] = useState("");
   const [exportingId, setExportingId] = useState<string | null>(null);
+  const [exportingExistingAutomationsId, setExportingExistingAutomationsId] = useState<
+    string | null
+  >(null);
   const [dialog, setDialog] = useState<{ open: boolean; editingId?: string }>({
     open: false,
   });
@@ -137,6 +140,40 @@ export default function EmpresasPage() {
       });
     } finally {
       setExportingId(null);
+    }
+  }
+
+  async function handleExportExistingAutomationsDeck(company: (typeof companies)[number]) {
+    setExportingExistingAutomationsId(company.id);
+    try {
+      const response = await fetch(`/api/empresas/${company.id}/deck-automacoes-existentes`, {
+        headers: { "x-user-id": getTrpcUserId() },
+      });
+      if (!response.ok) {
+        const message = await response.text();
+        throw new Error(message || `Erro ${response.status}`);
+      }
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const safeName = slugifyFilename(company.name) || company.id;
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `automacoes-existentes-${safeName}.pptx`;
+      try {
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+      } finally {
+        URL.revokeObjectURL(url);
+      }
+    } catch (error) {
+      toast({
+        title: "Erro ao exportar automações existentes",
+        description: error instanceof Error ? error.message : "Erro desconhecido",
+        variant: "destructive",
+      });
+    } finally {
+      setExportingExistingAutomationsId(null);
     }
   }
 
@@ -253,6 +290,15 @@ export default function EmpresasPage() {
                           title="Exportar diagnóstico completo (.pptx)"
                           disabled={exportingId === company.id}
                           onClick={() => handleExportDeck(company)}
+                        >
+                          <Download className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          title="Exportar automações existentes (.pptx)"
+                          disabled={exportingExistingAutomationsId === company.id}
+                          onClick={() => handleExportExistingAutomationsDeck(company)}
                         >
                           <Download className="h-4 w-4" />
                         </Button>
