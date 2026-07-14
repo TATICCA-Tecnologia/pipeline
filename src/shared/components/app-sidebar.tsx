@@ -15,6 +15,7 @@ import {
   DropdownMenuTrigger,
 } from "@/src/shared/components/ui/dropdown-menu";
 import {
+  Bot,
   Building2,
   ChevronsUpDown,
   FolderKanban,
@@ -46,6 +47,7 @@ const clientSections: NavSection[] = [
     items: [
       { href: "/cliente/solicitar", label: "Solicitar Projeto", icon: PlusCircle },
       { href: "/cliente", label: "Meus Projetos", icon: FolderKanban },
+      { href: "/cliente/robos", label: "Meus Robôs", icon: Bot },
     ],
   },
   {
