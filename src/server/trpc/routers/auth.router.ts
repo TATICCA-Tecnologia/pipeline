@@ -17,7 +17,7 @@ export const authRouter = router({
       if (!user || !user.isActive) {
         throw new TRPCError({ code: "UNAUTHORIZED", message: "Email ou senha inválidos" });
       }
-      if (user.password && !compareSync(input.password, user.password)) {
+      if (!user.password || !compareSync(input.password, user.password)) {
         throw new TRPCError({ code: "UNAUTHORIZED", message: "Email ou senha inválidos" });
       }
       return {

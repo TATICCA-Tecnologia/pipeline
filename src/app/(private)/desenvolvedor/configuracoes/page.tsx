@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useAuth } from "@/shared/context/auth-context";
+import { trpc } from "@/shared/trpc/client";
 import { Button } from "@/src/shared/components/ui/button";
 import { Input } from "@/src/shared/components/ui/input";
 import { Badge } from "@/src/shared/components/ui/badge";
@@ -62,6 +63,8 @@ export default function DesenvolvedorConfiguracoesPage() {
 
   const [isLoading, setIsLoading] = useState(false);
 
+  const changePasswordMutation = trpc.user.changePassword.useMutation();
+
   function handleProfileChange(field: string, value: string) {
     setProfile((prev) => ({ ...prev, [field]: value }));
   }
@@ -103,13 +106,26 @@ export default function DesenvolvedorConfiguracoesPage() {
       return;
     }
     setIsLoading(true);
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-    setIsLoading(false);
-    setPasswords({ current: "", new: "", confirm: "" });
-    toast({
-      title: "Senha alterada",
-      description: "Sua senha foi alterada com sucesso.",
-    });
+    try {
+      await changePasswordMutation.mutateAsync({
+        currentPassword: passwords.current,
+        newPassword: passwords.new,
+      });
+      setPasswords({ current: "", new: "", confirm: "" });
+      toast({
+        title: "Senha alterada",
+        description: "Sua senha foi alterada com sucesso.",
+      });
+    } catch (error) {
+      toast({
+        title: "Erro ao alterar senha",
+        description:
+          error instanceof Error ? error.message : "Tente novamente.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   async function handleSavePreferences() {

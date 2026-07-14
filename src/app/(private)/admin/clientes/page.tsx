@@ -50,6 +50,7 @@ import {
   FolderKanban,
   ShieldCheck,
   KeyRound,
+  Copy,
 } from "lucide-react";
 import type { User } from "@/shared/types";
 import { ManageCompaniesDialog } from "./_components/manage-companies-dialog";
@@ -83,6 +84,11 @@ export default function ClientesPage() {
   const [clientToResetPassword, setClientToResetPassword] = useState<User | null>(null);
   const [clientForCompanies, setClientForCompanies] = useState<User | null>(null);
   const [newPassword, setNewPassword] = useState("");
+  const [generatedPassword, setGeneratedPassword] = useState<{
+    name: string;
+    email: string;
+    password: string;
+  } | null>(null);
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -151,13 +157,13 @@ export default function ClientesPage() {
     setIsDialogOpen(true);
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!formData.name || !formData.email) return;
 
     if (editingClient) {
       updateClient(editingClient.id, { name: formData.name, email: formData.email });
     } else {
-      addClient({
+      const created = await addClient({
         name: formData.name,
         email: formData.email,
         role: formData.role,
@@ -170,6 +176,13 @@ export default function ClientesPage() {
             ? formData.newCompanyName.trim() || undefined
             : undefined,
       });
+      if (created) {
+        setGeneratedPassword({
+          name: formData.name,
+          email: formData.email,
+          password: created.temporaryPassword,
+        });
+      }
     }
 
     setIsDialogOpen(false);
@@ -601,6 +614,48 @@ export default function ClientesPage() {
                 ? "Salvando..."
                 : "Redefinir Senha"}
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Generated Password Dialog */}
+      <Dialog
+        open={!!generatedPassword}
+        onOpenChange={(open) => !open && setGeneratedPassword(null)}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Usuário criado</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <p className="text-sm text-muted-foreground">
+              Repasse essa senha temporária para {generatedPassword?.name} (
+              {generatedPassword?.email}). Ela poderá trocá-la depois em
+              Configurações.
+            </p>
+            <div className="flex items-center gap-2">
+              <Input
+                readOnly
+                value={generatedPassword?.password ?? ""}
+                className="font-mono"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                onClick={() => {
+                  if (generatedPassword) {
+                    navigator.clipboard.writeText(generatedPassword.password);
+                    toast.success("Senha copiada.");
+                  }
+                }}
+              >
+                <Copy className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button onClick={() => setGeneratedPassword(null)}>Fechar</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

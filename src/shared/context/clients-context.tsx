@@ -27,7 +27,7 @@ export interface NewUserInput {
 interface ClientsContextType {
   clients: User[];
   isLoading: boolean;
-  addClient: (input: NewUserInput) => void;
+  addClient: (input: NewUserInput) => Promise<{ temporaryPassword: string } | undefined>;
   updateClient: (id: string, updates: Partial<User>) => void;
   deleteClient: (id: string) => void;
   getClientById: (id: string) => User | undefined;
@@ -80,8 +80,12 @@ export function ClientsProvider({ children }: { children: ReactNode }) {
     : [];
 
   const addClient = useCallback(
-    (input: NewUserInput) => {
-      createClientMutation.mutate(input);
+    async (input: NewUserInput) => {
+      try {
+        return await createClientMutation.mutateAsync(input);
+      } catch {
+        return undefined;
+      }
     },
     [createClientMutation]
   );

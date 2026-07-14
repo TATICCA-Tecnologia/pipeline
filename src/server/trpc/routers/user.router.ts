@@ -1,10 +1,23 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { hashSync } from "bcryptjs";
+import { hashSync, compareSync } from "bcryptjs";
+import { randomBytes } from "crypto";
 import { router, publicProcedure, protectedProcedure, adminProcedure } from "../trpc";
 import { toFrontendRole, toPrismaRole } from "../mappers";
 
 const PASSWORD_RESET_SALT_ROUNDS = 10;
+
+// Sem 0/O/1/l/I para o admin não confundir os caracteres ao repassar a senha.
+const TEMP_PASSWORD_CHARSET = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
+
+function generateTemporaryPassword(length = 10): string {
+  const bytes = randomBytes(length);
+  let password = "";
+  for (let i = 0; i < length; i++) {
+    password += TEMP_PASSWORD_CHARSET[bytes[i] % TEMP_PASSWORD_CHARSET.length];
+  }
+  return password;
+}
 
 export const userRouter = router({
   me: protectedProcedure.query(async ({ ctx }) => {
@@ -95,10 +108,12 @@ export const userRouter = router({
         companyId = company.id;
       }
 
+      const temporaryPassword = generateTemporaryPassword();
       const user = await ctx.db.user.create({
         data: {
           name: input.name,
           email: input.email,
+          password: hashSync(temporaryPassword, PASSWORD_RESET_SALT_ROUNDS),
           role: toPrismaRole(input.role),
           ...(companyId ? { companies: { connect: { id: companyId } } } : {}),
         },
@@ -111,6 +126,7 @@ export const userRouter = router({
         role: toFrontendRole(user.role),
         companies: user.companies.map((c) => ({ id: c.id, name: c.name })),
         createdAt: user.createdAt,
+        temporaryPassword,
       };
     }),
 
@@ -236,6 +252,26 @@ export const userRouter = router({
       await ctx.db.user.update({
         where: { id: input.userId },
         data: { password: hashedPassword },
+      });
+      return { success: true };
+    }),
+
+  changePassword: protectedProcedure
+    .input(
+      z.object({
+        currentPassword: z.string(),
+        newPassword: z.string().min(6, "Senha deve ter pelo menos 6 caracteres"),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const user = await ctx.db.user.findUnique({ where: { id: ctx.userId } });
+      if (!user) throw new TRPCError({ code: "NOT_FOUND", message: "Usuário não encontrado" });
+      if (!user.password || !compareSync(input.currentPassword, user.password)) {
+        throw new TRPCError({ code: "UNAUTHORIZED", message: "Senha atual incorreta" });
+      }
+      await ctx.db.user.update({
+        where: { id: ctx.userId },
+        data: { password: hashSync(input.newPassword, PASSWORD_RESET_SALT_ROUNDS) },
       });
       return { success: true };
     }),

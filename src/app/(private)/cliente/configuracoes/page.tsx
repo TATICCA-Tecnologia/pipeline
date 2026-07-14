@@ -32,6 +32,7 @@ export default function ClienteConfiguracoes() {
       utils.user.me.invalidate();
     },
   });
+  const changePasswordMutation = trpc.user.changePassword.useMutation();
 
   const [profileData, setProfileData] = useState({
     name: "",
@@ -114,17 +115,30 @@ export default function ClienteConfiguracoes() {
     }
 
     setIsLoading(true);
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-    toast({
-      title: "Senha alterada",
-      description: "Sua senha foi atualizada com sucesso.",
-    });
-    setPasswordData({
-      currentPassword: "",
-      newPassword: "",
-      confirmPassword: "",
-    });
-    setIsLoading(false);
+    try {
+      await changePasswordMutation.mutateAsync({
+        currentPassword: passwordData.currentPassword,
+        newPassword: passwordData.newPassword,
+      });
+      toast({
+        title: "Senha alterada",
+        description: "Sua senha foi atualizada com sucesso.",
+      });
+      setPasswordData({
+        currentPassword: "",
+        newPassword: "",
+        confirmPassword: "",
+      });
+    } catch (error) {
+      toast({
+        title: "Erro ao alterar senha",
+        description:
+          error instanceof Error ? error.message : "Tente novamente.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   async function handleSaveNotifications() {
