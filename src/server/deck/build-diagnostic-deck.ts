@@ -38,7 +38,7 @@ import { formatCurrency, formatDate } from "@/shared/utils";
 // pptxgenjs espera).
 const COLOR_PRIMARY = "1E293B"; // slate-800
 const COLOR_ACCENT = "2563EB"; // blue-600
-const COLOR_MUTED = "64748B"; // slate-500
+export const COLOR_MUTED = "64748B"; // slate-500
 const COLOR_HEADER_BG = "1E293B";
 const COLOR_HEADER_TEXT = "FFFFFF";
 const COLOR_TABLE_BORDER = "E2E8F0";
@@ -58,7 +58,7 @@ const LOGO_DATA_URI: string | null = (() => {
   }
 })();
 
-const TABLE_HEADER_OPTS = {
+export const TABLE_HEADER_OPTS = {
   bold: true,
   color: COLOR_HEADER_TEXT,
   fill: { color: COLOR_HEADER_BG },
@@ -66,10 +66,10 @@ const TABLE_HEADER_OPTS = {
 
 type Ranking = Awaited<ReturnType<ReturnType<typeof createCaller>["project"]["getPrioritizedRanking"]>>;
 type AreaSummary = Awaited<ReturnType<ReturnType<typeof createCaller>["project"]["getAreaSummary"]>>;
-type Interviews = Awaited<ReturnType<ReturnType<typeof createCaller>["interview"]["list"]>>;
+export type Interviews = Awaited<ReturnType<ReturnType<typeof createCaller>["interview"]["list"]>>;
 
-type Slide = ReturnType<PptxGenJS["addSlide"]>;
-type TableRow = Parameters<Slide["addTable"]>[0][number];
+export type Slide = ReturnType<PptxGenJS["addSlide"]>;
+export type TableRow = Parameters<Slide["addTable"]>[0][number];
 
 const INTERVIEW_STATUS_LABEL: Record<string, string> = {
   realizado: "Realizado",
@@ -235,7 +235,7 @@ export async function buildDiagnosticDeck(companyId: string, actingUserId: strin
 // Slides
 // ---------------------------------------------------------------------------
 
-function addCoverSlide(pres: PptxGenJS, companyName: string): void {
+export function addCoverSlide(pres: PptxGenJS, companyName: string): void {
   const slide = pres.addSlide();
   if (LOGO_DATA_URI) {
     const width = 2.8;
@@ -573,7 +573,7 @@ function addPaybackCompositionSlide(
   addSlideTable(slide, [header, ...rows], [4.1, 1.1, 1.5, 1.1, 1.6, 1.5, 1.4]);
 }
 
-function addInterviewsSlide(pres: PptxGenJS, interviews: Interviews): void {
+export function addInterviewsSlide(pres: PptxGenJS, interviews: Interviews): void {
   const slide = addTitledSlide(pres, "Entrevistas");
 
   const header: TableRow = [
@@ -618,7 +618,7 @@ function benefitKeysOf(benefits: unknown): string[] {
   return benefits.filter((b): b is string => typeof b === "string");
 }
 
-type QuantitativeLine = { label: string; value: string; isGap?: boolean; isSaving?: boolean };
+export type QuantitativeLine = { label: string; value: string; isGap?: boolean; isSaving?: boolean };
 
 // Monta as linhas da tabela quantitativa com a MESMA regra do componente React:
 // linhas com valor null/vazio são puladas (buildLabeledLines), EXCETO
@@ -709,7 +709,11 @@ function addSectionLabel(slide: Slide, text: string, x: number, y: number, w: nu
   });
 }
 
-function addProjectSlide(pres: PptxGenJS, project: ProjectDeckRow): void {
+export function addProjectSlide(
+  pres: PptxGenJS,
+  project: ProjectDeckRow,
+  extraQuantitativeLines: QuantitativeLine[] = []
+): void {
   const slide = addTitledSlide(pres, project.title);
 
   // ----- Coluna esquerda: textos (só campos já preenchidos) -----
@@ -786,7 +790,7 @@ function addProjectSlide(pres: PptxGenJS, project: ProjectDeckRow): void {
   const rightX = 7.0;
   const rightW = 5.8;
 
-  const quantitativeLines = buildQuantitativeLines(project);
+  const quantitativeLines = [...buildQuantitativeLines(project), ...extraQuantitativeLines];
   addSectionLabel(slide, "Avaliação Quantitativa", rightX, 1.1, rightW);
 
   if (quantitativeLines.length > 0) {
@@ -882,7 +886,7 @@ function addProjectSlide(pres: PptxGenJS, project: ProjectDeckRow): void {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function addTitledSlide(pres: PptxGenJS, title: string): Slide {
+export function addTitledSlide(pres: PptxGenJS, title: string): Slide {
   const slide = pres.addSlide();
   slide.addText(title, {
     x: 0.5,
@@ -896,7 +900,7 @@ function addTitledSlide(pres: PptxGenJS, title: string): Slide {
   return slide;
 }
 
-function addSlideTable(slide: Slide, rows: TableRow[], colW: number[]): void {
+export function addSlideTable(slide: Slide, rows: TableRow[], colW: number[]): void {
   slide.addTable(rows, {
     x: 0.5,
     y: 1.1,
