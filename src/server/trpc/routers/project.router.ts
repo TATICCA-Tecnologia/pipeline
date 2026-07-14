@@ -12,6 +12,7 @@ import {
   type QualitativeWeights,
   type CombinedScoreWeights,
 } from "@/shared/lib/scoring";
+import { computeAnnualSavingBRL } from "@/shared/lib/savings";
 
 // Fallback dos pesos default do SystemSettings (schema.prisma), usado apenas se
 // a linha "default" ainda não existir por algum motivo (nunca deveria acontecer
@@ -367,6 +368,14 @@ export const projectRouter = router({
         }
       }
 
+      // Taxa horária padrão para calcular a economia anual estimada já na
+      // criação (nenhum campo de taxa/economia existe no formulário de
+      // criação — o projeto ainda não passou pelo arquiteto).
+      const settingsForCreate = await ctx.db.systemSettings.findUnique({
+        where: { id: "default" },
+      });
+      const defaultHourlyRateBRLForCreate = settingsForCreate?.defaultHourlyRateBRL ?? 90;
+
       const project = await ctx.db.project.create({
         data: {
           title: input.title,
@@ -406,6 +415,10 @@ export const projectRouter = router({
           currentAnnualHours: computeCurrentAnnualHours(
             input.taskDurationHours,
             input.processFrequency
+          ),
+          estimatedAnnualSavingBRL: computeAnnualSavingBRL(
+            input.monthlyHoursSaved ?? null,
+            defaultHourlyRateBRLForCreate
           ),
           features:
             input.features && input.features.length
