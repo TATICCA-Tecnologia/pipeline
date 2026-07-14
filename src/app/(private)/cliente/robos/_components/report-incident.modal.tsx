@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { toast } from "sonner";
 import type { ModalProps } from "@/shared/types/modal";
 import { Button } from "@/src/shared/components/ui/button";
 import { Textarea } from "@/src/shared/components/ui/textarea";
@@ -25,20 +26,24 @@ export function ReportIncidentModal({
   if (!data) return null;
   const { projectId, projectTitle } = data;
 
-  function handleSubmit() {
+  async function handleSubmit() {
     if (!content.trim() || !user) return;
     setSubmitting(true);
-    addComment({
-      projectId,
-      userId: user.id,
-      userName: user.name,
-      userRole: user.role,
-      content: content.trim(),
-      visibility: "GLOBAL",
-      isIncident: true,
-    });
-    setSubmitting(false);
-    onClose();
+    try {
+      await addComment({
+        projectId,
+        userId: user.id,
+        userName: user.name,
+        userRole: user.role,
+        content: content.trim(),
+        visibility: "GLOBAL",
+        isIncident: true,
+      });
+      toast.success("Problema reportado com sucesso");
+      onClose();
+    } catch {
+      setSubmitting(false);
+    }
   }
 
   return (

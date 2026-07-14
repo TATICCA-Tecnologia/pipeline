@@ -17,7 +17,7 @@ interface CommentsContextType {
       visibility?: CommentVisibility;
       isIncident?: boolean;
     }
-  ) => void;
+  ) => Promise<void>;
   updateComment: (id: string, content: string) => void;
   deleteComment: (id: string) => void;
 }
@@ -53,13 +53,13 @@ export function CommentsProvider({ children }: { children: ReactNode }) {
     []
   );
   const addComment = useCallback(
-    (
+    async (
       comment: Omit<Comment, "id" | "createdAt"> & {
         visibility?: CommentVisibility;
         isIncident?: boolean;
       }
     ) => {
-      createComment.mutate({
+      await createComment.mutateAsync({
         projectId: comment.projectId,
         content: comment.content,
         visibility: comment.visibility ?? "GLOBAL",
