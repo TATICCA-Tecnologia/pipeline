@@ -869,4 +869,44 @@ export const projectRouter = router({
 
       return ranked.sort((a, b) => b[sortKey] - a[sortKey]);
     }),
+
+  // Resumo por área das automações já existentes/entregues — mesmo padrão de
+  // getAreaSummary, com o filtro invertido e somando accumulatedSavingBRL
+  // (economia acumulada real) em vez de estimatedAnnualSavingBRL/currentAnnualHours.
+  getExistingAutomationsAreaSummary: adminProcedure
+    .input(z.object({ companyId: z.string().optional() }))
+    .query(async ({ ctx, input }) => {
+      const grouped = await ctx.db.project.groupBy({
+        by: ["areaId"],
+        _count: true,
+        _sum: { accumulatedSavingBRL: true },
+        where: {
+          areaId: { not: null },
+          OR: [{ hasCurrentApplication: "sim" }, { status: "DONE" }],
+          ...(input.companyId ? { companyId: input.companyId } : {}),
+        },
+      });
+
+      const areaIds = grouped
+        .map((g) => g.areaId)
+        .filter((id): id is string => id != null);
+
+      const areas = await ctx.db.projectArea.findMany({
+        where: { id: { in: areaIds } },
+      });
+      const areaById = new Map(areas.map((a) => [a.id, a]));
+
+      return grouped
+        .filter((g) => g.areaId != null && areaById.has(g.areaId))
+        .map((g) => {
+          const area = areaById.get(g.areaId as string)!;
+          return {
+            areaId: area.id,
+            areaName: area.name,
+            projectCount: g._count,
+            totalAccumulatedSavingBRL: g._sum.accumulatedSavingBRL ?? 0,
+          };
+        })
+        .sort((a, b) => b.projectCount - a.projectCount);
+    }),
 });
