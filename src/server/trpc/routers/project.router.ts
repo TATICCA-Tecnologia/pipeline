@@ -567,8 +567,23 @@ export const projectRouter = router({
       if (rest.complexity !== undefined) data.complexity = rest.complexity;
       if (rest.robotSchedule !== undefined) data.robotSchedule = rest.robotSchedule;
       if (rest.hourlyRateBRL !== undefined) data.hourlyRateBRL = rest.hourlyRateBRL;
-      if (rest.estimatedAnnualSavingBRL !== undefined)
+      if (rest.estimatedAnnualSavingBRL !== undefined) {
         data.estimatedAnnualSavingBRL = rest.estimatedAnnualSavingBRL;
+      } else if (rest.monthlyHoursSaved !== undefined || rest.hourlyRateBRL !== undefined) {
+        // Recalcula automaticamente sempre que horas ou taxa mudam sem um
+        // valor manual explícito nesta mesma chamada — mesmo padrão de
+        // currentAnnualHours (sempre derivado) alguns blocos abaixo, mas
+        // aqui o campo final continua editável manualmente quando o
+        // arquiteto manda um valor (ramo acima, `handleSaveArchitecture`
+        // sempre envia um).
+        const nextMonthlyHoursSaved =
+          rest.monthlyHoursSaved !== undefined ? rest.monthlyHoursSaved : current.monthlyHoursSaved;
+        const nextHourlyRateBRL =
+          rest.hourlyRateBRL !== undefined ? rest.hourlyRateBRL : current.hourlyRateBRL;
+        const settings = await ctx.db.systemSettings.findUnique({ where: { id: "default" } });
+        const effectiveRate = nextHourlyRateBRL ?? settings?.defaultHourlyRateBRL ?? 90;
+        data.estimatedAnnualSavingBRL = computeAnnualSavingBRL(nextMonthlyHoursSaved, effectiveRate);
+      }
       if (rest.implementationEffortDays !== undefined)
         data.implementationEffortDays = rest.implementationEffortDays;
       if (rest.implementationWave !== undefined) data.implementationWave = rest.implementationWave;
