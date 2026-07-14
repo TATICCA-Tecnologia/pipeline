@@ -35,6 +35,7 @@ export const commentRouter = router({
         userRole: c.user.role.toLowerCase() as "client" | "developer" | "admin",
         content: c.content,
         visibility: c.visibility,
+        isIncident: c.isIncident,
         createdAt: c.createdAt,
         updatedAt: c.updatedAt,
       }));
@@ -46,6 +47,7 @@ export const commentRouter = router({
         projectId: z.string(),
         content: z.string().min(1),
         visibility: z.enum(["GLOBAL", "INTERNAL"]).default("GLOBAL"),
+        isIncident: z.boolean().optional().default(false),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -55,6 +57,7 @@ export const commentRouter = router({
           userId: ctx.userId,
           content: input.content,
           visibility: input.visibility,
+          isIncident: input.isIncident,
         },
         include: { user: { select: { name: true, role: true } } },
       });
@@ -66,6 +69,7 @@ export const commentRouter = router({
         userRole: comment.user.role.toLowerCase(),
         content: comment.content,
         visibility: comment.visibility,
+        isIncident: comment.isIncident,
         createdAt: comment.createdAt,
         updatedAt: comment.updatedAt,
       };
@@ -87,6 +91,7 @@ export const commentRouter = router({
         userRole: comment.user.role.toLowerCase(),
         content: comment.content,
         visibility: comment.visibility,
+        isIncident: comment.isIncident,
         createdAt: comment.createdAt,
         updatedAt: comment.updatedAt,
       };
