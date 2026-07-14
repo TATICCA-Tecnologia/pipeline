@@ -160,6 +160,14 @@ export function ProjectChat({ projectId }: ProjectChatProps) {
               >
                 {getRoleLabel(comment.userRole)}
               </Badge>
+              {comment.isIncident && (
+                <Badge
+                  variant="outline"
+                  className="text-[10px] px-1 py-0 h-4 border border-destructive/40 bg-destructive/10 text-destructive"
+                >
+                  ⚠️ Incidente
+                </Badge>
+              )}
               <span className="text-xs text-muted-foreground">
                 {formatTime(comment.createdAt)}
                 {comment.updatedAt && " (editado)"}
