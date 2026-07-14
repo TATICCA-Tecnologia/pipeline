@@ -669,6 +669,8 @@ export const projectRouter = router({
         _sum: { estimatedAnnualSavingBRL: true, currentAnnualHours: true },
         where: {
           areaId: { not: null },
+          hasCurrentApplication: { not: "sim" },
+          status: { notIn: ["DONE", "CANCELLED"] },
           ...(input.companyId ? { companyId: input.companyId } : {}),
         },
       });
