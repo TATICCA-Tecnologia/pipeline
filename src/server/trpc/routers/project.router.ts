@@ -60,6 +60,8 @@ const ARCHITECT_ONLY_FIELDS = new Set([
   "implementationEffortDays",
   "implementationWave",
   "waveOrder",
+  "operationalStatus",
+  "accumulatedSavingBRL",
 ]);
 
 // Rótulos em pt-BR dos campos "de solicitação" editáveis por cliente-dono e
@@ -91,6 +93,8 @@ const SOLICITATION_FIELD_LABELS: Record<string, string> = {
   peopleInvolvedDetails: "Detalhes dos colaboradores",
   taskDurationHours: "Duração por execução",
   processFrequency: "Periodicidade",
+  operationalStatus: "Status operacional",
+  accumulatedSavingBRL: "Economia acumulada",
 };
 
 // Compara os valores enviados (rest) contra o estado atual do projeto (current,
@@ -481,6 +485,8 @@ export const projectRouter = router({
         ratingInternalImpact: z.number().int().min(1).max(5).nullable().optional(),
         ratingExternalImpact: z.number().int().min(1).max(5).nullable().optional(),
         ratingCompliance: z.number().int().min(1).max(5).nullable().optional(),
+        operationalStatus: z.enum(["ACTIVE", "PAUSED", "ISSUE"]).nullable().optional(),
+        accumulatedSavingBRL: z.number().min(0).nullable().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -583,6 +589,12 @@ export const projectRouter = router({
         data.taskDurationHours = nextDuration;
         data.processFrequency = nextFrequency;
         data.currentAnnualHours = computeCurrentAnnualHours(nextDuration, nextFrequency);
+      }
+      if (rest.operationalStatus !== undefined || rest.accumulatedSavingBRL !== undefined) {
+        if (rest.operationalStatus !== undefined) data.operationalStatus = rest.operationalStatus;
+        if (rest.accumulatedSavingBRL !== undefined)
+          data.accumulatedSavingBRL = rest.accumulatedSavingBRL;
+        data.operationalStatusUpdatedAt = new Date();
       }
 
       const changedFieldLabels = describeChangedFields(
