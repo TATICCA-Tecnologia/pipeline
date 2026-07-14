@@ -24,7 +24,7 @@ import {
   TableRow,
 } from "@/src/shared/components/ui/table";
 import { useToast } from "@/src/shared/hooks/use-toast";
-import { Building2, Plus, Search, Pencil, ListOrdered, Users, Download } from "lucide-react";
+import { Bot, Building2, Plus, Search, Pencil, ListOrdered, Users, Download } from "lucide-react";
 import Link from "next/link";
 import { getTrpcUserId } from "@/shared/trpc/auth-header";
 import { slugifyFilename } from "@/shared/utils";
@@ -235,6 +235,11 @@ export default function EmpresasPage() {
                         <Link href={`/admin/empresas/${company.id}/priorizacao`}>
                           <Button size="icon" variant="ghost" title="Priorização">
                             <ListOrdered className="h-4 w-4" />
+                          </Button>
+                        </Link>
+                        <Link href={`/admin/empresas/${company.id}/automacoes-existentes`}>
+                          <Button size="icon" variant="ghost" title="Automações Existentes">
+                            <Bot className="h-4 w-4" />
                           </Button>
                         </Link>
                         <Link href={`/admin/empresas/${company.id}/entrevistas`}>
