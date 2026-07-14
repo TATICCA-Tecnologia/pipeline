@@ -32,27 +32,6 @@ type ExistingAutomationsAreaSummary = Awaited<
   ReturnType<ReturnType<typeof createCaller>["project"]["getExistingAutomationsAreaSummary"]>
 >;
 
-type ExistingAutomationDeckRow = {
-  id: string;
-  title: string;
-  description: string | null;
-  architectNotes: string | null;
-  benefits: unknown;
-  processFrequency: string | null;
-  robotSchedule: string | null;
-  peopleInvolved: number | null;
-  taskDurationHours: number | null;
-  currentAnnualHours: number | null;
-  monthlyHoursSaved: number | null;
-  ratingErrorReduction: number | null;
-  ratingProcessCriticality: number | null;
-  ratingInternalImpact: number | null;
-  ratingExternalImpact: number | null;
-  ratingCompliance: number | null;
-  accumulatedSavingBRL: number | null;
-  operationalStatus: RobotOperationalStatus | null;
-};
-
 const ROBOT_OPERATIONAL_STATUS_LABEL: Record<RobotOperationalStatus, string> = {
   ACTIVE: "Ativo",
   PAUSED: "Pausado",
