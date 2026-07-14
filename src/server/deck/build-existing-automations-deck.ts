@@ -1,4 +1,5 @@
 import PptxGenJS from "pptxgenjs";
+import type { RobotOperationalStatus } from "@prisma/client";
 import { db } from "@/server/db";
 import { createCaller } from "@/server/trpc/root";
 import type { Context } from "@/server/trpc/context";
@@ -49,10 +50,10 @@ type ExistingAutomationDeckRow = {
   ratingExternalImpact: number | null;
   ratingCompliance: number | null;
   accumulatedSavingBRL: number | null;
-  operationalStatus: "ACTIVE" | "PAUSED" | "ISSUE" | null;
+  operationalStatus: RobotOperationalStatus | null;
 };
 
-const ROBOT_OPERATIONAL_STATUS_LABEL: Record<"ACTIVE" | "PAUSED" | "ISSUE", string> = {
+const ROBOT_OPERATIONAL_STATUS_LABEL: Record<RobotOperationalStatus, string> = {
   ACTIVE: "Ativo",
   PAUSED: "Pausado",
   ISSUE: "Com problema",
@@ -121,7 +122,7 @@ export async function buildExistingAutomationsDeck(
   if (interviews.length > 0) {
     addInterviewsSlide(pres, interviews);
   }
-  for (const project of projects as ExistingAutomationDeckRow[]) {
+  for (const project of projects) {
     const extraLines: QuantitativeLine[] = [
       {
         label: "Status operacional",
