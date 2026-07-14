@@ -57,7 +57,7 @@ export function ProjectChat({ projectId }: ProjectChatProps) {
       userRole: user.role,
       content: newMessage.trim(),
       visibility,
-    });
+    }).catch(() => {});
     setNewMessage("");
   }
 
