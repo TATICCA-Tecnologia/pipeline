@@ -711,7 +711,11 @@ export const projectRouter = router({
     .query(async ({ ctx, input }) => {
       const [projects, settings] = await Promise.all([
         ctx.db.project.findMany({
-          where: { companyId: input.companyId },
+          where: {
+            companyId: input.companyId,
+            hasCurrentApplication: { not: "sim" },
+            status: { notIn: ["DONE", "CANCELLED"] },
+          },
           select: {
             id: true,
             title: true,
