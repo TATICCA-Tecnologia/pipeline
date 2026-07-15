@@ -159,10 +159,15 @@ export const companyRouter = router({
       });
       const now = new Date();
       const totalMonthlyRecurring = items
-        .filter((i) => i.type === "recorrente" && (i.endDate == null || i.endDate >= now))
+        .filter(
+          (i) =>
+            i.type === "recorrente" &&
+            i.startDate <= now &&
+            (i.endDate == null || i.endDate >= now)
+        )
         .reduce((sum, i) => sum + i.amountBRL, 0);
       const totalOneTime = items
-        .filter((i) => i.type === "pontual")
+        .filter((i) => i.type === "pontual" && i.startDate <= now)
         .reduce((sum, i) => sum + i.amountBRL, 0);
       return { totalMonthlyRecurring, totalOneTime };
     }),
