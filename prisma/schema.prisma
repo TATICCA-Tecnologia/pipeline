@@ -172,7 +172,6 @@ model Project {
 
   // Arquitetura tecnica (preenchido pelo arquiteto)
   solutionTypes      Json?   // array de chaves: rpa, api, ia-ocr, power-platform, python, integracao, dashboard, outro
-  mainTool           String? // python, rocketbot, automation-anywhere, power-automate, power-apps, outro
   executionStrategy  String? // agendada, manual, trigger-email, trigger-api, tempo-real
   architectNotes     String?
 
@@ -204,6 +203,8 @@ model Project {
   areaId       String?
   theme        ProjectTheme?    @relation(fields: [themeId], references: [id], onDelete: SetNull)
   themeId      String?
+  mainTool     MainTool?        @relation(fields: [mainToolId], references: [id], onDelete: SetNull)
+  mainToolId   String?
   features     ProjectFeature[]
   phases       ProjectPhase[]
   tasks        Task[]
@@ -495,6 +496,23 @@ model ProjectTheme {
 
   @@unique([slug, areaId])
   @@map("project_themes")
+}
+
+// ==========================================
+// TAXONOMIA CONFIGURAVEL (FERRAMENTA PRINCIPAL)
+// ==========================================
+
+model MainTool {
+  id        String    @id @default(cuid())
+  name      String
+  slug      String    @unique
+  isActive  Boolean   @default(true)
+  order     Int       @default(0)
+  projects  Project[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@map("main_tools")
 }
 
 // ==========================================
