@@ -47,7 +47,12 @@ import { ArrowLeft, ListOrdered } from "lucide-react";
 import { formatCurrency, formatCompactBRL } from "@/shared/utils";
 import { COMPLEXITY_LEVELS } from "@/shared/constants/project-taxonomy";
 import { computeWaveSchedule } from "@/shared/lib/wave-schedule";
-import { computePaybackCurve, findPaybackDate } from "@/shared/lib/payback";
+import {
+  computePaybackCurve,
+  computeStructureCostAt,
+  findPaybackDate,
+  type StructureCostItem,
+} from "@/shared/lib/payback";
 import { WaveTimeline } from "@/src/shared/components/wave-timeline";
 import { PaybackChart } from "@/src/shared/components/payback-chart";
 import { AreaSummaryChart } from "@/src/shared/components/area-summary-chart";
@@ -280,9 +285,22 @@ export default function PriorizacaoPage({ params }: Props) {
 
   const developerDailyRateBRL = settings?.developerDailyRateBRL ?? 0;
 
+  const { data: costItems = [] } = trpc.company.listCostItems.useQuery({ companyId });
+
+  const structureCosts: StructureCostItem[] = useMemo(
+    () =>
+      costItems.map((item) => ({
+        type: item.type as "recorrente" | "pontual",
+        amountBRL: item.amountBRL,
+        startDate: item.startDate,
+        endDate: item.endDate,
+      })),
+    [costItems]
+  );
+
   const paybackCurve = useMemo(
-    () => computePaybackCurve(paybackSchedule, developerDailyRateBRL),
-    [paybackSchedule, developerDailyRateBRL]
+    () => computePaybackCurve(paybackSchedule, developerDailyRateBRL, structureCosts),
+    [paybackSchedule, developerDailyRateBRL, structureCosts]
   );
 
   const paybackDate = useMemo(() => findPaybackDate(paybackCurve), [paybackCurve]);
@@ -326,6 +344,14 @@ export default function PriorizacaoPage({ params }: Props) {
     const days = differenceInCalendarDays(paybackDate, scheduleStartDate);
     return Math.max(0, Math.round(days / 30.44));
   }, [paybackDate, scheduleStartDate]);
+
+  // Total de custo de estrutura já acumulado até hoje (fora da curva
+  // projetada) — mostrado como uma linha própria na tabela de composição,
+  // separado do custo de dev por robô que já é mostrado linha a linha.
+  const structureCostToDate = useMemo(
+    () => computeStructureCostAt(structureCosts, new Date()),
+    [structureCosts]
+  );
 
   function handleWaveChange(row: RankingRow, value: string) {
     if (value === WAVE_NONE) {
@@ -746,6 +772,16 @@ export default function PriorizacaoPage({ params }: Props) {
                         </TableCell>
                       </TableRow>
                     ))
+                  )}
+                  {structureCostToDate > 0 && (
+                    <TableRow className="bg-muted/30">
+                      <TableCell className="font-medium" colSpan={4}>
+                        Estrutura (pessoas/licenças) acumulada até hoje
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums font-medium" colSpan={3}>
+                        {formatCurrency(structureCostToDate)}
+                      </TableCell>
+                    </TableRow>
                   )}
                 </TableBody>
               </Table>
