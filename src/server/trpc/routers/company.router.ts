@@ -96,4 +96,74 @@ export const companyRouter = router({
       });
       return { id: company.id, name: company.name };
     }),
+
+  // ==========================================
+  // CUSTOS E ESTRUTURA (Pessoas, Licenças, etc.)
+  // ==========================================
+
+  listCostItems: adminProcedure
+    .input(z.object({ companyId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      return ctx.db.companyCostItem.findMany({
+        where: { companyId: input.companyId },
+        include: { category: true },
+        orderBy: { startDate: "desc" },
+      });
+    }),
+
+  createCostItem: adminProcedure
+    .input(
+      z.object({
+        companyId: z.string(),
+        categoryId: z.string(),
+        name: z.string().min(1),
+        type: z.enum(["recorrente", "pontual"]),
+        amountBRL: z.number().min(0),
+        startDate: z.date(),
+        endDate: z.date().nullable().optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      return ctx.db.companyCostItem.create({ data: input, include: { category: true } });
+    }),
+
+  updateCostItem: adminProcedure
+    .input(
+      z.object({
+        id: z.string(),
+        categoryId: z.string().optional(),
+        name: z.string().min(1).optional(),
+        type: z.enum(["recorrente", "pontual"]).optional(),
+        amountBRL: z.number().min(0).optional(),
+        startDate: z.date().optional(),
+        endDate: z.date().nullable().optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const { id, ...data } = input;
+      return ctx.db.companyCostItem.update({ where: { id }, data, include: { category: true } });
+    }),
+
+  deleteCostItem: adminProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      await ctx.db.companyCostItem.delete({ where: { id: input.id } });
+      return { success: true };
+    }),
+
+  getCostSummary: adminProcedure
+    .input(z.object({ companyId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const items = await ctx.db.companyCostItem.findMany({
+        where: { companyId: input.companyId },
+      });
+      const now = new Date();
+      const totalMonthlyRecurring = items
+        .filter((i) => i.type === "recorrente" && (i.endDate == null || i.endDate >= now))
+        .reduce((sum, i) => sum + i.amountBRL, 0);
+      const totalOneTime = items
+        .filter((i) => i.type === "pontual")
+        .reduce((sum, i) => sum + i.amountBRL, 0);
+      return { totalMonthlyRecurring, totalOneTime };
+    }),
 });
