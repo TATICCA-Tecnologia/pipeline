@@ -264,6 +264,13 @@ Substitua por:
   deleteCostCategory: adminProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
+      const itemCount = await ctx.db.companyCostItem.count({ where: { categoryId: input.id } });
+      if (itemCount > 0) {
+        throw new TRPCError({
+          code: "CONFLICT",
+          message: "Não é possível excluir uma categoria com itens de custo vinculados. Mova ou exclua os itens primeiro.",
+        });
+      }
       await ctx.db.companyCostCategory.delete({ where: { id: input.id } });
       return { success: true };
     }),
@@ -284,7 +291,7 @@ git commit -m "feat: add CompanyCostCategory CRUD procedures to taxonomy router"
 
 ## Context
 
-Task 2 de 10. Depende da Task 1 (precisa de `ctx.db.companyCostCategory` já existir no Prisma Client gerado). `z`, `publicProcedure`, `protectedProcedure`, `adminProcedure`, `TRPCError` já estão importados no topo do arquivo — nenhum import novo necessário. Copia exata do padrão já usado pra `MainTool` neste mesmo arquivo (mesmos códigos de erro, mesma validação de slug).
+Task 2 de 10. Depende da Task 1 (precisa de `ctx.db.companyCostCategory` já existir no Prisma Client gerado). `z`, `publicProcedure`, `protectedProcedure`, `adminProcedure`, `TRPCError` já estão importados no topo do arquivo — nenhum import novo necessário. Copia o padrão já usado pra `MainTool` neste mesmo arquivo (mesmos códigos de erro, mesma validação de slug), com UMA diferença deliberada: `deleteCostCategory` faz uma checagem prévia (`ctx.db.companyCostItem.count(...)`) antes de excluir, em vez de só chamar `.delete()` direto como `deleteMainTool`/`deleteArea`/`deleteTheme` fazem — porque `CompanyCostItem.categoryId` é uma FK obrigatória com `onDelete: Restrict` (Task 1), então excluir uma categoria em uso sem essa checagem estouraria um erro cru do Postgres (P2003) em vez de uma mensagem amigável. Não remova essa checagem pra "simplificar" e copiar os outros `delete*` ao pé da letra — ela é necessária aqui e não nos outros.
 
 ---
 
