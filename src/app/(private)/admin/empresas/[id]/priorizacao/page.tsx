@@ -50,6 +50,8 @@ import { computeWaveSchedule } from "@/shared/lib/wave-schedule";
 import { computePaybackCurve, findPaybackDate } from "@/shared/lib/payback";
 import { WaveTimeline } from "@/src/shared/components/wave-timeline";
 import { PaybackChart } from "@/src/shared/components/payback-chart";
+import { AreaSummaryChart } from "@/src/shared/components/area-summary-chart";
+import { ExistingAutomationsAreaSummaryChart } from "@/src/shared/components/existing-automations-area-summary-chart";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -158,6 +160,8 @@ export default function PriorizacaoPage({ params }: Props) {
     companyId,
     sortBy,
   });
+
+  const { data: areaSummaryGaps } = trpc.project.getAreaSummaryGaps.useQuery({ companyId });
 
   // Cronograma reaproveita os dados já buscados pelo ranking acima (que já
   // traz implementationWave/waveOrder/implementationEffortDays) — nenhuma
@@ -378,6 +382,7 @@ export default function PriorizacaoPage({ params }: Props) {
           <TabsTrigger value="ranking">Ranking</TabsTrigger>
           <TabsTrigger value="cronograma">Cronograma</TabsTrigger>
           <TabsTrigger value="payback">Payback</TabsTrigger>
+          <TabsTrigger value="resumo-area">Resumo por Área</TabsTrigger>
         </TabsList>
 
         <TabsContent value="ranking" className="space-y-6 mt-4">
@@ -746,6 +751,22 @@ export default function PriorizacaoPage({ params }: Props) {
               </Table>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="resumo-area" className="space-y-6 mt-4">
+          <AreaSummaryChart companyId={companyId} />
+          <ExistingAutomationsAreaSummaryChart companyId={companyId} />
+          {areaSummaryGaps &&
+            (areaSummaryGaps.pipelineWithoutArea > 0 || areaSummaryGaps.deliveredWithoutArea > 0) && (
+              <p className="text-xs text-muted-foreground">
+                {areaSummaryGaps.pipelineWithoutArea > 0 &&
+                  `${areaSummaryGaps.pipelineWithoutArea} projeto${areaSummaryGaps.pipelineWithoutArea !== 1 ? "s" : ""} em andamento`}
+                {areaSummaryGaps.pipelineWithoutArea > 0 && areaSummaryGaps.deliveredWithoutArea > 0 && " e "}
+                {areaSummaryGaps.deliveredWithoutArea > 0 &&
+                  `${areaSummaryGaps.deliveredWithoutArea} automaç${areaSummaryGaps.deliveredWithoutArea !== 1 ? "ões" : "ão"} entregue${areaSummaryGaps.deliveredWithoutArea !== 1 ? "s" : ""}`}
+                {" "}desta empresa não {areaSummaryGaps.pipelineWithoutArea + areaSummaryGaps.deliveredWithoutArea !== 1 ? "têm" : "tem"} área definida e não {areaSummaryGaps.pipelineWithoutArea + areaSummaryGaps.deliveredWithoutArea !== 1 ? "aparecem" : "aparece"} nos resumos acima.
+              </p>
+            )}
         </TabsContent>
       </Tabs>
     </div>
