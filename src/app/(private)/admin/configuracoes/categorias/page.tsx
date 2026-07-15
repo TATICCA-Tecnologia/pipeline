@@ -684,6 +684,9 @@ export default function CategoriasPage() {
                 </SelectContent>
               </Select>
             </div>
+            {areaMergeTargetId && !areaMergePreview && (
+              <p className="text-sm text-muted-foreground">Calculando impacto...</p>
+            )}
             {areaMergeTargetId && areaMergePreview && (
               areaMergePreview.collisions.length > 0 ? (
                 <p className="text-sm text-destructive">
@@ -754,6 +757,9 @@ export default function CategoriasPage() {
                 </SelectContent>
               </Select>
             </div>
+            {themeMergeTargetId && !themeMergePreview && (
+              <p className="text-sm text-muted-foreground">Calculando impacto...</p>
+            )}
             {themeMergeTargetId && themeMergePreview && (
               <p className="text-sm text-muted-foreground">
                 Isso vai mover <strong>{themeMergePreview.projectCount} projeto{themeMergePreview.projectCount !== 1 ? "s" : ""}</strong>
@@ -763,7 +769,7 @@ export default function CategoriasPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setThemeMergeDialog({ open: false })}>Cancelar</Button>
-            <Button onClick={confirmMergeTheme} disabled={!themeMergeTargetId || mergeTheme.isPending}>
+            <Button onClick={confirmMergeTheme} disabled={!themeMergeTargetId || !themeMergePreview || mergeTheme.isPending}>
               Confirmar mesclagem
             </Button>
           </DialogFooter>
