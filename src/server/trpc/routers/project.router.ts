@@ -51,7 +51,7 @@ const ARCHITECT_ONLY_FIELDS = new Set([
   "developerId",
   "companyId",
   "solutionTypes",
-  "mainTool",
+  "mainToolId",
   "executionStrategy",
   "architectNotes",
   "complexity",
@@ -230,6 +230,7 @@ export const projectRouter = router({
           client: { select: { id: true, name: true, email: true, role: true } },
           developer: { select: { id: true, name: true, email: true } },
           company: { select: { id: true, name: true } },
+          mainTool: { select: { id: true, name: true, slug: true } },
           tasks: true,
           features: true,
         },
@@ -287,6 +288,7 @@ export const projectRouter = router({
         waveOrder: project.waveOrder ?? undefined,
         solutionTypes: (project.solutionTypes as string[] | null) ?? [],
         mainTool: project.mainTool ?? undefined,
+        mainToolId: project.mainToolId ?? undefined,
         executionStrategy: project.executionStrategy ?? undefined,
         architectNotes: project.architectNotes ?? undefined,
         features:
@@ -473,7 +475,7 @@ export const projectRouter = router({
         themeId: z.string().nullable().optional(),
         estimatedDeadline: z.date().nullable().optional(),
         solutionTypes: z.array(z.string()).optional(),
-        mainTool: z.string().nullable().optional(),
+        mainToolId: z.string().nullable().optional(),
         executionStrategy: z.string().nullable().optional(),
         architectNotes: z.string().nullable().optional(),
         peopleInvolved: z.number().int().min(0).nullable().optional(),
@@ -561,7 +563,7 @@ export const projectRouter = router({
       if (rest.themeId !== undefined) data.themeId = rest.themeId;
       if (rest.estimatedDeadline !== undefined) data.deadline = rest.estimatedDeadline;
       if (rest.solutionTypes !== undefined) data.solutionTypes = rest.solutionTypes;
-      if (rest.mainTool !== undefined) data.mainTool = rest.mainTool;
+      if (rest.mainToolId !== undefined) data.mainToolId = rest.mainToolId;
       if (rest.executionStrategy !== undefined) data.executionStrategy = rest.executionStrategy;
       if (rest.architectNotes !== undefined) data.architectNotes = rest.architectNotes;
       if (rest.complexity !== undefined) data.complexity = rest.complexity;
