@@ -268,4 +268,56 @@ export const taxonomyRouter = router({
 
     return { seeded: true };
   }),
+
+  // ==========================================
+  // FERRAMENTA PRINCIPAL
+  // ==========================================
+
+  listMainTools: publicProcedure.query(async ({ ctx }) => {
+    return ctx.db.mainTool.findMany({
+      where: { isActive: true },
+      orderBy: { order: "asc" },
+    });
+  }),
+
+  listAllMainTools: protectedProcedure.query(async ({ ctx }) => {
+    return ctx.db.mainTool.findMany({
+      orderBy: { order: "asc" },
+    });
+  }),
+
+  createMainTool: adminProcedure
+    .input(
+      z.object({
+        name: z.string().min(1),
+        slug: z.string().min(1).regex(/^[a-z0-9-]+$/, "Slug deve ter apenas letras minúsculas, números e hífens"),
+        order: z.number().int().default(0),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const exists = await ctx.db.mainTool.findUnique({ where: { slug: input.slug } });
+      if (exists) throw new TRPCError({ code: "CONFLICT", message: "Já existe uma ferramenta com este slug" });
+      return ctx.db.mainTool.create({ data: input });
+    }),
+
+  updateMainTool: adminProcedure
+    .input(
+      z.object({
+        id: z.string(),
+        name: z.string().min(1).optional(),
+        isActive: z.boolean().optional(),
+        order: z.number().int().optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const { id, ...data } = input;
+      return ctx.db.mainTool.update({ where: { id }, data });
+    }),
+
+  deleteMainTool: adminProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      await ctx.db.mainTool.delete({ where: { id: input.id } });
+      return { success: true };
+    }),
 });
