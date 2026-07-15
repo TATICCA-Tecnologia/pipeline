@@ -17,16 +17,23 @@ import {
 } from "@/src/shared/components/ui/select";
 import { Loader2, Plus, Save, Trash2, Wrench, ListChecks } from "lucide-react";
 import { toast } from "sonner";
-import {
-  SOLUTION_TYPES,
-  MAIN_TOOLS,
-  EXECUTION_STRATEGIES,
-} from "../_constants/architecture";
+import { SOLUTION_TYPES, EXECUTION_STRATEGIES } from "../_constants/architecture";
+import { CreatableCombobox } from "@/src/shared/components/ui/creatable-combobox";
 import { COMPLEXITY_LEVELS } from "@/shared/constants/project-taxonomy";
 import { computeAnnualSavingBRL } from "@/shared/lib/savings";
 import { formatCurrency } from "@/shared/utils";
 
 const UNASSIGNED = "__unassigned__";
+
+function slugify(text: string) {
+  return text
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .replace(/[^a-z0-9\s-]/g, "")
+    .trim()
+    .replace(/\s+/g, "-");
+}
 
 interface ArchitectureTabProps {
   projectId: string;
@@ -48,6 +55,16 @@ export function ArchitectureTab({ projectId }: ArchitectureTabProps) {
     onError: (err) => toast.error("Falha ao salvar", { description: err.message }),
   });
 
+  const { data: mainTools = [] } = trpc.taxonomy.listMainTools.useQuery();
+  const createMainTool = trpc.taxonomy.createMainTool.useMutation({
+    onSuccess: (created) => {
+      utils.taxonomy.listMainTools.invalidate();
+      setMainToolId(created.id);
+      toast.success(`Ferramenta "${created.name}" criada`);
+    },
+    onError: (err) => toast.error("Falha ao criar ferramenta", { description: err.message }),
+  });
+
   const createPhase = trpc.specification.createPhase.useMutation({
     onSuccess: () => utils.specification.getByProject.invalidate({ projectId }),
     onError: (err) => toast.error("Falha ao criar fase", { description: err.message }),
@@ -62,7 +79,7 @@ export function ArchitectureTab({ projectId }: ArchitectureTabProps) {
   });
 
   const [solutionTypes, setSolutionTypes] = useState<string[]>([]);
-  const [mainTool, setMainTool] = useState<string>("");
+  const [mainToolId, setMainToolId] = useState<string>("");
   const [executionStrategy, setExecutionStrategy] = useState<string>("");
   const [architectNotes, setArchitectNotes] = useState<string>("");
   const [complexity, setComplexity] = useState<string>("");
@@ -76,7 +93,7 @@ export function ArchitectureTab({ projectId }: ArchitectureTabProps) {
   useEffect(() => {
     if (project) {
       setSolutionTypes(project.solutionTypes ?? []);
-      setMainTool(project.mainTool ?? "");
+      setMainToolId(project.mainTool?.id ?? "");
       setExecutionStrategy(project.executionStrategy ?? "");
       setArchitectNotes(project.architectNotes ?? "");
       setComplexity(project.complexity ?? "");
@@ -150,7 +167,7 @@ export function ArchitectureTab({ projectId }: ArchitectureTabProps) {
     updateProject.mutate({
       id: projectId,
       solutionTypes,
-      mainTool: mainTool || null,
+      mainToolId: mainToolId || null,
       executionStrategy: executionStrategy || null,
       architectNotes: architectNotes || null,
       complexity: (complexity || null) as "baixa" | "media" | "alta" | null,
@@ -212,18 +229,20 @@ export function ArchitectureTab({ projectId }: ArchitectureTabProps) {
           <div className="grid gap-5 sm:grid-cols-2">
             <div className="space-y-2">
               <Label>Ferramenta principal</Label>
-              <Select value={mainTool} onValueChange={setMainTool}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione" />
-                </SelectTrigger>
-                <SelectContent>
-                  {MAIN_TOOLS.map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <CreatableCombobox
+                options={mainTools.map((t) => ({ value: t.id, label: t.name }))}
+                value={mainToolId}
+                onChange={setMainToolId}
+                onCreate={(label) =>
+                  createMainTool.mutate({
+                    name: label,
+                    slug: slugify(label),
+                    order: mainTools.length,
+                  })
+                }
+                placeholder="Selecione ou crie"
+                disabled={createMainTool.isPending}
+              />
             </div>
 
             <div className="space-y-2">
