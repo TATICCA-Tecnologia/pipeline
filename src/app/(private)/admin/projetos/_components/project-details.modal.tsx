@@ -243,7 +243,12 @@ export function ProjectDetailsModal({
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
         ) : (
-          <ProjectDetailSections project={project} viewerRole={user?.role} />
+          <ProjectDetailSections
+            project={project}
+            viewerRole={user?.role}
+            currentUserId={user?.id}
+            allowEdit
+          />
         )}
       </div>
 
