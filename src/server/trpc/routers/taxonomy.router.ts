@@ -432,4 +432,63 @@ export const taxonomyRouter = router({
       await ctx.db.mainTool.delete({ where: { id: input.id } });
       return { success: true };
     }),
+
+  // ==========================================
+  // CATEGORIAS DE CUSTO DE EMPRESA
+  // ==========================================
+
+  listCostCategories: publicProcedure.query(async ({ ctx }) => {
+    return ctx.db.companyCostCategory.findMany({
+      where: { isActive: true },
+      orderBy: { order: "asc" },
+    });
+  }),
+
+  listAllCostCategories: protectedProcedure.query(async ({ ctx }) => {
+    return ctx.db.companyCostCategory.findMany({
+      orderBy: { order: "asc" },
+    });
+  }),
+
+  createCostCategory: adminProcedure
+    .input(
+      z.object({
+        name: z.string().min(1),
+        slug: z.string().min(1).regex(/^[a-z0-9-]+$/, "Slug deve ter apenas letras minúsculas, números e hífens"),
+        order: z.number().int().default(0),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const exists = await ctx.db.companyCostCategory.findUnique({ where: { slug: input.slug } });
+      if (exists) throw new TRPCError({ code: "CONFLICT", message: "Já existe uma categoria de custo com este slug" });
+      return ctx.db.companyCostCategory.create({ data: input });
+    }),
+
+  updateCostCategory: adminProcedure
+    .input(
+      z.object({
+        id: z.string(),
+        name: z.string().min(1).optional(),
+        isActive: z.boolean().optional(),
+        order: z.number().int().optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const { id, ...data } = input;
+      return ctx.db.companyCostCategory.update({ where: { id }, data });
+    }),
+
+  deleteCostCategory: adminProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const itemCount = await ctx.db.companyCostItem.count({ where: { categoryId: input.id } });
+      if (itemCount > 0) {
+        throw new TRPCError({
+          code: "CONFLICT",
+          message: "Não é possível excluir uma categoria com itens de custo vinculados. Mova ou exclua os itens primeiro.",
+        });
+      }
+      await ctx.db.companyCostCategory.delete({ where: { id: input.id } });
+      return { success: true };
+    }),
 });
