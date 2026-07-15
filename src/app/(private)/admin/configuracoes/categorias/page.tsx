@@ -33,6 +33,13 @@ import {
 import { Badge } from "@/src/shared/components/ui/badge";
 import { Switch } from "@/src/shared/components/ui/switch";
 import { Label } from "@/src/shared/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/src/shared/components/ui/select";
 import { useToast } from "@/src/shared/hooks/use-toast";
 import {
   Plus,
@@ -44,6 +51,7 @@ import {
   Lightbulb,
   Database,
   Wrench,
+  Merge,
 } from "lucide-react";
 
 function slugify(text: string) {
@@ -109,6 +117,35 @@ export default function CategoriasPage() {
     }
   }
 
+  // — MESCLAR ÁREA —
+  const [areaMergeDialog, setAreaMergeDialog] = useState<{ open: boolean; source?: AreaItem }>({ open: false });
+  const [areaMergeTargetId, setAreaMergeTargetId] = useState<string>("");
+
+  const { data: areaMergePreview } = trpc.taxonomy.previewAreaMerge.useQuery(
+    { sourceId: areaMergeDialog.source?.id ?? "", targetId: areaMergeTargetId },
+    { enabled: areaMergeDialog.open && !!areaMergeDialog.source && !!areaMergeTargetId }
+  );
+
+  const mergeArea = trpc.taxonomy.mergeArea.useMutation({
+    onSuccess: () => {
+      utils.taxonomy.listAllAreas.invalidate();
+      utils.taxonomy.listAllSuggestions.invalidate();
+      setAreaMergeDialog({ open: false });
+      setAreaMergeTargetId("");
+      toast({ title: "Área mesclada" });
+    },
+    onError: (e: { message: string }) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
+  });
+
+  function openMergeArea(area: AreaItem) {
+    setAreaMergeTargetId("");
+    setAreaMergeDialog({ open: true, source: area });
+  }
+  function confirmMergeArea() {
+    if (!areaMergeDialog.source || !areaMergeTargetId) return;
+    mergeArea.mutate({ sourceId: areaMergeDialog.source.id, targetId: areaMergeTargetId });
+  }
+
   // — TEMA —
   const [themeDialog, setThemeDialog] = useState<{ open: boolean; areaId?: string; editing?: { id: string; name: string; slug: string; order: number } }>({ open: false });
   const [themeForm, setThemeForm] = useState({ name: "", slug: "", order: 0 });
@@ -143,6 +180,34 @@ export default function CategoriasPage() {
     } else if (themeDialog.areaId) {
       createTheme.mutate({ areaId: themeDialog.areaId, name: themeForm.name, slug: themeForm.slug, order: themeForm.order });
     }
+  }
+
+  // — MESCLAR TEMA —
+  const [themeMergeDialog, setThemeMergeDialog] = useState<{ open: boolean; source?: { id: string; name: string } }>({ open: false });
+  const [themeMergeTargetId, setThemeMergeTargetId] = useState<string>("");
+
+  const { data: themeMergePreview } = trpc.taxonomy.previewThemeMerge.useQuery(
+    { sourceId: themeMergeDialog.source?.id ?? "", targetId: themeMergeTargetId },
+    { enabled: themeMergeDialog.open && !!themeMergeDialog.source && !!themeMergeTargetId }
+  );
+
+  const mergeTheme = trpc.taxonomy.mergeTheme.useMutation({
+    onSuccess: () => {
+      utils.taxonomy.listAllAreas.invalidate();
+      setThemeMergeDialog({ open: false });
+      setThemeMergeTargetId("");
+      toast({ title: "Tema mesclado" });
+    },
+    onError: (e: { message: string }) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
+  });
+
+  function openMergeTheme(theme: { id: string; name: string }) {
+    setThemeMergeTargetId("");
+    setThemeMergeDialog({ open: true, source: theme });
+  }
+  function confirmMergeTheme() {
+    if (!themeMergeDialog.source || !themeMergeTargetId) return;
+    mergeTheme.mutate({ sourceId: themeMergeDialog.source.id, targetId: themeMergeTargetId });
   }
 
   // — SUGESTÕES —
@@ -315,6 +380,9 @@ export default function CategoriasPage() {
                       <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEditArea(area)}>
                         <Pencil className="h-3.5 w-3.5" />
                       </Button>
+                      <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openMergeArea(area)}>
+                        <Merge className="h-3.5 w-3.5" />
+                      </Button>
                       <Button
                         size="icon"
                         variant="ghost"
@@ -363,6 +431,9 @@ export default function CategoriasPage() {
                               />
                               <button onClick={() => openEditTheme(theme)} className="text-muted-foreground hover:text-foreground">
                                 <Pencil className="h-3 w-3" />
+                              </button>
+                              <button onClick={() => openMergeTheme(theme)} className="text-muted-foreground hover:text-foreground">
+                                <Merge className="h-3 w-3" />
                               </button>
                               <button
                                 onClick={() => setDeleteConfirm({ open: true, type: "theme", id: theme.id, label: theme.name })}
@@ -578,6 +649,122 @@ export default function CategoriasPage() {
             <Button variant="outline" onClick={() => setThemeDialog({ open: false })}>Cancelar</Button>
             <Button onClick={submitTheme} disabled={!themeForm.name || (!themeDialog.editing && !themeForm.slug)}>
               {themeDialog.editing ? "Salvar" : "Criar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog: Mesclar Área */}
+      <Dialog
+        open={areaMergeDialog.open}
+        onOpenChange={(o) => {
+          setAreaMergeDialog({ open: o });
+          if (!o) setAreaMergeTargetId("");
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Mesclar &quot;{areaMergeDialog.source?.name}&quot;</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <Label>Mesclar com</Label>
+              <Select value={areaMergeTargetId} onValueChange={setAreaMergeTargetId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione a área de destino" />
+                </SelectTrigger>
+                <SelectContent>
+                  {areas
+                    .filter((a: AreaItem) => a.isActive && a.id !== areaMergeDialog.source?.id)
+                    .map((a: AreaItem) => (
+                      <SelectItem key={a.id} value={a.id}>
+                        {a.name}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {areaMergeTargetId && areaMergePreview && (
+              areaMergePreview.collisions.length > 0 ? (
+                <p className="text-sm text-destructive">
+                  Não é possível mesclar: os temas{" "}
+                  {areaMergePreview.collisions.map((c) => `"${c.sourceThemeName}"`).join(", ")}{" "}
+                  já existem na área de destino. Mescle ou renomeie esses temas primeiro.
+                </p>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Isso vai mover <strong>{areaMergePreview.themeCount} tema{areaMergePreview.themeCount !== 1 ? "s" : ""}</strong>,{" "}
+                  <strong>{areaMergePreview.projectCount} projeto{areaMergePreview.projectCount !== 1 ? "s" : ""}</strong>,{" "}
+                  <strong>{areaMergePreview.interviewCount} entrevista{areaMergePreview.interviewCount !== 1 ? "s" : ""}</strong> e{" "}
+                  <strong>{areaMergePreview.suggestionCount} sugest{areaMergePreview.suggestionCount !== 1 ? "ões" : "ão"}</strong>
+                  {" "}de &quot;{areaMergeDialog.source?.name}&quot; para &quot;
+                  {areas.find((a: AreaItem) => a.id === areaMergeTargetId)?.name}&quot;. Essa ação não pode ser desfeita.
+                </p>
+              )
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAreaMergeDialog({ open: false })}>Cancelar</Button>
+            <Button
+              onClick={confirmMergeArea}
+              disabled={
+                !areaMergeTargetId ||
+                !areaMergePreview ||
+                areaMergePreview.collisions.length > 0 ||
+                mergeArea.isPending
+              }
+            >
+              Confirmar mesclagem
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog: Mesclar Tema */}
+      <Dialog
+        open={themeMergeDialog.open}
+        onOpenChange={(o) => {
+          setThemeMergeDialog({ open: o });
+          if (!o) setThemeMergeTargetId("");
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Mesclar &quot;{themeMergeDialog.source?.name}&quot;</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <Label>Mesclar com</Label>
+              <Select value={themeMergeTargetId} onValueChange={setThemeMergeTargetId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o tema de destino" />
+                </SelectTrigger>
+                <SelectContent>
+                  {areas
+                    .flatMap((a: AreaItem) =>
+                      a.themes
+                        .filter((t: AreaItem["themes"][number]) => t.isActive && t.id !== themeMergeDialog.source?.id)
+                        .map((t: AreaItem["themes"][number]) => ({ id: t.id, label: `${a.name} > ${t.name}` }))
+                    )
+                    .map((opt: { id: string; label: string }) => (
+                      <SelectItem key={opt.id} value={opt.id}>
+                        {opt.label}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {themeMergeTargetId && themeMergePreview && (
+              <p className="text-sm text-muted-foreground">
+                Isso vai mover <strong>{themeMergePreview.projectCount} projeto{themeMergePreview.projectCount !== 1 ? "s" : ""}</strong>
+                {" "}de &quot;{themeMergeDialog.source?.name}&quot; para o tema selecionado. Essa ação não pode ser desfeita.
+              </p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setThemeMergeDialog({ open: false })}>Cancelar</Button>
+            <Button onClick={confirmMergeTheme} disabled={!themeMergeTargetId || mergeTheme.isPending}>
+              Confirmar mesclagem
             </Button>
           </DialogFooter>
         </DialogContent>
