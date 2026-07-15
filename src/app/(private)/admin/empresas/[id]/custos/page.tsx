@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useState } from "react";
+import { use, useMemo, useState } from "react";
 import Link from "next/link";
 import { trpc } from "@/shared/trpc/client";
 import type { inferRouterOutputs } from "@trpc/server";
@@ -84,6 +84,19 @@ export default function CustosEstruturaPage({ params }: Props) {
     open: false,
   });
 
+  // Se o item sendo editado tem uma categoria que foi desativada depois (e por
+  // isso não aparece mais em `categories`, que só lista ativas), injeta ela
+  // mesmo assim na lista de opções — senão o Select mostraria o campo em
+  // branco mesmo com `form.categoryId` preenchido, dando a impressão de que
+  // nada está selecionado.
+  const categoryOptions = useMemo(() => {
+    const opts = categories.map((c) => ({ id: c.id, name: c.name }));
+    if (dialog.editing && !opts.some((o) => o.id === dialog.editing!.categoryId)) {
+      opts.push({ id: dialog.editing.categoryId, name: dialog.editing.category.name });
+    }
+    return opts;
+  }, [categories, dialog.editing]);
+
   const invalidateAll = () => {
     utils.company.listCostItems.invalidate({ companyId });
     utils.company.getCostSummary.invalidate({ companyId });
@@ -110,6 +123,7 @@ export default function CustosEstruturaPage({ params }: Props) {
       invalidateAll();
       toast({ title: "Item de custo removido" });
     },
+    onError: (e) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
   });
 
   function openNew() {
@@ -276,7 +290,7 @@ export default function CustosEstruturaPage({ params }: Props) {
                   <SelectValue placeholder="Selecione" />
                 </SelectTrigger>
                 <SelectContent>
-                  {categories.map((c) => (
+                  {categoryOptions.map((c) => (
                     <SelectItem key={c.id} value={c.id}>
                       {c.name}
                     </SelectItem>
