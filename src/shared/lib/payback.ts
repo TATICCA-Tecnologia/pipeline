@@ -26,6 +26,14 @@ export type PaybackPoint = {
   cumulativeSaving: number;
 };
 
+/** Item de custo de estrutura da empresa (`CompanyCostItem`) — pessoas, licenças, etc. */
+export type StructureCostItem = {
+  type: "recorrente" | "pontual";
+  amountBRL: number;
+  startDate: Date;
+  endDate: Date | null;
+};
+
 /** Granularidade da série retornada: um ponto a cada 7 dias corridos. */
 const POINT_INTERVAL_DAYS = 7;
 
@@ -58,6 +66,31 @@ function businessDaysElapsedInWindow(windowStart: Date, windowEnd: Date, asOf: D
 }
 
 /**
+ * Custo de estrutura (pessoas/licenças/infraestrutura — `CompanyCostItem`)
+ * acumulado até `asOf`. Item recorrente: soma `(amountBRL * 12 / 365) × dias
+ * decorridos entre startDate e min(asOf, endDate ?? asOf)` — mesmo padrão de
+ * "anualiza e divide por 365" já usado no lado da economia
+ * (`estimatedAnnualSavingBRL / 365`). Item pontual: soma o valor cheio a
+ * partir de `startDate` (reconhecido de uma vez, não distribuído).
+ * Exportada porque a tela de Priorização usa separadamente pra mostrar o
+ * total de estrutura na tabela de composição, fora da curva.
+ */
+export function computeStructureCostAt(structureCosts: StructureCostItem[], asOf: Date): number {
+  let total = 0;
+  for (const item of structureCosts) {
+    if (asOf < item.startDate) continue;
+    if (item.type === "pontual") {
+      total += item.amountBRL;
+      continue;
+    }
+    const clampedEnd = item.endDate && item.endDate < asOf ? item.endDate : asOf;
+    const days = differenceInCalendarDays(clampedEnd, item.startDate) + 1;
+    total += (item.amountBRL * 12 / 365) * Math.max(0, days);
+  }
+  return total;
+}
+
+/**
  * Calcula, num único dia `asOf`, o custo acumulado e a economia acumulada de
  * todo o schedule até aquele ponto.
  *
@@ -75,8 +108,13 @@ function businessDaysElapsedInWindow(windowStart: Date, windowEnd: Date, asOf: D
  * de ser desenvolvido) — por isso `daysSinceDelivery` usa `+ 1` (o dia da
  * entrega conta como o 1º dia de economia, não o dia seguinte).
  */
-function computePointAt(schedule: PaybackScheduleItem[], dailyRateBRL: number, asOf: Date): PaybackPoint {
-  let cumulativeCost = 0;
+function computePointAt(
+  schedule: PaybackScheduleItem[],
+  dailyRateBRL: number,
+  structureCosts: StructureCostItem[],
+  asOf: Date
+): PaybackPoint {
+  let cumulativeCost = computeStructureCostAt(structureCosts, asOf);
   let cumulativeSaving = 0;
 
   for (const item of schedule) {
@@ -106,7 +144,8 @@ function computePointAt(schedule: PaybackScheduleItem[], dailyRateBRL: number, a
  */
 export function computePaybackCurve(
   schedule: PaybackScheduleItem[],
-  dailyRateBRL: number
+  dailyRateBRL: number,
+  structureCosts: StructureCostItem[] = []
 ): PaybackPoint[] {
   if (schedule.length === 0) return [];
 
@@ -119,7 +158,7 @@ export function computePaybackCurve(
   const points: PaybackPoint[] = [];
   let cursor = scheduleStart;
   while (cursor <= windowEnd) {
-    points.push(computePointAt(schedule, dailyRateBRL, cursor));
+    points.push(computePointAt(schedule, dailyRateBRL, structureCosts, cursor));
     cursor = addDays(cursor, POINT_INTERVAL_DAYS);
   }
 
@@ -128,7 +167,7 @@ export function computePaybackCurve(
   // calculada.
   const lastPoint = points[points.length - 1];
   if (!lastPoint || differenceInCalendarDays(windowEnd, lastPoint.date) > 0) {
-    points.push(computePointAt(schedule, dailyRateBRL, windowEnd));
+    points.push(computePointAt(schedule, dailyRateBRL, structureCosts, windowEnd));
   }
 
   return points;
