@@ -110,9 +110,10 @@ model Company {
   updatedAt DateTime @updatedAt
 
   // Relacionamentos
-  users      User[]      @relation("UserCompanies")
+  users      User[]            @relation("UserCompanies")
   projects   Project[]
   interviews Interview[]
+  costItems  CompanyCostItem[]
 
   @@map("companies")
 }
@@ -513,6 +514,40 @@ model MainTool {
   updatedAt DateTime  @updatedAt
 
   @@map("main_tools")
+}
+
+// ==========================================
+// CUSTOS E ESTRUTURA DA EMPRESA
+// ==========================================
+
+model CompanyCostCategory {
+  id        String            @id @default(cuid())
+  name      String
+  slug      String            @unique
+  isActive  Boolean           @default(true)
+  order     Int               @default(0)
+  costItems CompanyCostItem[]
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+
+  @@map("company_cost_categories")
+}
+
+model CompanyCostItem {
+  id         String              @id @default(cuid())
+  company    Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  companyId  String
+  category   CompanyCostCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  categoryId String
+  name       String
+  type       String // "recorrente" | "pontual"
+  amountBRL  Float
+  startDate  DateTime
+  endDate    DateTime? // só relevante pra "recorrente"; null = em andamento
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@map("company_cost_items")
 }
 
 // ==========================================
