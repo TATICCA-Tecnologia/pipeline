@@ -107,6 +107,112 @@ export const taxonomyRouter = router({
     }),
 
   // ==========================================
+  // MERGE (AREA E TEMA)
+  // ==========================================
+
+  previewAreaMerge: protectedProcedure
+    .input(z.object({ sourceId: z.string(), targetId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const [source, target] = await Promise.all([
+        ctx.db.projectArea.findUnique({ where: { id: input.sourceId }, include: { themes: true } }),
+        ctx.db.projectArea.findUnique({ where: { id: input.targetId }, include: { themes: true } }),
+      ]);
+      if (!source || !target) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Área não encontrada" });
+      }
+
+      const targetSlugs = new Map(target.themes.map((t) => [t.slug, t.name]));
+      const collisions = source.themes
+        .filter((t) => targetSlugs.has(t.slug))
+        .map((t) => ({
+          slug: t.slug,
+          sourceThemeName: t.name,
+          targetThemeName: targetSlugs.get(t.slug)!,
+        }));
+
+      const [projectCount, interviewCount, suggestionCount] = await Promise.all([
+        ctx.db.project.count({ where: { areaId: input.sourceId } }),
+        ctx.db.interview.count({ where: { areaId: input.sourceId } }),
+        ctx.db.featureSuggestion.count({ where: { areaSlug: source.slug } }),
+      ]);
+
+      return {
+        themeCount: source.themes.length,
+        projectCount,
+        interviewCount,
+        suggestionCount,
+        collisions,
+      };
+    }),
+
+  mergeArea: adminProcedure
+    .input(z.object({ sourceId: z.string(), targetId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      if (input.sourceId === input.targetId) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Selecione uma área de destino diferente da origem" });
+      }
+      const [source, target] = await Promise.all([
+        ctx.db.projectArea.findUnique({ where: { id: input.sourceId }, include: { themes: true } }),
+        ctx.db.projectArea.findUnique({ where: { id: input.targetId }, include: { themes: true } }),
+      ]);
+      if (!source || !target) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Área não encontrada" });
+      }
+
+      const targetSlugs = new Set(target.themes.map((t) => t.slug));
+      const collisions = source.themes.filter((t) => targetSlugs.has(t.slug));
+      if (collisions.length > 0) {
+        const names = collisions.map((t) => `"${t.name}"`).join(", ");
+        throw new TRPCError({
+          code: "CONFLICT",
+          message: `Não é possível mesclar: os temas ${names} já existem na área de destino. Mescle ou renomeie esses temas primeiro.`,
+        });
+      }
+
+      await ctx.db.$transaction([
+        ctx.db.projectTheme.updateMany({ where: { areaId: input.sourceId }, data: { areaId: input.targetId } }),
+        ctx.db.project.updateMany({ where: { areaId: input.sourceId }, data: { areaId: input.targetId } }),
+        ctx.db.interview.updateMany({ where: { areaId: input.sourceId }, data: { areaId: input.targetId } }),
+        ctx.db.featureSuggestion.updateMany({ where: { areaSlug: source.slug }, data: { areaSlug: target.slug } }),
+        ctx.db.projectArea.delete({ where: { id: input.sourceId } }),
+      ]);
+
+      return { success: true };
+    }),
+
+  previewThemeMerge: protectedProcedure
+    .input(z.object({ sourceId: z.string(), targetId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const projectCount = await ctx.db.project.count({ where: { themeId: input.sourceId } });
+      return { projectCount };
+    }),
+
+  mergeTheme: adminProcedure
+    .input(z.object({ sourceId: z.string(), targetId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      if (input.sourceId === input.targetId) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Selecione um tema de destino diferente da origem" });
+      }
+      const [source, target] = await Promise.all([
+        ctx.db.projectTheme.findUnique({ where: { id: input.sourceId } }),
+        ctx.db.projectTheme.findUnique({ where: { id: input.targetId } }),
+      ]);
+      if (!source || !target) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Tema não encontrado" });
+      }
+
+      await ctx.db.$transaction([
+        ctx.db.project.updateMany({
+          where: { themeId: input.sourceId },
+          data: { themeId: input.targetId, areaId: target.areaId },
+        }),
+        ctx.db.projectTheme.delete({ where: { id: input.sourceId } }),
+      ]);
+
+      return { success: true };
+    }),
+
+  // ==========================================
   // SUGESTOES DE FUNCIONALIDADES
   // ==========================================
 
