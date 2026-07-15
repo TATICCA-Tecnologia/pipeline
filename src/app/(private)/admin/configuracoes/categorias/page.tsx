@@ -9,6 +9,7 @@ type RouterOutputs = inferRouterOutputs<AppRouter>;
 type AreaItem = RouterOutputs["taxonomy"]["listAllAreas"][number];
 type SuggestionItem = RouterOutputs["taxonomy"]["listAllSuggestions"][number];
 type MainToolItem = RouterOutputs["taxonomy"]["listAllMainTools"][number];
+type CostCategoryItem = RouterOutputs["taxonomy"]["listAllCostCategories"][number];
 
 import { Button } from "@/src/shared/components/ui/button";
 import { Input } from "@/src/shared/components/ui/input";
@@ -52,6 +53,7 @@ import {
   Database,
   Wrench,
   Merge,
+  Wallet,
 } from "lucide-react";
 
 function slugify(text: string) {
@@ -283,8 +285,45 @@ export default function CategoriasPage() {
     }
   }
 
+  // — CATEGORIAS DE CUSTO —
+  const { data: costCategories = [] } = trpc.taxonomy.listAllCostCategories.useQuery();
+  const [costCategoryDialog, setCostCategoryDialog] = useState<{ open: boolean; editing?: { id: string; name: string; slug: string; order: number } }>({ open: false });
+  const [costCategoryForm, setCostCategoryForm] = useState({ name: "", slug: "", order: 0 });
+
+  const createCostCategory = trpc.taxonomy.createCostCategory.useMutation({
+    onSuccess: () => { utils.taxonomy.listAllCostCategories.invalidate(); setCostCategoryDialog({ open: false }); toast({ title: "Categoria de custo criada" }); },
+    onError: (e: { message: string }) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
+  });
+  const updateCostCategory = trpc.taxonomy.updateCostCategory.useMutation({
+    onSuccess: () => { utils.taxonomy.listAllCostCategories.invalidate(); setCostCategoryDialog({ open: false }); toast({ title: "Categoria de custo atualizada" }); },
+    onError: (e: { message: string }) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
+  });
+  const deleteCostCategory = trpc.taxonomy.deleteCostCategory.useMutation({
+    onSuccess: () => { utils.taxonomy.listAllCostCategories.invalidate(); toast({ title: "Categoria de custo removida" }); },
+    onError: (e: { message: string }) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
+  });
+  const toggleCostCategory = trpc.taxonomy.updateCostCategory.useMutation({
+    onSuccess: () => utils.taxonomy.listAllCostCategories.invalidate(),
+  });
+
+  function openNewCostCategory() {
+    setCostCategoryForm({ name: "", slug: "", order: costCategories.length });
+    setCostCategoryDialog({ open: true });
+  }
+  function openEditCostCategory(cat: { id: string; name: string; slug: string; order: number }) {
+    setCostCategoryForm({ name: cat.name, slug: cat.slug, order: cat.order });
+    setCostCategoryDialog({ open: true, editing: cat });
+  }
+  function submitCostCategory() {
+    if (costCategoryDialog.editing) {
+      updateCostCategory.mutate({ id: costCategoryDialog.editing.id, name: costCategoryForm.name, order: costCategoryForm.order });
+    } else {
+      createCostCategory.mutate({ name: costCategoryForm.name, slug: costCategoryForm.slug, order: costCategoryForm.order });
+    }
+  }
+
   // — DELETE CONFIRM —
-  const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; type?: "area" | "theme" | "suggestion" | "mainTool"; id?: string; label?: string }>({ open: false });
+  const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; type?: "area" | "theme" | "suggestion" | "mainTool" | "costCategory"; id?: string; label?: string }>({ open: false });
 
   function confirmDelete() {
     if (!deleteConfirm.id || !deleteConfirm.type) return;
@@ -292,6 +331,7 @@ export default function CategoriasPage() {
     if (deleteConfirm.type === "theme") deleteTheme.mutate({ id: deleteConfirm.id });
     if (deleteConfirm.type === "suggestion") deleteSugg.mutate({ id: deleteConfirm.id });
     if (deleteConfirm.type === "mainTool") deleteMainTool.mutate({ id: deleteConfirm.id });
+    if (deleteConfirm.type === "costCategory") deleteCostCategory.mutate({ id: deleteConfirm.id });
     setDeleteConfirm({ open: false });
   }
 
@@ -540,6 +580,56 @@ export default function CategoriasPage() {
                   </button>
                   <button
                     onClick={() => setDeleteConfirm({ open: true, type: "mainTool", id: tool.id, label: tool.name })}
+                    className="text-destructive/60 hover:text-destructive"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </button>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        )}
+      </div>
+
+      {/* Categorias de custo */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-semibold">Categorias de custo</h2>
+            <p className="text-sm text-muted-foreground">
+              Categorias usadas nos itens de custo em &quot;Custos e Estrutura&quot; de cada empresa.
+            </p>
+          </div>
+          <Button size="sm" variant="outline" onClick={openNewCostCategory}>
+            <Plus className="mr-2 h-4 w-4" />
+            Nova categoria
+          </Button>
+        </div>
+        {costCategories.length === 0 ? (
+          <Card className="flex flex-col items-center justify-center py-10 text-center">
+            <Wallet className="mb-3 h-8 w-8 text-muted-foreground/50" />
+            <p className="text-sm font-medium">Nenhuma categoria de custo cadastrada</p>
+          </Card>
+        ) : (
+          <Card>
+            <CardContent className="flex flex-wrap gap-2 pt-4">
+              {costCategories.map((cat: CostCategoryItem) => (
+                <div
+                  key={cat.id}
+                  className={`flex items-center gap-1 rounded-md border px-2 py-1 text-xs ${!cat.isActive ? "opacity-50" : ""}`}
+                >
+                  <span>{cat.name}</span>
+                  <Badge variant="secondary" className="text-[10px]">{cat.slug}</Badge>
+                  <Switch
+                    checked={cat.isActive}
+                    onCheckedChange={(v) => toggleCostCategory.mutate({ id: cat.id, isActive: v })}
+                    className="scale-75"
+                  />
+                  <button onClick={() => openEditCostCategory(cat)} className="text-muted-foreground hover:text-foreground">
+                    <Pencil className="h-3 w-3" />
+                  </button>
+                  <button
+                    onClick={() => setDeleteConfirm({ open: true, type: "costCategory", id: cat.id, label: cat.name })}
                     className="text-destructive/60 hover:text-destructive"
                   >
                     <Trash2 className="h-3 w-3" />
@@ -857,6 +947,58 @@ export default function CategoriasPage() {
             <Button variant="outline" onClick={() => setMainToolDialog({ open: false })}>Cancelar</Button>
             <Button onClick={submitMainTool} disabled={!mainToolForm.name || (!mainToolDialog.editing && !mainToolForm.slug)}>
               {mainToolDialog.editing ? "Salvar" : "Criar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog: Categoria de custo */}
+      <Dialog open={costCategoryDialog.open} onOpenChange={(o) => setCostCategoryDialog({ open: o })}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{costCategoryDialog.editing ? "Editar categoria de custo" : "Nova categoria de custo"}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <Label>Nome</Label>
+              <Input
+                value={costCategoryForm.name}
+                onChange={(e) => {
+                  const name = e.target.value;
+                  setCostCategoryForm((f) => ({
+                    ...f,
+                    name,
+                    slug: costCategoryDialog.editing ? f.slug : slugify(name),
+                  }));
+                }}
+                placeholder="Ex: Suporte técnico"
+              />
+            </div>
+            {!costCategoryDialog.editing && (
+              <div className="space-y-1.5">
+                <Label>Slug</Label>
+                <Input
+                  value={costCategoryForm.slug}
+                  onChange={(e) => setCostCategoryForm((f) => ({ ...f, slug: slugify(e.target.value) }))}
+                  placeholder="Ex: suporte-tecnico"
+                />
+                <p className="text-xs text-muted-foreground">Identificador único. Não pode ser alterado após criação.</p>
+              </div>
+            )}
+            <div className="space-y-1.5">
+              <Label>Ordem</Label>
+              <Input
+                type="number"
+                min={0}
+                value={costCategoryForm.order}
+                onChange={(e) => setCostCategoryForm((f) => ({ ...f, order: Number(e.target.value) }))}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCostCategoryDialog({ open: false })}>Cancelar</Button>
+            <Button onClick={submitCostCategory} disabled={!costCategoryForm.name || (!costCategoryDialog.editing && !costCategoryForm.slug)}>
+              {costCategoryDialog.editing ? "Salvar" : "Criar"}
             </Button>
           </DialogFooter>
         </DialogContent>
