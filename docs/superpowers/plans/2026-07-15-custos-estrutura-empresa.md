@@ -1597,7 +1597,6 @@ Substitua por:
     caller.project.getPrioritizedRanking({ companyId, sortBy: "combinado" }),
     caller.settings.getSettings(),
     caller.interview.list({ companyId }),
-    caller.company.listCostItems({ companyId }),
 ```
 
 Encontre (mais abaixo, ainda dentro do mesmo array — é o último item antes do `]`):
@@ -1650,6 +1649,7 @@ Substitua por:
         ratingCompliance: true,
       },
     }),
+    caller.company.listCostItems({ companyId }),
   ]);
 
   const structureCosts: StructureCostItem[] = costItems.map((item) => ({
