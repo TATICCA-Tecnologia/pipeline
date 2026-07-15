@@ -498,7 +498,7 @@ Substitua por (insere um novo diálogo antes):
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setThemeMergeDialog({ open: false })}>Cancelar</Button>
-            <Button onClick={confirmMergeTheme} disabled={!themeMergeTargetId || mergeTheme.isPending}>
+            <Button onClick={confirmMergeTheme} disabled={!themeMergeTargetId || !themeMergePreview || mergeTheme.isPending}>
               Confirmar mesclagem
             </Button>
           </DialogFooter>
