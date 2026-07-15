@@ -74,7 +74,8 @@ export interface Project {
   hourlyRateBRL?: number;
   estimatedAnnualSavingBRL?: number;
   solutionTypes?: string[];
-  mainTool?: string;
+  mainTool?: { id: string; name: string; slug: string };
+  mainToolId?: string;
   executionStrategy?: string;
   architectNotes?: string;
   // Operacao pos-entrega (admin escreve, cliente sempre ve)
