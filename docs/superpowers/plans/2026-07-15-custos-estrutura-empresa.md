@@ -393,10 +393,15 @@ Substitua por:
       });
       const now = new Date();
       const totalMonthlyRecurring = items
-        .filter((i) => i.type === "recorrente" && (i.endDate == null || i.endDate >= now))
+        .filter(
+          (i) =>
+            i.type === "recorrente" &&
+            i.startDate <= now &&
+            (i.endDate == null || i.endDate >= now)
+        )
         .reduce((sum, i) => sum + i.amountBRL, 0);
       const totalOneTime = items
-        .filter((i) => i.type === "pontual")
+        .filter((i) => i.type === "pontual" && i.startDate <= now)
         .reduce((sum, i) => sum + i.amountBRL, 0);
       return { totalMonthlyRecurring, totalOneTime };
     }),
@@ -419,7 +424,7 @@ git commit -m "feat: add cost item CRUD and summary procedures to company router
 
 Task 3 de 10. Depende da Task 1. `z`/`TRPCError`/`adminProcedure` já importados no topo do arquivo (`import { z } from "zod"; import { TRPCError } from "@trpc/server"; import { router, adminProcedure } from "../trpc";`) — nenhum import novo necessário. Todos os procedures são `adminProcedure` (mesmo racional de sensibilidade financeira já documentado em `project.router.ts` pra `getAreaSummary`/`getPrioritizedRanking`).
 
-`getCostSummary` considera "recorrente ativo hoje" um item sem `endDate` OU com `endDate` no futuro/hoje — itens recorrentes já encerrados não entram no total mensal atual (mas continuam contando pro cálculo de payback, que é histórico/temporal, não um "hoje").
+`getCostSummary` considera "ativo hoje" um item com `startDate <= hoje` E (sem `endDate` OU `endDate >= hoje`) — itens recorrentes que ainda não começaram (`startDate` no futuro, ex: "novo funcionário começa mês que vem") ou já encerrados não entram no total mensal atual; item pontual com `startDate` no futuro também não entra no total acumulado ainda. Isso mantém a consistência com o cálculo de payback (Task 4, `computeStructureCostAt`), que também ignora custos cuja `startDate` ainda não chegou (`if (asOf < item.startDate) continue`) — sem esse mesmo filtro aqui, os cards de resumo desta tela mostrariam um número diferente do que a curva de payback usa pros mesmos dados.
 
 ---
 
