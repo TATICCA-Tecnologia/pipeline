@@ -158,6 +158,9 @@ export const taxonomyRouter = router({
       if (!source || !target) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Área não encontrada" });
       }
+      if (!target.isActive) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Não é possível mesclar para uma área inativa" });
+      }
 
       const targetSlugs = new Set(target.themes.map((t) => t.slug));
       const collisions = source.themes.filter((t) => targetSlugs.has(t.slug));
@@ -199,6 +202,9 @@ export const taxonomyRouter = router({
       ]);
       if (!source || !target) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Tema não encontrado" });
+      }
+      if (!target.isActive) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Não é possível mesclar para um tema inativo" });
       }
 
       await ctx.db.$transaction([
