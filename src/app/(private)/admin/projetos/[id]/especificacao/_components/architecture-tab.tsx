@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { trpc } from "@/shared/trpc/client";
 import { Button } from "@/src/shared/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/src/shared/components/ui/card";
@@ -56,6 +56,13 @@ export function ArchitectureTab({ projectId }: ArchitectureTabProps) {
   });
 
   const { data: mainTools = [] } = trpc.taxonomy.listMainTools.useQuery();
+  const mainToolOptions = useMemo(() => {
+    const opts = mainTools.map((t) => ({ value: t.id, label: t.name }));
+    if (project?.mainTool && !opts.some((o) => o.value === project.mainTool!.id)) {
+      opts.push({ value: project.mainTool.id, label: project.mainTool.name });
+    }
+    return opts;
+  }, [mainTools, project?.mainTool]);
   const createMainTool = trpc.taxonomy.createMainTool.useMutation({
     onSuccess: (created) => {
       utils.taxonomy.listMainTools.invalidate();
@@ -230,7 +237,7 @@ export function ArchitectureTab({ projectId }: ArchitectureTabProps) {
             <div className="space-y-2">
               <Label>Ferramenta principal</Label>
               <CreatableCombobox
-                options={mainTools.map((t) => ({ value: t.id, label: t.name }))}
+                options={mainToolOptions}
                 value={mainToolId}
                 onChange={setMainToolId}
                 onCreate={(label) =>
@@ -385,7 +392,7 @@ export function ArchitectureTab({ projectId }: ArchitectureTabProps) {
           <div className="flex justify-end pt-2">
             <Button
               onClick={handleSaveArchitecture}
-              disabled={updateProject.isPending}
+              disabled={updateProject.isPending || createMainTool.isPending}
             >
               {updateProject.isPending ? (
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
