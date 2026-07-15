@@ -478,7 +478,7 @@ Substitua por (insere um novo diálogo antes):
                   {areas
                     .flatMap((a: AreaItem) =>
                       a.themes
-                        .filter((t: AreaItem["themes"][number]) => t.id !== themeMergeDialog.source?.id)
+                        .filter((t: AreaItem["themes"][number]) => t.isActive && t.id !== themeMergeDialog.source?.id)
                         .map((t: AreaItem["themes"][number]) => ({ id: t.id, label: `${a.name} > ${t.name}` }))
                     )
                     .map((opt: { id: string; label: string }) => (
