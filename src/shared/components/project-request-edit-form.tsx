@@ -31,7 +31,6 @@ import {
 } from "@/shared/constants/project-taxonomy";
 import {
   SOLUTION_TYPES,
-  MAIN_TOOLS,
   EXECUTION_STRATEGIES,
 } from "@/src/app/(private)/admin/projetos/[id]/especificacao/_constants/architecture";
 import { useTaxonomy } from "@/src/app/(private)/cliente/solicitar/utils/use-taxonomy";
@@ -529,7 +528,7 @@ export function ProjectRequestEditForm({
             label="Complexidade"
             value={resolveLabel(project.complexity, COMPLEXITY_LEVELS)}
           />
-          <FieldRow label="Ferramenta principal" value={resolveLabel(project.mainTool, MAIN_TOOLS)} />
+          <FieldRow label="Ferramenta principal" value={project.mainTool?.name} />
           <FieldRow
             label="Estratégia de execução"
             value={resolveLabel(project.executionStrategy, EXECUTION_STRATEGIES)}
