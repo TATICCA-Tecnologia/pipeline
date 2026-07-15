@@ -16,6 +16,7 @@ import {
   Table,
   TableBody,
   TableCell,
+  TableFooter,
   TableHead,
   TableHeader,
   TableRow,
@@ -55,6 +56,15 @@ function AreaSummaryTooltip({
 export function AreaSummaryChart({ companyId }: { companyId?: string }) {
   const { data, isLoading } = trpc.project.getAreaSummary.useQuery({ companyId });
 
+  const totals = data?.reduce(
+    (acc, row) => ({
+      projectCount: acc.projectCount + row.projectCount,
+      totalEstimatedSavingBRL: acc.totalEstimatedSavingBRL + row.totalEstimatedSavingBRL,
+      totalCurrentAnnualHours: acc.totalCurrentAnnualHours + row.totalCurrentAnnualHours,
+    }),
+    { projectCount: 0, totalEstimatedSavingBRL: 0, totalCurrentAnnualHours: 0 }
+  );
+
   return (
     <Card
       className="bg-card animate-fade-up"
@@ -79,7 +89,7 @@ export function AreaSummaryChart({ companyId }: { companyId?: string }) {
 
         {!isLoading && data && data.length > 0 && (
           <div className="grid gap-6 lg:grid-cols-2">
-            <div className="h-64 w-full">
+            <div className="w-full" style={{ height: Math.max(256, data.length * 36 + 40) }}>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart
                   data={data}
@@ -146,6 +156,22 @@ export function AreaSummaryChart({ companyId }: { companyId?: string }) {
                     </TableRow>
                   ))}
                 </TableBody>
+                {totals && (
+                  <TableFooter>
+                    <TableRow>
+                      <TableCell className="font-semibold">Total</TableCell>
+                      <TableCell className="text-right font-semibold tabular-nums">
+                        {totals.projectCount}
+                      </TableCell>
+                      <TableCell className="text-right font-semibold tabular-nums">
+                        {formatCurrency(totals.totalEstimatedSavingBRL)}
+                      </TableCell>
+                      <TableCell className="text-right font-semibold tabular-nums">
+                        {formatHours(totals.totalCurrentAnnualHours)}
+                      </TableCell>
+                    </TableRow>
+                  </TableFooter>
+                )}
               </Table>
             </div>
           </div>

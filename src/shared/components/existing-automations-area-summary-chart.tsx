@@ -16,6 +16,7 @@ import {
   Table,
   TableBody,
   TableCell,
+  TableFooter,
   TableHead,
   TableHeader,
   TableRow,
@@ -53,6 +54,14 @@ export function ExistingAutomationsAreaSummaryChart({ companyId }: { companyId?:
     companyId,
   });
 
+  const totals = data?.reduce(
+    (acc, row) => ({
+      projectCount: acc.projectCount + row.projectCount,
+      totalAccumulatedSavingBRL: acc.totalAccumulatedSavingBRL + row.totalAccumulatedSavingBRL,
+    }),
+    { projectCount: 0, totalAccumulatedSavingBRL: 0 }
+  );
+
   return (
     <Card
       className="bg-card animate-fade-up"
@@ -77,7 +86,7 @@ export function ExistingAutomationsAreaSummaryChart({ companyId }: { companyId?:
 
         {!isLoading && data && data.length > 0 && (
           <div className="grid gap-6 lg:grid-cols-2">
-            <div className="h-64 w-full">
+            <div className="w-full" style={{ height: Math.max(256, data.length * 36 + 40) }}>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart
                   data={data}
@@ -140,6 +149,19 @@ export function ExistingAutomationsAreaSummaryChart({ companyId }: { companyId?:
                     </TableRow>
                   ))}
                 </TableBody>
+                {totals && (
+                  <TableFooter>
+                    <TableRow>
+                      <TableCell className="font-semibold">Total</TableCell>
+                      <TableCell className="text-right font-semibold tabular-nums">
+                        {totals.projectCount}
+                      </TableCell>
+                      <TableCell className="text-right font-semibold tabular-nums">
+                        {formatCurrency(totals.totalAccumulatedSavingBRL)}
+                      </TableCell>
+                    </TableRow>
+                  </TableFooter>
+                )}
               </Table>
             </div>
           </div>
