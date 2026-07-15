@@ -8,8 +8,10 @@ import type { Context } from "@/server/trpc/context";
 import { computeWaveSchedule, type WaveScheduleItem } from "@/shared/lib/wave-schedule";
 import {
   computePaybackCurve,
+  computeStructureCostAt,
   findPaybackDate,
   type PaybackPoint,
+  type StructureCostItem,
 } from "@/shared/lib/payback";
 import {
   BENEFIT_OPTIONS,
@@ -162,6 +164,7 @@ export async function buildDiagnosticDeck(companyId: string, actingUserId: strin
     settings,
     interviews,
     projects,
+    costItems,
   ] = await Promise.all([
     caller.project.getAreaSummary({ companyId }),
     caller.project.getPrioritizedRanking({ companyId, sortBy: "economia" }),
@@ -199,7 +202,15 @@ export async function buildDiagnosticDeck(companyId: string, actingUserId: strin
         ratingCompliance: true,
       },
     }),
+    caller.company.listCostItems({ companyId }),
   ]);
+
+  const structureCosts: StructureCostItem[] = costItems.map((item) => ({
+    type: item.type as "recorrente" | "pontual",
+    amountBRL: item.amountBRL,
+    startDate: item.startDate,
+    endDate: item.endDate,
+  }));
 
   const pres = new PptxGenJS();
   pres.layout = "LAYOUT_WIDE";
@@ -213,8 +224,8 @@ export async function buildDiagnosticDeck(companyId: string, actingUserId: strin
   addRankingSlide(pres, "Ranking por qualitativo", rankingQualitativo, "qualitativo");
   addRankingSlide(pres, "Ranking combinado", rankingCombinado, "combinado");
   addScheduleSlide(pres, rankingCombinado, settings.wave1StartDate);
-  addPaybackSlide(pres, rankingCombinado, settings);
-  addPaybackCompositionSlide(pres, rankingCombinado, settings);
+  addPaybackSlide(pres, rankingCombinado, settings, structureCosts);
+  addPaybackCompositionSlide(pres, rankingCombinado, settings, structureCosts);
   // Entrevistas: se não houver nenhuma, o slide é pulado inteiramente (não
   // criamos um slide vazio nem lançamos erro — decisão explícita do Passo 8a).
   if (interviews.length > 0) {
@@ -445,7 +456,8 @@ function addScheduleSlide(pres: PptxGenJS, ranking: Ranking, wave1StartDateRaw: 
 function addPaybackSlide(
   pres: PptxGenJS,
   ranking: Ranking,
-  settings: { developerDailyRateBRL: number | null; wave1StartDate: Date | null }
+  settings: { developerDailyRateBRL: number | null; wave1StartDate: Date | null },
+  structureCosts: StructureCostItem[]
 ): void {
   const slide = addTitledSlide(pres, "Payback / ROI acumulado");
   const { wave1, wave2, startDate } = computeWaveSchedules(ranking, settings.wave1StartDate);
@@ -462,7 +474,7 @@ function addPaybackSlide(
   }));
 
   const dailyRate = settings.developerDailyRateBRL ?? 0;
-  const curve = computePaybackCurve(paybackSchedule, dailyRate);
+  const curve = computePaybackCurve(paybackSchedule, dailyRate, structureCosts);
   const paybackDate = findPaybackDate(curve);
 
   const scheduleStartDate =
@@ -529,7 +541,8 @@ function addPaybackSlide(
 function addPaybackCompositionSlide(
   pres: PptxGenJS,
   ranking: Ranking,
-  settings: { developerDailyRateBRL: number | null; wave1StartDate: Date | null }
+  settings: { developerDailyRateBRL: number | null; wave1StartDate: Date | null },
+  structureCosts: StructureCostItem[]
 ): void {
   const { wave1, wave2 } = computeWaveSchedules(ranking, settings.wave1StartDate);
   const withWave = [
@@ -544,6 +557,7 @@ function addPaybackCompositionSlide(
     ranking.map((row) => [row.id, row.estimatedAnnualSavingBRL ?? 0])
   );
   const dailyRate = settings.developerDailyRateBRL ?? 0;
+  const structureCostToDate = computeStructureCostAt(structureCosts, new Date());
 
   const header: TableRow = [
     { text: "Processo", options: TABLE_HEADER_OPTS },
@@ -569,6 +583,14 @@ function addPaybackCompositionSlide(
       { text: formatCurrency(annualSavingBRL) },
     ];
   });
+
+  if (structureCostToDate > 0) {
+    rows.push([
+      { text: "Estrutura (pessoas/licenças) acumulada até hoje", options: { colspan: 5 } },
+      { text: formatCurrency(structureCostToDate) },
+      { text: "" },
+    ]);
+  }
 
   addSlideTable(slide, [header, ...rows], [4.1, 1.1, 1.5, 1.1, 1.6, 1.5, 1.4]);
 }
