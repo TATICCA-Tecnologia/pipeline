@@ -8,10 +8,12 @@ import { Empty, EmptyMedia, EmptyTitle, EmptyDescription } from "@/src/shared/co
 import { Spinner } from "@/src/shared/components/ui/spinner";
 import { formatDate } from "@/shared/utils";
 import { trpc } from "@/shared/trpc/client";
+import { useDemoMode } from "@/shared/context/demo-mode-context";
 import { FileText, Mail, Building2, Calendar, CheckCircle, X } from "lucide-react";
 import { toast } from "sonner";
 
 export default function AdminSolicitacoesPage() {
+  const { maskPersonName, maskContact, maskCompanyName, maskFreeText } = useDemoMode();
   const [acting, setActing] = useState<{ id: string; action: "approve" | "reject" } | null>(null);
   const { data: requests = [], isLoading } = trpc.request.list.useQuery();
   const utils = trpc.useUtils();
@@ -80,16 +82,18 @@ export default function AdminSolicitacoesPage() {
               <CardHeader className="p-4 sm:p-6">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                   <div className="min-w-0">
-                    <CardTitle className="text-base sm:text-lg">{request.name}</CardTitle>
+                    <CardTitle className="text-base sm:text-lg">
+                      {maskPersonName(request.id, request.name, "cliente")}
+                    </CardTitle>
                     <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1 text-sm text-muted-foreground">
                       <span className="flex items-center gap-1">
                         <Mail className="h-3 w-3 shrink-0" />
-                        {request.email}
+                        {maskContact(request.email, "email")}
                       </span>
                       {request.company && (
                         <span className="flex items-center gap-1">
                           <Building2 className="h-3 w-3 shrink-0" />
-                          {request.company}
+                          {maskCompanyName(request.company, request.company)}
                         </span>
                       )}
                     </div>
@@ -103,7 +107,7 @@ export default function AdminSolicitacoesPage() {
                 <div>
                   <p className="text-sm font-medium mb-1">Descrição</p>
                   <p className="text-sm text-muted-foreground">
-                    {request.description}
+                    {maskFreeText(request.description)}
                   </p>
                 </div>
 
