@@ -2,6 +2,7 @@
 
 import type { Project, UserRole } from "@/shared/types";
 import { STATUS_CONFIG, PRIORITY_CONFIG } from "@/shared/types";
+import { useDemoMode } from "@/shared/context/demo-mode-context";
 import { formatDate, formatCurrency } from "@/shared/utils";
 import { DetailSection, FieldRow } from "@/shared/components/detail-section";
 import { useState } from "react";
@@ -38,6 +39,7 @@ export function ProjectDetailSections({
   allowEdit?: boolean;
 }) {
   const [isEditing, setIsEditing] = useState(false);
+  const { maskFreeText, maskCompanyName } = useDemoMode();
   const statusConfig = STATUS_CONFIG[project.status] ?? {
     label: project.status,
     color: "bg-muted",
@@ -86,12 +88,12 @@ export function ProjectDetailSections({
 
       <DetailSection title="Básico">
         <FieldRow label="ID do projeto" value={project.id} />
-        <FieldRow label="Título" value={project.title} />
-        <FieldRow label="Descrição" value={project.description} />
+        <FieldRow label="Título" value={maskFreeText(project.title)} />
+        <FieldRow label="Descrição" value={maskFreeText(project.description)} />
         <FieldRow label="Tipo / Plataforma" value={project.projectType} />
         <FieldRow label="Status" value={statusConfig.label} />
         <FieldRow label="Prioridade" value={priorityConfig.label} />
-        <FieldRow label="Empresa" value={project.companyName} />
+        <FieldRow label="Empresa" value={maskCompanyName(project.companyId, project.companyName)} />
         <FieldRow label="Cliente (ID)" value={project.clientId} />
         <FieldRow label="Desenvolvedor (ID)" value={project.developerId} />
         <FieldRow label="Criado em" value={formatDate(project.createdAt)} />
@@ -99,26 +101,26 @@ export function ProjectDetailSections({
       </DetailSection>
 
       <DetailSection title="Envolvidos & contexto atual">
-        <FieldRow label="Público-alvo" value={project.targetAudience} />
+        <FieldRow label="Público-alvo" value={maskFreeText(project.targetAudience)} />
         <FieldRow label="Usuários esperados" value={project.expectedUsers} />
         <FieldRow
           label="Processo/sistema existente"
           value={resolveLabel(project.hasExistingSystem, HAS_EXISTING_SYSTEM_OPTIONS)}
         />
-        <FieldRow label="Detalhes do processo atual" value={project.existingSystemDetails} />
+        <FieldRow label="Detalhes do processo atual" value={maskFreeText(project.existingSystemDetails)} />
         <FieldRow
           label="Aplicação existente hoje"
           value={resolveLabel(project.hasCurrentApplication, HAS_CURRENT_APPLICATION_OPTIONS)}
         />
         <FieldRow
           label="Detalhes da aplicação existente"
-          value={project.currentApplicationDetails}
+          value={maskFreeText(project.currentApplicationDetails)}
         />
       </DetailSection>
 
       <DetailSection title="Diagnóstico operacional">
         <FieldRow label="Colaboradores envolvidos" value={project.peopleInvolved} />
-        <FieldRow label="Detalhes dos colaboradores" value={project.peopleInvolvedDetails} />
+        <FieldRow label="Detalhes dos colaboradores" value={maskFreeText(project.peopleInvolvedDetails)} />
         <FieldRow label="Duração por execução (horas)" value={project.taskDurationHours} />
         <FieldRow
           label="Periodicidade"
@@ -130,7 +132,7 @@ export function ProjectDetailSections({
       <DetailSection title="Funcionalidades & benefícios">
         <FieldRow label="Funcionalidades" value={project.features} />
         <FieldRow label="Benefícios esperados" value={benefitLabels} />
-        <FieldRow label="Detalhes dos benefícios" value={project.benefitsDetails} />
+        <FieldRow label="Detalhes dos benefícios" value={maskFreeText(project.benefitsDetails)} />
         <FieldRow label="Horas economizadas por mês" value={project.monthlyHoursSaved} />
       </DetailSection>
 
@@ -149,13 +151,13 @@ export function ProjectDetailSections({
       </DetailSection>
 
       <DetailSection title="Narrativa & prazo">
-        <FieldRow label="Narrativa do processo" value={project.projectNarrative} />
+        <FieldRow label="Narrativa do processo" value={maskFreeText(project.projectNarrative)} />
         <FieldRow label="Urgência" value={resolveLabel(project.urgency, URGENCY_LEVELS)} />
         <FieldRow
           label="Prazo limite"
           value={project.estimatedDeadline ? formatDate(project.estimatedDeadline) : undefined}
         />
-        <FieldRow label="Informações adicionais" value={project.additionalInfo} />
+        <FieldRow label="Informações adicionais" value={maskFreeText(project.additionalInfo)} />
       </DetailSection>
 
       {canSeeTechnical && (
@@ -169,7 +171,7 @@ export function ProjectDetailSections({
             label="Estratégia de execução"
             value={resolveLabel(project.executionStrategy, EXECUTION_STRATEGIES)}
           />
-          <FieldRow label="Notas do arquiteto" value={project.architectNotes} />
+          <FieldRow label="Notas do arquiteto" value={maskFreeText(project.architectNotes)} />
           <FieldRow label="Tipos de solução" value={solutionTypeLabels} />
           <FieldRow
             label="Economia anual estimada"
