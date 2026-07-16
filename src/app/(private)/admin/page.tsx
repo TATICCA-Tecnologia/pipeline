@@ -1,6 +1,7 @@
 "use client";
 
 import { useProjects } from "@/shared/context/projects-context";
+import { useDemoMode } from "@/shared/context/demo-mode-context";
 import { STATUS_CONFIG } from "@/shared/types";
 import type { ProjectStatus } from "@/shared/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/src/shared/components/ui/card";
@@ -78,6 +79,7 @@ function StatCard({
 
 export default function AdminDashboard() {
   const { projects, requests } = useProjects();
+  const { maskFreeText } = useDemoMode();
 
   const stats = {
     total: projects.length,
@@ -193,7 +195,7 @@ export default function AdminDashboard() {
                     style={{ animationDelay: `${400 + i * 50}ms`, animationFillMode: "both" }}
                   >
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium">{project.title}</p>
+                      <p className="truncate text-sm font-medium">{maskFreeText(project.title)}</p>
                       <p className="truncate text-xs text-muted-foreground">
                         {project.projectType}
                       </p>
