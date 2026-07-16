@@ -14,6 +14,7 @@ import {
 import { Badge } from "@/src/shared/components/ui/badge";
 import { X, Plus } from "lucide-react";
 import type { User } from "@/shared/types";
+import { useDemoMode } from "@/shared/context/demo-mode-context";
 
 interface ManageCompaniesDialogProps {
   client: User | null;
@@ -28,6 +29,7 @@ export function ManageCompaniesDialog({
 }: ManageCompaniesDialogProps) {
   const [search, setSearch] = useState("");
   const utils = trpc.useUtils();
+  const { maskPersonName, maskCompanyName } = useDemoMode();
 
   const { data: userCompanies = [], refetch: refetchUserCompanies } =
     trpc.user.listCompaniesForUser.useQuery(
@@ -78,7 +80,7 @@ export function ManageCompaniesDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Empresas de {client.name}</DialogTitle>
+          <DialogTitle>Empresas de {maskPersonName(client.id, client.name, "cliente")}</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-2">
@@ -95,7 +97,7 @@ export function ManageCompaniesDialog({
                   variant="secondary"
                   className="pl-3 pr-1 py-1.5 flex items-center gap-1"
                 >
-                  {company.name}
+                  {maskCompanyName(company.id, company.name)}
                   <button
                     type="button"
                     onClick={() =>
@@ -105,7 +107,7 @@ export function ManageCompaniesDialog({
                       })
                     }
                     className="ml-1 rounded-full p-0.5 hover:bg-muted-foreground/20"
-                    aria-label={`Remover ${company.name}`}
+                    aria-label={`Remover ${maskCompanyName(company.id, company.name)}`}
                   >
                     <X className="h-3 w-3" />
                   </button>
@@ -132,7 +134,7 @@ export function ManageCompaniesDialog({
                 }
                 className="flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left text-sm hover:bg-accent"
               >
-                {company.name}
+                {maskCompanyName(company.id, company.name)}
                 <Plus className="h-3.5 w-3.5 text-muted-foreground" />
               </button>
             ))}
