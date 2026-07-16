@@ -3,6 +3,8 @@
 import { useAuth } from "@/shared/context/auth-context";
 import { AppSidebar } from "@/shared/components";
 import { ImpersonationBanner } from "@/shared/components/impersonation-banner";
+import { DemoModeBar } from "@/shared/components/demo-mode-bar";
+import { DemoModeProvider } from "@/shared/context/demo-mode-context";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { Spinner } from "@/src/shared/components/ui/spinner";
@@ -36,14 +38,17 @@ export default function PrivateLayout({
   }
 
   return (
-    <ModalProvider>
-      <div className="min-h-screen bg-background">
-        <AppSidebar />
-        <main className="ml-64">
-          <ImpersonationBanner />
-          <div className="p-6">{children}</div>
-        </main>
-      </div>
-    </ModalProvider>
+    <DemoModeProvider>
+      <ModalProvider>
+        <div className="min-h-screen bg-background">
+          <AppSidebar />
+          <main className="ml-64">
+            <DemoModeBar />
+            <ImpersonationBanner />
+            <div className="p-6">{children}</div>
+          </main>
+        </div>
+      </ModalProvider>
+    </DemoModeProvider>
   );
 }
