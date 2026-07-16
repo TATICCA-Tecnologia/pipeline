@@ -24,6 +24,7 @@ import {
   TableRow,
 } from "@/src/shared/components/ui/table";
 import { useToast } from "@/src/shared/hooks/use-toast";
+import { useDemoMode } from "@/shared/context/demo-mode-context";
 import { Bot, Building2, Plus, Search, Pencil, ListOrdered, Users, Download, Wallet } from "lucide-react";
 import Link from "next/link";
 import { getTrpcUserId } from "@/shared/trpc/auth-header";
@@ -33,6 +34,7 @@ const EMPTY_FORM = { name: "", document: "", email: "", phone: "" };
 
 export default function EmpresasPage() {
   const { toast } = useToast();
+  const { maskCompanyName, maskContact } = useDemoMode();
   const utils = trpc.useUtils();
   const { data: companies = [], isLoading } = trpc.company.listAll.useQuery();
 
@@ -239,15 +241,17 @@ export default function EmpresasPage() {
               ) : (
                 filtered.map((company) => (
                   <TableRow key={company.id} className={!company.isActive ? "opacity-60" : undefined}>
-                    <TableCell className="font-medium">{company.name}</TableCell>
+                    <TableCell className="font-medium">{maskCompanyName(company.id, company.name)}</TableCell>
                     <TableCell className="text-muted-foreground">
-                      {company.document || "-"}
+                      {company.document ? maskContact(company.document, "document") : "-"}
                     </TableCell>
                     <TableCell className="text-muted-foreground">
                       {company.email || company.phone ? (
                         <div className="space-y-0.5">
-                          {company.email && <p className="truncate">{company.email}</p>}
-                          {company.phone && <p>{company.phone}</p>}
+                          {company.email && (
+                            <p className="truncate">{maskContact(company.email, "email")}</p>
+                          )}
+                          {company.phone && <p>{maskContact(company.phone, "phone")}</p>}
                         </div>
                       ) : (
                         "-"
