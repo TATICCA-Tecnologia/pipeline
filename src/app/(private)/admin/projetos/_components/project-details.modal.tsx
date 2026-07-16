@@ -18,6 +18,7 @@ import {
 } from "@/src/shared/components/ui/alert-dialog";
 import { ProjectDetailSections } from "@/shared/components/project-detail-sections";
 import { useAuth } from "@/shared/context/auth-context";
+import { useDemoMode } from "@/shared/context/demo-mode-context";
 import { useModal } from "@/shared/context/modal-context";
 import { useProjects } from "@/shared/context/projects-context";
 import { trpc } from "@/shared/trpc/client";
@@ -45,6 +46,7 @@ export function ProjectDetailsModal({
   onClose,
 }: ModalProps<ProjectDetailsModalData>) {
   const { user } = useAuth();
+  const { maskFreeText } = useDemoMode();
   const { deleteProject } = useProjects();
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -131,7 +133,7 @@ export function ProjectDetailsModal({
       </div>
 
       <div className="flex-1 overflow-y-auto px-5 py-6">
-        <h2 className="mb-1 text-lg font-bold text-[#0F172A]">{project.title}</h2>
+        <h2 className="mb-1 text-lg font-bold text-[#0F172A]">{maskFreeText(project.title)}</h2>
         <p className="mb-5 text-sm text-[#6B7280]">
           {isLoading && !fullProject
             ? "Carregando detalhes completos..."
