@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useProjects } from "@/shared/context/projects-context";
+import { useDemoMode } from "@/shared/context/demo-mode-context";
 import { KanbanBoard } from "@/shared/components";
 import type { Project, ProjectStatus } from "@/shared/types";
 import { STATUS_CONFIG, PRIORITY_CONFIG } from "@/shared/types";
@@ -115,6 +116,7 @@ const ALL_COLUMNS: ProjectStatus[] = [
 export default function AdminProjetosPage() {
   const { projects, moveProject } = useProjects();
   const { openModal } = useModal();
+  const { isDemoMode } = useDemoMode();
   const [companyFilter, setCompanyFilter] = useState(ALL_COMPANIES_VALUE);
 
   const filteredProjects = filterProjectsByCompany(projects, companyFilter);
@@ -162,7 +164,8 @@ export default function AdminProjetosPage() {
               downloadProjectsCSV(filteredProjects);
               toast.success("CSV exportado com sucesso");
             }}
-            disabled={filteredProjects.length === 0}
+            disabled={filteredProjects.length === 0 || isDemoMode}
+            title={isDemoMode ? "Exportação desativada no modo demonstração" : undefined}
           >
             <Download className="h-3.5 w-3.5 mr-1.5" />
             Exportar CSV
