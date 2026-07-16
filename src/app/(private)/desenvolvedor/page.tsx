@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useAuth } from "@/shared/context/auth-context";
+import { useDemoMode } from "@/shared/context/demo-mode-context";
 import { useProjects } from "@/shared/context/projects-context";
 import { KanbanBoard } from "@/shared/components";
 import type { Project, ProjectStatus } from "@/shared/types";
@@ -40,6 +41,7 @@ const DEVELOPER_COLUMNS: ProjectStatus[] = [
 export default function DesenvolvedorDashboard() {
   const { user, isSuperAdmin } = useAuth();
   const { projects, moveProject } = useProjects();
+  const { maskFreeText } = useDemoMode();
   const { openModal } = useModal();
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [companyFilter, setCompanyFilter] = useState(ALL_COMPANIES_VALUE);
@@ -153,7 +155,7 @@ export default function DesenvolvedorDashboard() {
       >
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>{selectedProject?.title}</DialogTitle>
+            <DialogTitle>{maskFreeText(selectedProject?.title)}</DialogTitle>
             <DialogDescription>Detalhes e ações do projeto</DialogDescription>
           </DialogHeader>
 
@@ -183,7 +185,7 @@ export default function DesenvolvedorDashboard() {
                     <div>
                       <p className="text-sm font-medium">Descrição</p>
                       <p className="text-sm text-muted-foreground">
-                        {selectedProject.description}
+                        {maskFreeText(selectedProject.description)}
                       </p>
                     </div>
                   </div>
