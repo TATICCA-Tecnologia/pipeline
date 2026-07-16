@@ -14,6 +14,7 @@ import {
   SOLUTION_TYPES,
   EXECUTION_STRATEGIES,
 } from "@/src/app/(private)/admin/projetos/[id]/especificacao/_constants/architecture";
+import { useDemoMode } from "@/shared/context/demo-mode-context";
 
 // Página de tamanho fixo (16:9, mesma proporção de um slide de verdade) — o conteúdo
 // NUNCA muda o tamanho da página; em vez disso, encolhe (useFitToSlide abaixo) até caber.
@@ -217,6 +218,7 @@ function buildLabeledLinesWithDetail(
 export function ProjectExecutiveSlide({ project }: { project: Project }) {
   const contentRef = useRef<HTMLDivElement>(null);
   const scale = useFitToSlide(contentRef, project.id);
+  const { maskFreeText, maskCompanyName } = useDemoMode();
 
   const areaEntrevistada = project.projectType.split(" · Plataforma")[0];
 
@@ -224,14 +226,14 @@ export function ProjectExecutiveSlide({ project }: { project: Project }) {
     {
       label: "Abordagem",
       value: resolveLabel(project.hasExistingSystem, HAS_EXISTING_SYSTEM_OPTIONS),
-      detail: project.existingSystemDetails,
+      detail: maskFreeText(project.existingSystemDetails) ?? undefined,
     },
     {
       label: "Aplicação existente hoje",
       value: resolveLabel(project.hasCurrentApplication, HAS_CURRENT_APPLICATION_OPTIONS),
-      detail: project.currentApplicationDetails,
+      detail: maskFreeText(project.currentApplicationDetails) ?? undefined,
     },
-    { label: "Público-alvo", value: project.targetAudience },
+    { label: "Público-alvo", value: maskFreeText(project.targetAudience) ?? undefined },
   ]);
 
   const solutionTypeLabels = (project.solutionTypes ?? []).map(
@@ -257,7 +259,7 @@ export function ProjectExecutiveSlide({ project }: { project: Project }) {
   const quantitativeLines: { label: string; value: string; isGap?: boolean }[] = [
     ...buildLabeledLines([
       { label: "Periodicidade do processo", value: periodicidadeLabel },
-      { label: "Rodagem do bot", value: project.robotSchedule },
+      { label: "Rodagem do bot", value: maskFreeText(project.robotSchedule) ?? undefined },
     ]),
     {
       label: "Colaboradores",
@@ -327,11 +329,11 @@ export function ProjectExecutiveSlide({ project }: { project: Project }) {
           <div>
             {project.companyName && (
               <div className="mb-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                {project.companyName}
+                {maskCompanyName(project.companyId, project.companyName)}
               </div>
             )}
             <h1 className="max-w-[85%] text-3xl font-extrabold leading-tight tracking-tight">
-              {project.title}
+              {maskFreeText(project.title)}
             </h1>
             {areaEntrevistada && (
               <p className="mt-1 text-sm font-semibold text-teal-600">{areaEntrevistada}</p>
@@ -352,7 +354,7 @@ export function ProjectExecutiveSlide({ project }: { project: Project }) {
               <div>
                 <SectionLabel>O processo hoje</SectionLabel>
                 <p className="mt-1.5 text-sm leading-relaxed text-foreground/90">
-                  {project.description}
+                  {maskFreeText(project.description)}
                 </p>
               </div>
             )}
@@ -393,7 +395,7 @@ export function ProjectExecutiveSlide({ project }: { project: Project }) {
                   Principais ações da automação
                 </div>
                 <p className="text-sm leading-relaxed text-foreground/90">
-                  {project.architectNotes}
+                  {maskFreeText(project.architectNotes)}
                 </p>
               </div>
             )}
