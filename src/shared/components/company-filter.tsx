@@ -1,6 +1,7 @@
 "use client";
 
 import type { Project } from "@/shared/types";
+import { useDemoMode } from "@/shared/context/demo-mode-context";
 import {
   Select,
   SelectContent,
@@ -18,6 +19,7 @@ interface CompanyFilterProps {
 }
 
 export function CompanyFilter({ projects, value, onChange }: CompanyFilterProps) {
+  const { maskCompanyName } = useDemoMode();
   const companies = Array.from(
     new Map(
       projects
@@ -39,7 +41,7 @@ export function CompanyFilter({ projects, value, onChange }: CompanyFilterProps)
         <SelectItem value={ALL_COMPANIES_VALUE}>Todas as empresas</SelectItem>
         {companies.map(([id, name]) => (
           <SelectItem key={id} value={id}>
-            {name}
+            {maskCompanyName(id, name)}
           </SelectItem>
         ))}
       </SelectContent>
