@@ -3,6 +3,7 @@
 import { use, useMemo, useState } from "react";
 import Link from "next/link";
 import { trpc } from "@/shared/trpc/client";
+import { useDemoMode } from "@/shared/context/demo-mode-context";
 import type { inferRouterOutputs } from "@trpc/server";
 import type { AppRouter } from "@/server/trpc/root";
 import { Button } from "@/src/shared/components/ui/button";
@@ -66,6 +67,7 @@ export default function CustosEstruturaPage({ params }: Props) {
 
   const { data: companies = [] } = trpc.company.listAll.useQuery();
   const company = companies.find((c) => c.id === companyId);
+  const { maskCompanyName } = useDemoMode();
 
   const { data: items = [], isLoading } = trpc.company.listCostItems.useQuery({ companyId });
   const { data: categories = [] } = trpc.taxonomy.listCostCategories.useQuery();
@@ -174,7 +176,9 @@ export default function CustosEstruturaPage({ params }: Props) {
         </Link>
         <div>
           <h1 className="text-2xl font-bold text-foreground">Custos e Estrutura</h1>
-          <p className="text-muted-foreground">{company?.name ?? "Carregando..."}</p>
+          <p className="text-muted-foreground">
+            {maskCompanyName(companyId, company?.name) ?? "Carregando..."}
+          </p>
         </div>
       </div>
 
