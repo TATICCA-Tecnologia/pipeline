@@ -69,7 +69,7 @@ const ROLE_LABEL: Record<string, string> = {
 export default function ClientesPage() {
   const { clients, addClient, updateClient, deleteClient, refetch } = useClients();
   const { projects } = useProjects();
-  const { maskPersonName, maskContact, maskCompanyName } = useDemoMode();
+  const { isDemoMode, maskPersonName, maskContact, maskCompanyName } = useDemoMode();
   const { data: companies = [] } = trpc.company.list.useQuery();
   const [search, setSearch] = useQueryState(
     "q",
@@ -393,6 +393,7 @@ export default function ClientesPage() {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem
+                            disabled={isDemoMode}
                             onClick={() => handleOpenDialog(client)}
                           >
                             <Pencil className="h-4 w-4 mr-2" />
