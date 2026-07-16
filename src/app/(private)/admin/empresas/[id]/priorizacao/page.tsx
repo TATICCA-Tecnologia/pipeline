@@ -23,6 +23,7 @@ import {
 } from "recharts";
 import { toast } from "sonner";
 import { trpc } from "@/shared/trpc/client";
+import { useDemoMode } from "@/shared/context/demo-mode-context";
 import { Card, CardContent, CardHeader, CardTitle } from "@/src/shared/components/ui/card";
 import { Badge } from "@/src/shared/components/ui/badge";
 import { Button } from "@/src/shared/components/ui/button";
@@ -161,10 +162,18 @@ export default function PriorizacaoPage({ params }: Props) {
   const { data: companies = [] } = trpc.company.listAll.useQuery();
   const company = companies.find((c) => c.id === companyId);
 
+  const { maskFreeText, maskCompanyName } = useDemoMode();
   const { data: ranking = [], isLoading } = trpc.project.getPrioritizedRanking.useQuery({
     companyId,
     sortBy,
   });
+  // Cópia com o título mascarado — usada em todo lugar abaixo que exibe o ranking
+  // (gráfico, tooltip, tabela, cronograma, payback), pra masquear uma vez só na fonte
+  // em vez de em cada ponto de renderização.
+  const displayRanking = useMemo(
+    () => ranking.map((row) => ({ ...row, title: maskFreeText(row.title) ?? row.title })),
+    [ranking, maskFreeText]
+  );
 
   const { data: areaSummaryGaps } = trpc.project.getAreaSummaryGaps.useQuery({ companyId });
 
@@ -185,12 +194,12 @@ export default function PriorizacaoPage({ params }: Props) {
 
   const chartData = useMemo(
     () =>
-      ranking.map((row) => ({
+      displayRanking.map((row) => ({
         ...row,
         activeScore: activeScoreOf(row, sortBy),
         shortTitle: truncate(row.title, 18),
       })),
-    [ranking, sortBy]
+    [displayRanking, sortBy]
   );
 
   // Data de início da onda 1: vem de SystemSettings.wave1StartDate (Passo 1/3).
@@ -202,12 +211,12 @@ export default function PriorizacaoPage({ params }: Props) {
   );
 
   const wave1Projects = useMemo(
-    () => ranking.filter((row) => row.implementationWave === 1),
-    [ranking]
+    () => displayRanking.filter((row) => row.implementationWave === 1),
+    [displayRanking]
   );
   const wave2Projects = useMemo(
-    () => ranking.filter((row) => row.implementationWave === 2),
-    [ranking]
+    () => displayRanking.filter((row) => row.implementationWave === 2),
+    [displayRanking]
   );
 
   const wave1Schedule = useMemo(
@@ -260,16 +269,16 @@ export default function PriorizacaoPage({ params }: Props) {
   }
 
   const areaNameByProjectId = useMemo(
-    () => new Map(ranking.map((row) => [row.id, row.areaName])),
-    [ranking]
+    () => new Map(displayRanking.map((row) => [row.id, row.areaName])),
+    [displayRanking]
   );
 
   // Payback (Passo 6): reaproveita os dois schedules já calculados acima pelo
   // Passo 5 (nenhuma chamada de rede adicional) e a saving anual de cada
   // robô, já presente no ranking buscado no topo da página.
   const savingByProjectId = useMemo(
-    () => new Map(ranking.map((row) => [row.id, row.estimatedAnnualSavingBRL ?? 0])),
-    [ranking]
+    () => new Map(displayRanking.map((row) => [row.id, row.estimatedAnnualSavingBRL ?? 0])),
+    [displayRanking]
   );
 
   const paybackSchedule = useMemo(
@@ -398,7 +407,7 @@ export default function PriorizacaoPage({ params }: Props) {
             Priorização de processos
           </h1>
           <p className="text-muted-foreground">
-            {company?.name ?? "Carregando..."} — ranking reordenável por critério
+            {maskCompanyName(companyId, company?.name) ?? "Carregando..."} — ranking reordenável por critério
           </p>
         </div>
       </div>
@@ -538,14 +547,14 @@ export default function PriorizacaoPage({ params }: Props) {
                         Carregando ranking...
                       </TableCell>
                     </TableRow>
-                  ) : ranking.length === 0 ? (
+                  ) : displayRanking.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={9} className="h-24 text-center text-muted-foreground">
                         Nenhum projeto encontrado para esta empresa.
                       </TableCell>
                     </TableRow>
                   ) : (
-                    ranking.map((row, index) => (
+                    displayRanking.map((row, index) => (
                       <TableRow key={row.id}>
                         <TableCell className="text-muted-foreground tabular-nums">
                           {index + 1}
