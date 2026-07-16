@@ -4,6 +4,7 @@ import { use, useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { trpc } from "@/shared/trpc/client";
+import { useDemoMode } from "@/shared/context/demo-mode-context";
 import { Card, CardContent } from "@/src/shared/components/ui/card";
 import { Badge } from "@/src/shared/components/ui/badge";
 import { Button } from "@/src/shared/components/ui/button";
@@ -105,6 +106,7 @@ export default function EntrevistasPage({ params }: Props) {
 
   const { data: companies = [] } = trpc.company.listAll.useQuery();
   const company = companies.find((c) => c.id === companyId);
+  const { maskCompanyName, maskPersonName } = useDemoMode();
 
   const { data: areas = [] } = trpc.taxonomy.listAreas.useQuery();
 
@@ -193,8 +195,8 @@ export default function EntrevistasPage({ params }: Props) {
             Entrevistas de levantamento
           </h1>
           <p className="text-muted-foreground">
-            {company?.name ?? "Carregando..."} — participantes, área, data e status das
-            entrevistas realizadas
+            {maskCompanyName(companyId, company?.name) ?? "Carregando..."} — participantes,
+            área, data e status das entrevistas realizadas
           </p>
         </div>
         <Button onClick={openNew} className="gap-2 shrink-0">
@@ -231,7 +233,9 @@ export default function EntrevistasPage({ params }: Props) {
               ) : (
                 interviews.map((interview) => (
                   <TableRow key={interview.id}>
-                    <TableCell className="font-medium">{interview.participantName}</TableCell>
+                    <TableCell className="font-medium">
+                      {maskPersonName(interview.id, interview.participantName, "cliente")}
+                    </TableCell>
                     <TableCell className="text-muted-foreground">
                       {interview.area?.name ?? "-"}
                     </TableCell>
