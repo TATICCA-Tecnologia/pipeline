@@ -5,6 +5,7 @@ import { useProjects } from "@/shared/context/projects-context";
 import { useAuth } from "@/shared/context/auth-context";
 import type { Project } from "@/shared/types";
 import { ProjectDetailSections } from "@/shared/components/project-detail-sections";
+import { useDemoMode } from "@/shared/context/demo-mode-context";
 import { ProjectChat } from "@/shared/components/project-chat";
 import { ProjectFiles } from "@/shared/components/project-files";
 import { Card, CardContent, CardHeader, CardTitle } from "@/src/shared/components/ui/card";
@@ -49,6 +50,7 @@ export default function ProjetoPage({ params }: ProjetoPageProps) {
   const { projects } = useProjects();
   const { user } = useAuth();
   const { projectDetails, activityLogs, developers } = useProject(id);
+  const { maskFreeText, maskCompanyName, maskPersonName, maskContact } = useDemoMode();
   const { addFeatureMutation, toggleFeatureMutation, updateProjectMutation } = useProjectActions(id);
   const { openModal } = useModal();
 
@@ -133,7 +135,7 @@ export default function ProjetoPage({ params }: ProjetoPageProps) {
         </Link>
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold text-foreground">{project.title}</h1>
+            <h1 className="text-2xl font-bold text-foreground">{maskFreeText(project.title)}</h1>
             <Badge className={statusConfig.color}>{statusConfig.label}</Badge>
             <Badge variant="outline" className={priorityConfig.color}>
               {priorityConfig.label}
@@ -422,7 +424,8 @@ export default function ProjetoPage({ params }: ProjetoPageProps) {
               <div className="flex items-center gap-2 rounded-lg bg-secondary/30 p-2 text-sm">
                 <Building className="h-4 w-4 text-muted-foreground" />
                 <span>
-                  {(projectDetails as any)?.companyName ?? "Sem empresa definida"}
+                  {maskCompanyName(project.companyId, (projectDetails as any)?.companyName) ??
+                    "Sem empresa definida"}
                 </span>
               </div>
               {project.developerId ? (
@@ -434,10 +437,14 @@ export default function ProjetoPage({ params }: ProjetoPageProps) {
                   </div>
                   <div>
                     <p className="text-sm font-medium">
-                      {(projectDetails as any)?.developer?.name ?? "Desenvolvedor atribuído"}
+                      {maskPersonName(
+                        project.developerId,
+                        (projectDetails as any)?.developer?.name,
+                        "desenvolvedor"
+                      ) ?? "Desenvolvedor atribuído"}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      {(projectDetails as any)?.developer?.email ?? ""}
+                      {maskContact((projectDetails as any)?.developer?.email, "email") ?? ""}
                     </p>
                   </div>
                 </div>
