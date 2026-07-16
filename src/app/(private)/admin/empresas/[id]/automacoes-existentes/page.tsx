@@ -14,6 +14,7 @@ import {
   YAxis,
 } from "recharts";
 import { trpc } from "@/shared/trpc/client";
+import { useDemoMode } from "@/shared/context/demo-mode-context";
 import { Card, CardContent, CardHeader, CardTitle } from "@/src/shared/components/ui/card";
 import { Badge } from "@/src/shared/components/ui/badge";
 import { Button } from "@/src/shared/components/ui/button";
@@ -99,19 +100,24 @@ export default function AutomacoesExistentesPage({ params }: Props) {
   const { data: companies = [] } = trpc.company.listAll.useQuery();
   const company = companies.find((c) => c.id === companyId);
 
+  const { maskFreeText, maskCompanyName } = useDemoMode();
   const { data: ranking = [], isLoading } = trpc.project.getExistingAutomationsRanking.useQuery({
     companyId,
     sortBy,
   });
+  const displayRanking = useMemo(
+    () => ranking.map((row) => ({ ...row, title: maskFreeText(row.title) ?? row.title })),
+    [ranking, maskFreeText]
+  );
 
   const chartData = useMemo(
     () =>
-      ranking.map((row) => ({
+      displayRanking.map((row) => ({
         ...row,
         activeScore: activeScoreOf(row, sortBy),
         shortTitle: truncate(row.title, 18),
       })),
-    [ranking, sortBy]
+    [displayRanking, sortBy]
   );
 
   function handleViewDetails(row: RankingRow) {
@@ -137,8 +143,8 @@ export default function AutomacoesExistentesPage({ params }: Props) {
             Automações existentes
           </h1>
           <p className="text-muted-foreground">
-            {company?.name ?? "Carregando..."} — automações já entregues/existentes, fora do
-            funil de desenvolvimento
+            {maskCompanyName(companyId, company?.name) ?? "Carregando..."} — automações já
+            entregues/existentes, fora do funil de desenvolvimento
           </p>
         </div>
       </div>
@@ -261,14 +267,14 @@ export default function AutomacoesExistentesPage({ params }: Props) {
                     Carregando...
                   </TableCell>
                 </TableRow>
-              ) : ranking.length === 0 ? (
+              ) : displayRanking.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
                     Nenhuma automação existente encontrada para esta empresa.
                   </TableCell>
                 </TableRow>
               ) : (
-                ranking.map((row, index) => {
+                displayRanking.map((row, index) => {
                   const statusConfig = row.operationalStatus
                     ? ROBOT_OPERATIONAL_STATUS_CONFIG[row.operationalStatus]
                     : null;
