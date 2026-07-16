@@ -106,7 +106,7 @@ export default function EntrevistasPage({ params }: Props) {
 
   const { data: companies = [] } = trpc.company.listAll.useQuery();
   const company = companies.find((c) => c.id === companyId);
-  const { maskCompanyName, maskPersonName } = useDemoMode();
+  const { isDemoMode, maskCompanyName, maskPersonName } = useDemoMode();
 
   const { data: areas = [] } = trpc.taxonomy.listAreas.useQuery();
 
@@ -249,7 +249,13 @@ export default function EntrevistasPage({ params }: Props) {
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1">
-                        <Button size="icon" variant="ghost" onClick={() => openEdit(interview)}>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          disabled={isDemoMode}
+                          title={isDemoMode ? "Edição desativada no modo demonstração" : undefined}
+                          onClick={() => openEdit(interview)}
+                        >
                           <Pencil className="h-4 w-4" />
                         </Button>
                         <Button
@@ -260,7 +266,9 @@ export default function EntrevistasPage({ params }: Props) {
                             setDeleteConfirm({
                               open: true,
                               id: interview.id,
-                              label: interview.participantName,
+                              label:
+                                maskPersonName(interview.id, interview.participantName, "cliente") ??
+                                interview.participantName,
                             })
                           }
                         >
