@@ -20,12 +20,14 @@ import { Button } from "@/src/shared/components/ui/button";
 import { formatCurrency, formatDate } from "@/shared/utils";
 import { ROBOT_OPERATIONAL_STATUS_CONFIG } from "@/shared/types";
 import type { Project } from "@/shared/types";
+import { useDemoMode } from "@/shared/context/demo-mode-context";
 import { useModal } from "@/shared/context/modal-context";
 import { ReportIncidentModal } from "./_components/report-incident.modal";
 
 export default function MeusRobosPage() {
   const { projects } = useProjects();
   const { openModal } = useModal();
+  const { maskFreeText, maskCompanyName } = useDemoMode();
   const [companyFilter, setCompanyFilter] = useState(ALL_COMPANIES_VALUE);
 
   const doneProjects = projects.filter((p) => p.status === "completed");
@@ -39,7 +41,7 @@ export default function MeusRobosPage() {
     openModal(
       `report-incident-${project.id}`,
       ReportIncidentModal,
-      { projectId: project.id, projectTitle: project.title },
+      { projectId: project.id, projectTitle: maskFreeText(project.title) ?? project.title },
       { size: "md", position: "center" }
     );
   }
@@ -84,9 +86,11 @@ export default function MeusRobosPage() {
                 : null;
               return (
                 <TableRow key={project.id}>
-                  <TableCell className="font-medium">{project.title}</TableCell>
+                  <TableCell className="font-medium">{maskFreeText(project.title)}</TableCell>
                   {showCompanyColumn && (
-                    <TableCell>{project.companyName ?? "—"}</TableCell>
+                    <TableCell>
+                      {maskCompanyName(project.companyId, project.companyName) ?? "—"}
+                    </TableCell>
                   )}
                   <TableCell>
                     <Badge variant="outline" className={statusConfig?.color}>
