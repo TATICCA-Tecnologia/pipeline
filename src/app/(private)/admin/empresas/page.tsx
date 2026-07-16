@@ -34,7 +34,7 @@ const EMPTY_FORM = { name: "", document: "", email: "", phone: "" };
 
 export default function EmpresasPage() {
   const { toast } = useToast();
-  const { maskCompanyName, maskContact } = useDemoMode();
+  const { isDemoMode, maskCompanyName, maskContact } = useDemoMode();
   const utils = trpc.useUtils();
   const { data: companies = [], isLoading } = trpc.company.listAll.useQuery();
 
@@ -311,7 +311,13 @@ export default function EmpresasPage() {
                         >
                           <Download className="h-4 w-4" />
                         </Button>
-                        <Button size="icon" variant="ghost" onClick={() => openEdit(company)}>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          disabled={isDemoMode}
+                          title={isDemoMode ? "Edição desativada no modo demonstração" : undefined}
+                          onClick={() => openEdit(company)}
+                        >
                           <Pencil className="h-4 w-4" />
                         </Button>
                       </div>
