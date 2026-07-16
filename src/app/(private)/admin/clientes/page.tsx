@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useQueryState, parseAsString } from "nuqs";
 import { useClients, type CreatableRole } from "@/shared/context/clients-context";
+import { useDemoMode } from "@/shared/context/demo-mode-context";
 import { useProjects } from "@/shared/context/projects-context";
 import { trpc } from "@/shared/trpc/client";
 import { toast } from "sonner";
@@ -68,6 +69,7 @@ const ROLE_LABEL: Record<string, string> = {
 export default function ClientesPage() {
   const { clients, addClient, updateClient, deleteClient, refetch } = useClients();
   const { projects } = useProjects();
+  const { maskPersonName, maskContact, maskCompanyName } = useDemoMode();
   const { data: companies = [] } = trpc.company.list.useQuery();
   const [search, setSearch] = useQueryState(
     "q",
@@ -349,10 +351,10 @@ export default function ClientesPage() {
                           </span>
                         </div>
                         <div>
-                          <p className="font-medium">{client.name}</p>
+                          <p className="font-medium">{maskPersonName(client.id, client.name, "cliente")}</p>
                           <p className="text-sm text-muted-foreground flex items-center gap-1">
                             <Mail className="h-3 w-3" />
-                            {client.email}
+                            {maskContact(client.email, "email")}
                           </p>
                         </div>
                       </div>
@@ -367,7 +369,7 @@ export default function ClientesPage() {
                         <div className="flex items-center gap-1 text-muted-foreground">
                           <Building2 className="h-4 w-4 shrink-0" />
                           <span className="truncate">
-                            {client.companies.map((c) => c.name).join(", ")}
+                            {client.companies.map((c) => maskCompanyName(c.id, c.name)).join(", ")}
                           </span>
                         </div>
                       ) : (
