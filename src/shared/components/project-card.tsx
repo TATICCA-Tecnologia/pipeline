@@ -7,6 +7,7 @@ import { STATUS_CONFIG, PRIORITY_CONFIG } from "@/shared/types";
 import { formatDate } from "@/shared/utils";
 import { Calendar, ArrowRight, Presentation } from "lucide-react";
 import { useAuth } from "@/shared/context/auth-context";
+import { useDemoMode } from "@/shared/context/demo-mode-context";
 import { useModal } from "@/shared/context/modal-context";
 import { ProjectExecutiveSlideModal } from "@/src/app/(private)/admin/projetos/_components/project-executive-slide.modal";
 
@@ -36,6 +37,7 @@ export function ProjectCard({
   const statusConfig = STATUS_CONFIG[project.status];
   const { user } = useAuth();
   const { openModal } = useModal();
+  const { maskFreeText, maskCompanyName } = useDemoMode();
   const canSeeSlide =
     user?.role === "admin" || user?.role === "developer" || user?.role === "super_admin";
 
@@ -84,11 +86,11 @@ export function ProjectCard({
         {/* Título + descrição */}
         <div className="min-w-0 space-y-0.5">
           <p className="line-clamp-2 text-[13px] font-semibold leading-snug text-foreground">
-            {project.title}
+            {maskFreeText(project.title)}
           </p>
           {project.description && (
             <p className="line-clamp-1 text-[11px] text-muted-foreground leading-relaxed">
-              {project.description}
+              {maskFreeText(project.description)}
             </p>
           )}
         </div>
@@ -122,9 +124,9 @@ export function ProjectCard({
           {project.companyName && (
             <span
               className="inline-block max-w-full truncate text-[10px] text-muted-foreground"
-              title={project.companyName}
+              title={maskCompanyName(project.companyId, project.companyName) ?? undefined}
             >
-              {project.companyName}
+              {maskCompanyName(project.companyId, project.companyName)}
             </span>
           )}
           <Badge
