@@ -41,6 +41,7 @@ export function KanbanColumn({
   return (
     <div
       ref={setNodeRef}
+      data-column-status={status}
       className={[
         "flex flex-1 flex-col basis-60 min-w-60 rounded-lg transition-colors duration-150",
         isOver

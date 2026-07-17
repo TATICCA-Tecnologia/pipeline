@@ -46,6 +46,20 @@ export function KanbanBoard({
   const [activeId, setActiveId] = useState<string | null>(null);
   // DEBUG (temporário) — remover depois de diagnosticar o bug de drag-and-drop
   const lastLoggedOverId = useRef<string | null | undefined>(undefined);
+  // Posição real do ponteiro, rastreada de forma independente do sistema de
+  // colisão do dnd-kit (que não está resolvendo o alvo corretamente durante
+  // o arrasto). Usada em handleDragEnd para achar o alvo real via
+  // document.elementFromPoint, em vez de confiar em event.over.
+  const pointerPositionRef = useRef({ x: 0, y: 0 });
+
+  useEffect(() => {
+    if (!activeId) return;
+    const handlePointerMove = (e: PointerEvent) => {
+      pointerPositionRef.current = { x: e.clientX, y: e.clientY };
+    };
+    window.addEventListener("pointermove", handlePointerMove);
+    return () => window.removeEventListener("pointermove", handlePointerMove);
+  }, [activeId]);
 
   useEffect(() => {
     if (!activeId) setItems(projects);
@@ -100,20 +114,33 @@ export function KanbanBoard({
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
-    const { active, delta } = event;
+    const { active } = event;
     const movedId = String(active.id);
     setActiveId(null);
+
+    // Não confia em event.over (a resolução de colisão do dnd-kit trava no
+    // primeiro alvo detectado e não acompanha o restante do arrasto) — em vez
+    // disso, olha o que está de verdade sob o ponteiro no momento em que
+    // soltou, via API nativa do navegador.
+    const { x, y } = pointerPositionRef.current;
+    const elementAtPoint = document.elementFromPoint(x, y);
+    const columnEl = elementAtPoint?.closest("[data-column-status]");
+    const targetStatus = columnEl?.getAttribute("data-column-status") as
+      | ProjectStatus
+      | null
+      | undefined;
+
     const original = projects.find((p) => p.id === movedId);
-    const updated = items.find((p) => p.id === movedId);
+
     // DEBUG (temporário) — remover depois de diagnosticar o bug de drag-and-drop
     console.log(
-      `[kanban debug] SOLTOU: dx=${Math.round(delta.x)} dy=${Math.round(delta.y)} originalStatus=${original?.status} updatedStatus=${updated?.status}`
+      `[kanban debug] SOLTOU em (${x}, ${y}) → coluna detectada: ${targetStatus ?? "NENHUMA"} | status atual: ${original?.status}`
     );
-    if (original && updated && original.status !== updated.status) {
-      onMoveProject?.(movedId, updated.status);
-    } else {
-      setItems(projects);
+
+    if (original && targetStatus && targetStatus !== original.status) {
+      onMoveProject?.(movedId, targetStatus);
     }
+    setItems(projects);
   };
 
   const handleDragCancel = () => {
