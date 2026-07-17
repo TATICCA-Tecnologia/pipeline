@@ -118,6 +118,14 @@ export const specificationRouter = router({
           tasks: true,
         },
       });
+      await ctx.db.activityLog.create({
+        data: {
+          projectId: phase.projectId,
+          userId: ctx.userId,
+          action: "Fase de especificação atualizada",
+          details: phase.name,
+        },
+      });
       return phase;
     }),
 
@@ -177,6 +185,15 @@ export const specificationRouter = router({
         },
         include: {
           assignee: { select: { id: true, name: true, email: true } },
+          phase: { select: { projectId: true, name: true } },
+        },
+      });
+      await ctx.db.activityLog.create({
+        data: {
+          projectId: task.phase.projectId,
+          userId: ctx.userId,
+          action: "Tarefa de fase criada",
+          details: `${task.phase.name} → ${task.title}`,
         },
       });
       return task;
@@ -202,6 +219,15 @@ export const specificationRouter = router({
         data,
         include: {
           assignee: { select: { id: true, name: true, email: true } },
+          phase: { select: { projectId: true, name: true } },
+        },
+      });
+      await ctx.db.activityLog.create({
+        data: {
+          projectId: task.phase.projectId,
+          userId: ctx.userId,
+          action: "Tarefa de fase atualizada",
+          details: `${task.phase.name} → ${task.title}`,
         },
       });
       return task;
@@ -258,7 +284,20 @@ export const specificationRouter = router({
   deleteTask: adminProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
+      const task = await ctx.db.phaseTask.findUnique({
+        where: { id: input.id },
+        include: { phase: { select: { projectId: true, name: true } } },
+      });
+      if (!task) throw new TRPCError({ code: "NOT_FOUND" });
       await ctx.db.phaseTask.delete({ where: { id: input.id } });
+      await ctx.db.activityLog.create({
+        data: {
+          projectId: task.phase.projectId,
+          userId: ctx.userId,
+          action: "Tarefa de fase removida",
+          details: `${task.phase.name} → ${task.title}`,
+        },
+      });
       return { success: true };
     }),
 

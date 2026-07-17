@@ -15,6 +15,7 @@ export const activityRouter = router({
         id: l.id,
         projectId: l.projectId,
         userId: l.userId,
+        userName: l.user.name,
         action: l.action,
         details: l.details ?? undefined,
         createdAt: l.createdAt,

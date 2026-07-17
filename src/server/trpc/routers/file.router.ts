@@ -101,6 +101,16 @@ export const fileRouter = router({
         },
         include: { uploadedBy: { select: { name: true } } },
       });
+
+      await ctx.db.activityLog.create({
+        data: {
+          projectId: input.projectId,
+          userId: ctx.userId,
+          action: "Arquivo anexado",
+          details: file.name,
+        },
+      });
+
       return {
         id: file.id,
         projectId: file.projectId,
