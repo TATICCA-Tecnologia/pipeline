@@ -434,6 +434,58 @@ export const taxonomyRouter = router({
     }),
 
   // ==========================================
+  // TIPO DE PROJETO
+  // ==========================================
+
+  listProjectKinds: publicProcedure.query(async ({ ctx }) => {
+    return ctx.db.projectKind.findMany({
+      where: { isActive: true },
+      orderBy: { order: "asc" },
+    });
+  }),
+
+  listAllProjectKinds: protectedProcedure.query(async ({ ctx }) => {
+    return ctx.db.projectKind.findMany({
+      orderBy: { order: "asc" },
+    });
+  }),
+
+  createProjectKind: adminProcedure
+    .input(
+      z.object({
+        name: z.string().min(1),
+        slug: z.string().min(1).regex(/^[a-z0-9-]+$/, "Slug deve ter apenas letras minúsculas, números e hífens"),
+        order: z.number().int().default(0),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const exists = await ctx.db.projectKind.findUnique({ where: { slug: input.slug } });
+      if (exists) throw new TRPCError({ code: "CONFLICT", message: "Já existe um tipo de projeto com este slug" });
+      return ctx.db.projectKind.create({ data: input });
+    }),
+
+  updateProjectKind: adminProcedure
+    .input(
+      z.object({
+        id: z.string(),
+        name: z.string().min(1).optional(),
+        isActive: z.boolean().optional(),
+        order: z.number().int().optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const { id, ...data } = input;
+      return ctx.db.projectKind.update({ where: { id }, data });
+    }),
+
+  deleteProjectKind: adminProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      await ctx.db.projectKind.delete({ where: { id: input.id } });
+      return { success: true };
+    }),
+
+  // ==========================================
   // CATEGORIAS DE CUSTO DE EMPRESA
   // ==========================================
 
