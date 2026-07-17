@@ -52,6 +52,7 @@ const ARCHITECT_ONLY_FIELDS = new Set([
   "companyId",
   "solutionTypes",
   "mainToolId",
+  "projectKindId",
   "executionStrategy",
   "architectNotes",
   "complexity",
@@ -159,6 +160,7 @@ export const projectRouter = router({
           company: {
             select: { id: true, name: true },
           },
+          projectKind: { select: { id: true, name: true, slug: true } },
           features: true,
         },
         orderBy: { updatedAt: "desc" },
@@ -175,6 +177,8 @@ export const projectRouter = router({
         companyId: p.companyId ?? undefined,
         companyName: p.company?.name,
         projectType: p.platform ?? p.type,
+        projectKind: p.projectKind ?? undefined,
+        projectKindId: p.projectKindId ?? undefined,
         estimatedDeadline: p.deadline ?? undefined,
         targetAudience: p.targetAudience ?? undefined,
         expectedUsers: p.expectedUsers ?? undefined,
@@ -231,6 +235,7 @@ export const projectRouter = router({
           developer: { select: { id: true, name: true, email: true } },
           company: { select: { id: true, name: true } },
           mainTool: { select: { id: true, name: true, slug: true } },
+          projectKind: { select: { id: true, name: true, slug: true } },
           tasks: true,
           features: true,
         },
@@ -289,6 +294,8 @@ export const projectRouter = router({
         solutionTypes: (project.solutionTypes as string[] | null) ?? [],
         mainTool: project.mainTool ?? undefined,
         mainToolId: project.mainToolId ?? undefined,
+        projectKind: project.projectKind ?? undefined,
+        projectKindId: project.projectKindId ?? undefined,
         executionStrategy: project.executionStrategy ?? undefined,
         architectNotes: project.architectNotes ?? undefined,
         features:
@@ -476,6 +483,7 @@ export const projectRouter = router({
         estimatedDeadline: z.date().nullable().optional(),
         solutionTypes: z.array(z.string()).optional(),
         mainToolId: z.string().nullable().optional(),
+        projectKindId: z.string().nullable().optional(),
         executionStrategy: z.string().nullable().optional(),
         architectNotes: z.string().nullable().optional(),
         peopleInvolved: z.number().int().min(0).nullable().optional(),
@@ -564,6 +572,7 @@ export const projectRouter = router({
       if (rest.estimatedDeadline !== undefined) data.deadline = rest.estimatedDeadline;
       if (rest.solutionTypes !== undefined) data.solutionTypes = rest.solutionTypes;
       if (rest.mainToolId !== undefined) data.mainToolId = rest.mainToolId;
+      if (rest.projectKindId !== undefined) data.projectKindId = rest.projectKindId;
       if (rest.executionStrategy !== undefined) data.executionStrategy = rest.executionStrategy;
       if (rest.architectNotes !== undefined) data.architectNotes = rest.architectNotes;
       if (rest.complexity !== undefined) data.complexity = rest.complexity;
