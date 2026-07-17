@@ -44,12 +44,10 @@ export function KanbanBoard({
 }: KanbanBoardProps) {
   const [items, setItems] = useState<Project[]>(projects);
   const [activeId, setActiveId] = useState<string | null>(null);
-  // DEBUG (temporário) — remover depois de diagnosticar o bug de drag-and-drop
-  const lastLoggedOverId = useRef<string | null | undefined>(undefined);
   // Posição real do ponteiro, rastreada de forma independente do sistema de
   // colisão do dnd-kit (que não está resolvendo o alvo corretamente durante
   // o arrasto). Usada em handleDragEnd para achar o alvo real via
-  // document.elementFromPoint, em vez de confiar em event.over.
+  // document.elementsFromPoint, em vez de confiar em event.over.
   const pointerPositionRef = useRef({ x: 0, y: 0 });
 
   useEffect(() => {
@@ -82,21 +80,10 @@ export function KanbanBoard({
 
   const handleDragStart = (event: DragStartEvent) => {
     setActiveId(String(event.active.id));
-    // DEBUG (temporário) — remover depois de diagnosticar o bug de drag-and-drop
-    lastLoggedOverId.current = undefined;
-    console.log("[kanban debug] START");
   };
 
   const handleDragOver = (event: DragOverEvent) => {
-    const { active, over, delta } = event;
-    const overIdNow = over ? String(over.id) : null;
-    // DEBUG (temporário) — só loga quando o alvo detectado muda, pra não inundar o console
-    if (overIdNow !== lastLoggedOverId.current) {
-      lastLoggedOverId.current = overIdNow;
-      console.log(
-        `[kanban debug] overId mudou para: ${overIdNow ?? "NENHUM"} | mouse moveu dx=${Math.round(delta.x)} dy=${Math.round(delta.y)}`
-      );
-    }
+    const { active, over } = event;
     if (!over) return;
     const activeIdStr = String(active.id);
     const overIdStr = String(over.id);
@@ -137,11 +124,6 @@ export function KanbanBoard({
       | undefined;
 
     const original = projects.find((p) => p.id === movedId);
-
-    // DEBUG (temporário) — remover depois de diagnosticar o bug de drag-and-drop
-    console.log(
-      `[kanban debug] SOLTOU em (${x}, ${y}) → coluna detectada: ${targetStatus ?? "NENHUMA"} | status atual: ${original?.status}`
-    );
 
     if (original && targetStatus && targetStatus !== original.status) {
       onMoveProject?.(movedId, targetStatus);
