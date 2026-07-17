@@ -141,10 +141,9 @@ export default function AdminProjetosPage() {
   const [kindFilter, setKindFilter] = useState(ALL_PROJECT_KINDS_VALUE);
   const [sortBy, setSortBy] = useState<SortBy>("updatedAt");
 
-  const filteredProjects = filterProjectsByKind(
-    filterProjectsByCompany(projects, companyFilter),
-    kindFilter
-  ).sort((a, b) => new Date(b[sortBy]).getTime() - new Date(a[sortBy]).getTime());
+  const filteredProjects = [
+    ...filterProjectsByKind(filterProjectsByCompany(projects, companyFilter), kindFilter),
+  ].sort((a, b) => new Date(b[sortBy]).getTime() - new Date(a[sortBy]).getTime());
 
   const handleMoveProject = (projectId: string, newStatus: ProjectStatus) => {
     moveProject(projectId, newStatus);
