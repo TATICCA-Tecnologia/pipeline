@@ -115,7 +115,7 @@ export function ProjectCard({
           )}
           {project.projectType && (
             <span
-              className="inline-block max-w-full truncate rounded bg-secondary px-1.5 py-px text-[10px] font-medium text-secondary-foreground"
+              className="inline-block max-w-[170px] truncate rounded bg-secondary px-1.5 py-px text-[10px] font-medium text-secondary-foreground"
               title={project.projectType}
             >
               {project.projectType}
@@ -123,7 +123,7 @@ export function ProjectCard({
           )}
           {project.projectKind && (
             <span
-              className="inline-block max-w-full truncate rounded bg-primary/10 px-1.5 py-px text-[10px] font-medium text-primary"
+              className="inline-block max-w-[170px] truncate rounded bg-primary/10 px-1.5 py-px text-[10px] font-medium text-primary"
               title={project.projectKind.name}
             >
               {project.projectKind.name}
@@ -131,7 +131,7 @@ export function ProjectCard({
           )}
           {project.companyName && (
             <span
-              className="inline-block max-w-full truncate text-[10px] text-muted-foreground"
+              className="inline-block max-w-[170px] truncate text-[10px] text-muted-foreground"
               title={maskCompanyName(project.companyId, project.companyName) ?? undefined}
             >
               {maskCompanyName(project.companyId, project.companyName)}

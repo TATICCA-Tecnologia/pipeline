@@ -69,6 +69,11 @@ export function KanbanBoard({
 
   const handleDragOver = (event: DragOverEvent) => {
     const { active, over } = event;
+    // DEBUG (temporário) — remover depois de diagnosticar o bug de drag-and-drop
+    console.log("[kanban debug] dragOver", {
+      overId: over?.id ?? null,
+      activeId: active.id,
+    });
     if (!over) return;
     const activeIdStr = String(active.id);
     const overIdStr = String(over.id);
@@ -78,6 +83,12 @@ export function KanbanBoard({
     if (!activeItem) return;
 
     const targetStatus = resolveTargetStatus(overIdStr);
+    // DEBUG (temporário)
+    console.log("[kanban debug] resolveTargetStatus", {
+      overIdStr,
+      targetStatus,
+      activeItemStatus: activeItem.status,
+    });
     if (!targetStatus || targetStatus === activeItem.status) return;
 
     setItems((prev) =>
@@ -91,6 +102,13 @@ export function KanbanBoard({
     setActiveId(null);
     const original = projects.find((p) => p.id === movedId);
     const updated = items.find((p) => p.id === movedId);
+    // DEBUG (temporário) — remover depois de diagnosticar o bug de drag-and-drop
+    console.log("[kanban debug] dragEnd", {
+      movedId,
+      originalStatus: original?.status,
+      updatedStatus: updated?.status,
+      willMove: !!(original && updated && original.status !== updated.status),
+    });
     if (original && updated && original.status !== updated.status) {
       onMoveProject?.(movedId, updated.status);
     } else {
