@@ -68,11 +68,13 @@ export function KanbanBoard({
   };
 
   const handleDragOver = (event: DragOverEvent) => {
-    const { active, over } = event;
+    const { active, over, collisions } = event;
     // DEBUG (temporário) — remover depois de diagnosticar o bug de drag-and-drop
     console.log("[kanban debug] dragOver", {
       overId: over?.id ?? null,
       activeId: active.id,
+      activeRect: active.rect.current.translated,
+      allCollisions: collisions?.map((c) => c.id) ?? [],
     });
     if (!over) return;
     const activeIdStr = String(active.id);
