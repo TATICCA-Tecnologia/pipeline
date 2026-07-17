@@ -338,6 +338,20 @@ export function ProjectExecutiveSlide({ project }: { project: Project }) {
             {areaEntrevistada && (
               <p className="mt-1 text-sm font-semibold text-teal-600">{areaEntrevistada}</p>
             )}
+            {(project.projectKind || project.mainTool) && (
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {project.projectKind && (
+                  <span className="inline-block rounded-full bg-teal-50 px-2.5 py-0.5 text-[11px] font-semibold text-teal-700">
+                    {project.projectKind.name}
+                  </span>
+                )}
+                {project.mainTool && (
+                  <span className="inline-block rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-semibold text-slate-700">
+                    {project.mainTool.name}
+                  </span>
+                )}
+              </div>
+            )}
           </div>
           <Image
             src="/taticca-logo-horizontal.png"
