@@ -76,6 +76,8 @@ export interface Project {
   solutionTypes?: string[];
   mainTool?: { id: string; name: string; slug: string };
   mainToolId?: string;
+  projectKind?: { id: string; name: string; slug: string };
+  projectKindId?: string;
   executionStrategy?: string;
   architectNotes?: string;
   // Operacao pos-entrega (admin escreve, cliente sempre ve)
