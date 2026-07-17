@@ -72,6 +72,23 @@ export function ArchitectureTab({ projectId }: ArchitectureTabProps) {
     onError: (err) => toast.error("Falha ao criar ferramenta", { description: err.message }),
   });
 
+  const { data: projectKinds = [] } = trpc.taxonomy.listProjectKinds.useQuery();
+  const projectKindOptions = useMemo(() => {
+    const opts = projectKinds.map((k) => ({ value: k.id, label: k.name }));
+    if (project?.projectKind && !opts.some((o) => o.value === project.projectKind!.id)) {
+      opts.push({ value: project.projectKind.id, label: project.projectKind.name });
+    }
+    return opts;
+  }, [projectKinds, project?.projectKind]);
+  const createProjectKind = trpc.taxonomy.createProjectKind.useMutation({
+    onSuccess: (created) => {
+      utils.taxonomy.listProjectKinds.invalidate();
+      setProjectKindId(created.id);
+      toast.success(`Tipo de projeto "${created.name}" criado`);
+    },
+    onError: (err) => toast.error("Falha ao criar tipo de projeto", { description: err.message }),
+  });
+
   const createPhase = trpc.specification.createPhase.useMutation({
     onSuccess: () => utils.specification.getByProject.invalidate({ projectId }),
     onError: (err) => toast.error("Falha ao criar fase", { description: err.message }),
@@ -87,6 +104,7 @@ export function ArchitectureTab({ projectId }: ArchitectureTabProps) {
 
   const [solutionTypes, setSolutionTypes] = useState<string[]>([]);
   const [mainToolId, setMainToolId] = useState<string>("");
+  const [projectKindId, setProjectKindId] = useState<string>("");
   const [executionStrategy, setExecutionStrategy] = useState<string>("");
   const [architectNotes, setArchitectNotes] = useState<string>("");
   const [complexity, setComplexity] = useState<string>("");
@@ -101,6 +119,7 @@ export function ArchitectureTab({ projectId }: ArchitectureTabProps) {
     if (project) {
       setSolutionTypes(project.solutionTypes ?? []);
       setMainToolId(project.mainTool?.id ?? "");
+      setProjectKindId(project.projectKind?.id ?? "");
       setExecutionStrategy(project.executionStrategy ?? "");
       setArchitectNotes(project.architectNotes ?? "");
       setComplexity(project.complexity ?? "");
@@ -175,6 +194,7 @@ export function ArchitectureTab({ projectId }: ArchitectureTabProps) {
       id: projectId,
       solutionTypes,
       mainToolId: mainToolId || null,
+      projectKindId: projectKindId || null,
       executionStrategy: executionStrategy || null,
       architectNotes: architectNotes || null,
       complexity: (complexity || null) as "baixa" | "media" | "alta" | null,
@@ -233,7 +253,7 @@ export function ArchitectureTab({ projectId }: ArchitectureTabProps) {
             </div>
           </div>
 
-          <div className="grid gap-5 sm:grid-cols-2">
+          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
             <div className="space-y-2">
               <Label>Ferramenta principal</Label>
               <CreatableCombobox
@@ -249,6 +269,24 @@ export function ArchitectureTab({ projectId }: ArchitectureTabProps) {
                 }
                 placeholder="Selecione ou crie"
                 disabled={createMainTool.isPending}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Tipo de projeto</Label>
+              <CreatableCombobox
+                options={projectKindOptions}
+                value={projectKindId}
+                onChange={setProjectKindId}
+                onCreate={(label) =>
+                  createProjectKind.mutate({
+                    name: label,
+                    slug: slugify(label),
+                    order: projectKinds.length,
+                  })
+                }
+                placeholder="Selecione ou crie"
+                disabled={createProjectKind.isPending}
               />
             </div>
 
