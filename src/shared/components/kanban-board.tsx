@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   DndContext,
   DragOverlay,
@@ -43,6 +43,8 @@ export function KanbanBoard({
 }: KanbanBoardProps) {
   const [items, setItems] = useState<Project[]>(projects);
   const [activeId, setActiveId] = useState<string | null>(null);
+  // DEBUG (temporário) — remover depois de diagnosticar o bug de drag-and-drop
+  const lastLoggedOverId = useRef<string | null | undefined>(undefined);
 
   useEffect(() => {
     if (!activeId) setItems(projects);
@@ -65,17 +67,21 @@ export function KanbanBoard({
 
   const handleDragStart = (event: DragStartEvent) => {
     setActiveId(String(event.active.id));
+    // DEBUG (temporário) — remover depois de diagnosticar o bug de drag-and-drop
+    lastLoggedOverId.current = undefined;
+    console.log("[kanban debug] START");
   };
 
   const handleDragOver = (event: DragOverEvent) => {
-    const { active, over, collisions } = event;
-    // DEBUG (temporário) — remover depois de diagnosticar o bug de drag-and-drop
-    console.log("[kanban debug] dragOver", {
-      overId: over?.id ?? null,
-      activeId: active.id,
-      activeRect: active.rect.current.translated,
-      allCollisions: collisions?.map((c) => c.id) ?? [],
-    });
+    const { active, over, delta } = event;
+    const overIdNow = over ? String(over.id) : null;
+    // DEBUG (temporário) — só loga quando o alvo detectado muda, pra não inundar o console
+    if (overIdNow !== lastLoggedOverId.current) {
+      lastLoggedOverId.current = overIdNow;
+      console.log(
+        `[kanban debug] overId mudou para: ${overIdNow ?? "NENHUM"} | mouse moveu dx=${Math.round(delta.x)} dy=${Math.round(delta.y)}`
+      );
+    }
     if (!over) return;
     const activeIdStr = String(active.id);
     const overIdStr = String(over.id);
@@ -85,12 +91,6 @@ export function KanbanBoard({
     if (!activeItem) return;
 
     const targetStatus = resolveTargetStatus(overIdStr);
-    // DEBUG (temporário)
-    console.log("[kanban debug] resolveTargetStatus", {
-      overIdStr,
-      targetStatus,
-      activeItemStatus: activeItem.status,
-    });
     if (!targetStatus || targetStatus === activeItem.status) return;
 
     setItems((prev) =>
@@ -99,18 +99,15 @@ export function KanbanBoard({
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
-    const { active } = event;
+    const { active, delta } = event;
     const movedId = String(active.id);
     setActiveId(null);
     const original = projects.find((p) => p.id === movedId);
     const updated = items.find((p) => p.id === movedId);
     // DEBUG (temporário) — remover depois de diagnosticar o bug de drag-and-drop
-    console.log("[kanban debug] dragEnd", {
-      movedId,
-      originalStatus: original?.status,
-      updatedStatus: updated?.status,
-      willMove: !!(original && updated && original.status !== updated.status),
-    });
+    console.log(
+      `[kanban debug] SOLTOU: dx=${Math.round(delta.x)} dy=${Math.round(delta.y)} originalStatus=${original?.status} updatedStatus=${updated?.status}`
+    );
     if (original && updated && original.status !== updated.status) {
       onMoveProject?.(movedId, updated.status);
     } else {
