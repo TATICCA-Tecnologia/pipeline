@@ -7,7 +7,6 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { ScrollArea } from "@/src/shared/components/ui/scroll-area";
 import type { Project, ProjectStatus } from "@/shared/types";
 import { STATUS_CONFIG } from "@/shared/types";
 import { ProjectCard } from "./project-card";
@@ -61,7 +60,7 @@ export function KanbanColumn({
         </div>
       </div>
 
-      <ScrollArea className="flex-1">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden">
         <SortableContext
           items={projects.map((p) => p.id)}
           strategy={verticalListSortingStrategy}
@@ -104,7 +103,7 @@ export function KanbanColumn({
             )}
           </div>
         </SortableContext>
-      </ScrollArea>
+      </div>
     </div>
   );
 }
