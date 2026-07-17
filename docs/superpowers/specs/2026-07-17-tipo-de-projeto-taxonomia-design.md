@@ -61,7 +61,7 @@ Estende `src/server/trpc/routers/taxonomy.router.ts` com o mesmo formato da seç
 
 `src/server/trpc/routers/project.router.ts`:
 - `ARCHITECT_ONLY_FIELDS`: adiciona `projectKindId` (mesmo tratamento de `mainToolId`).
-- `create` — Zod: `projectKindId: z.string().nullable().optional()`.
+- `create` — não aceita `projectKindId` (mesmo tratamento de `mainToolId`: fica de fora do formulário de solicitação do cliente, só é setado depois via `update` na aba Arquitetura).
 - `update` — Zod: `projectKindId: z.string().nullable().optional()`; data-building: `if (rest.projectKindId !== undefined) data.projectKindId = rest.projectKindId;`
 - `byId` — resposta inclui `projectKind: project.projectKind ?? undefined, projectKindId: project.projectKindId ?? undefined`.
 
@@ -87,7 +87,7 @@ Em `project-card.tsx`, novo badge condicional (`project.projectKind && (...)`) i
 
 Em `page.tsx`, junto ao `CompanyFilter` (linhas 151-155):
 - Novo componente `ProjectKindFilter` (mesmo padrão do `CompanyFilter`: dropdown "Todos os tipos", opção `ALL_PROJECT_KINDS_VALUE`, função `filterProjectsByKind`), filtrando por `project.projectKindId`.
-- Novo controle "Ordenar por" (`Select` simples com duas opções: "Criação mais recente" → sort por `createdAt desc`, "Edição mais recente" → sort por `updatedAt desc`). Aplica-se sobre `filteredProjects` antes de passar para `KanbanBoard`, ordenando os cards dentro de cada coluna. Estado local `sortBy`, default "Criação mais recente" (preserva comportamento implícito atual).
+- Novo controle "Ordenar por" (`Select` simples com duas opções: "Edição mais recente" → sort por `updatedAt desc`, "Criação mais recente" → sort por `createdAt desc`). Aplica-se sobre `filteredProjects` antes de passar para `KanbanBoard`, ordenando os cards dentro de cada coluna. Estado local `sortBy`, default `"updatedAt"` (preserva o `orderBy: { updatedAt: "desc" }` que já era o comportamento implícito da query `project.list` antes desta feature).
 
 `downloadProjectsCSV`: adiciona coluna "Tipo de Projeto" lendo `project.projectKind?.name ?? ""`.
 
