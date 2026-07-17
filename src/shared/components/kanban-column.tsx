@@ -66,7 +66,7 @@ export function KanbanColumn({
           items={projects.map((p) => p.id)}
           strategy={verticalListSortingStrategy}
         >
-          <div className="flex flex-col gap-2 py-1 min-h-20">
+          <div className="flex w-full min-w-0 flex-col gap-2 py-1 min-h-20">
             {projects.map((project, i) =>
               canDrag ? (
                 <SortableCard
@@ -78,7 +78,7 @@ export function KanbanColumn({
               ) : (
                 <div
                   key={project.id}
-                  className="animate-fade-up"
+                  className="w-full min-w-0 animate-fade-up"
                   style={{
                     animationDelay: `${i * 40}ms`,
                     animationFillMode: "both",
@@ -138,7 +138,7 @@ function SortableCard({ project, isActive, onClick }: SortableCardProps) {
       style={style}
       {...attributes}
       {...listeners}
-      className="touch-none"
+      className="w-full min-w-0 touch-none"
     >
       <ProjectCard project={project} onClick={onClick} />
     </div>

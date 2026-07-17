@@ -46,7 +46,7 @@ export function ProjectCard({
       className={[
         "group relative cursor-pointer overflow-hidden border border-border/60 bg-card shadow-sm gap-0 py-0",
         "transition-all duration-200 ease-out",
-        "hover:border-primary/40 hover:shadow-md hover:shadow-primary/5 hover:-translate-y-0.5 max-w-[300px]",
+        "hover:border-primary/40 hover:shadow-md hover:shadow-primary/5 hover:-translate-y-0.5 w-full min-w-0 max-w-[300px]",
         isDragging ? "card-dragging" : "",
       ].join(" ")}
       onClick={onClick}
