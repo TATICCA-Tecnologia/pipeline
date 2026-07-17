@@ -486,7 +486,7 @@ export default function ProjetoPage({ params }: ProjetoPageProps) {
                             )}
                           </p>
                           <p className="text-xs text-muted-foreground">
-                            {new Date(log.createdAt).toLocaleString("pt-BR")}
+                            {log.userName} · {new Date(log.createdAt).toLocaleString("pt-BR")}
                           </p>
                         </div>
                       </div>

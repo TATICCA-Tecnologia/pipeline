@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/src/shared/component
 import { Badge } from "@/src/shared/components/ui/badge";
 import { Progress } from "@/src/shared/components/ui/progress";
 import { Separator } from "@/src/shared/components/ui/separator";
+import { ScrollArea } from "@/src/shared/components/ui/scroll-area";
 import {
   Dialog,
   DialogContent,
@@ -63,6 +64,7 @@ export default function EspecificacaoPage({ params }: Props) {
 
   const { data: phases, refetch } = trpc.specification.getByProject.useQuery({ projectId });
   const { data: project } = trpc.project.byId.useQuery({ id: projectId });
+  const { data: activityLogs = [] } = trpc.activity.byProject.useQuery({ projectId });
   const { data: developers = [] } = trpc.user.listDevelopers.useQuery();
 
   const createPhase = trpc.specification.createPhase.useMutation({ onSuccess: () => refetch() });
@@ -795,6 +797,46 @@ export default function EspecificacaoPage({ params }: Props) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Clock className="h-4 w-4" />
+            Atividade Recente
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {activityLogs.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              Nenhuma atividade registrada ainda para este projeto.
+            </p>
+          ) : (
+            <ScrollArea className="max-h-56 pr-1 overflow-x-auto">
+              <div className="space-y-3">
+                {activityLogs.map((log) => (
+                  <div key={log.id} className="flex items-start gap-3">
+                    <div className="mt-2 h-2 w-2 shrink-0 rounded-full bg-primary" />
+                    <div className="min-w-0 space-y-0.5">
+                      <p className="text-sm break-words">
+                        <span className="font-medium">{log.action}</span>
+                        {log.details && (
+                          <>
+                            {" "}
+                            <span className="text-muted-foreground">• {log.details}</span>
+                          </>
+                        )}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {log.userName} · {new Date(log.createdAt).toLocaleString("pt-BR")}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

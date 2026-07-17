@@ -30,10 +30,12 @@ import {
   SelectValue,
 } from "@/src/shared/components/ui/select";
 import { HAS_CURRENT_APPLICATION_OPTIONS } from "@/shared/constants/project-taxonomy";
-import { ROBOT_OPERATIONAL_STATUS_CONFIG } from "@/shared/types";
-import type { RobotOperationalStatus } from "@/shared/types";
+import { ROBOT_OPERATIONAL_STATUS_CONFIG, STATUS_CONFIG } from "@/shared/types";
+import type { RobotOperationalStatus, ProjectStatus } from "@/shared/types";
 import { Input } from "@/src/shared/components/ui/input";
-import { Loader2, Presentation } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/src/shared/components/ui/card";
+import { ScrollArea } from "@/src/shared/components/ui/scroll-area";
+import { Loader2, Presentation, Clock } from "lucide-react";
 import { toast } from "sonner";
 import { ProjectExecutiveSlideModal } from "./project-executive-slide.modal";
 
@@ -71,11 +73,32 @@ export function ProjectDetailsModal({
     { id: data?.project.id ?? "" },
     { enabled: !!data?.project.id }
   );
+  const { data: activityLogs = [] } = trpc.activity.byProject.useQuery(
+    { projectId: data?.project.id ?? "" },
+    { enabled: !!data?.project.id }
+  );
+
+  // Mover projeto entre colunas sem arrastar — workaround enquanto o drag-and-drop
+  // do Kanban não funciona de forma confiável em todos os papéis/navegadores.
+  const utils = trpc.useUtils();
+  const [pendingMoveStatus, setPendingMoveStatus] = useState<ProjectStatus | undefined>(
+    undefined
+  );
+  const moveProjectMutation = trpc.project.move.useMutation({
+    onSuccess: () => {
+      utils.project.list.invalidate();
+      if (data?.project.id) utils.project.byId.invalidate({ id: data.project.id });
+      toast.success("Projeto movido");
+      setPendingMoveStatus(undefined);
+    },
+    onError: (error) => {
+      toast.error(error.message || "Não foi possível mover o projeto.");
+    },
+  });
 
   // Correção pontual de "Aplicação existente hoje" — esse campo só era preenchido na
   // criação (XML/formulário) e não tinha nenhuma forma de corrigir depois, mesmo quando a
   // extração original errou (ex.: contar uma ferramenta já abandonada como "Sim").
-  const utils = trpc.useUtils();
   const [pendingHasCurrentApplication, setPendingHasCurrentApplication] = useState<
     string | undefined
   >(undefined);
@@ -139,6 +162,49 @@ export function ProjectDetailsModal({
             ? "Carregando detalhes completos..."
             : "Todos os dados coletados na solicitação ou na importação de XML."}
         </p>
+
+        {(user?.role === "admin" ||
+          user?.role === "developer" ||
+          user?.role === "super_admin") &&
+          !isLoading && (
+            <div className="mb-5 flex items-center gap-3 rounded-md border border-dashed border-border p-3">
+              <Label htmlFor="move-status" className="text-xs text-muted-foreground">
+                Mover para:
+              </Label>
+              <Select
+                value={pendingMoveStatus ?? project.status}
+                onValueChange={(v) => setPendingMoveStatus(v as ProjectStatus)}
+              >
+                <SelectTrigger id="move-status" className="h-8 w-44 text-xs">
+                  <SelectValue placeholder="Selecione" />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(STATUS_CONFIG).map(([value, cfg]) => (
+                    <SelectItem key={value} value={value}>
+                      {cfg.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button
+                size="sm"
+                className="h-8"
+                disabled={
+                  !pendingMoveStatus ||
+                  pendingMoveStatus === project.status ||
+                  moveProjectMutation.isPending
+                }
+                onClick={() =>
+                  moveProjectMutation.mutate({
+                    id: project.id,
+                    status: pendingMoveStatus as ProjectStatus,
+                  })
+                }
+              >
+                {moveProjectMutation.isPending ? "Movendo..." : "Mover"}
+              </Button>
+            </div>
+          )}
 
         {(user?.role === "admin" || user?.role === "super_admin") && !isLoading && (
           <div className="mb-5 flex items-center gap-3 rounded-md border border-dashed border-border p-3">
@@ -251,6 +317,48 @@ export function ProjectDetailsModal({
             currentUserId={user?.id}
             allowEdit
           />
+        )}
+
+        {!isLoading && (
+          <Card className="mt-5">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Clock className="h-4 w-4" />
+                Atividade Recente
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {activityLogs.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  Nenhuma atividade registrada ainda para este projeto.
+                </p>
+              ) : (
+                <ScrollArea className="max-h-56 pr-1 overflow-x-auto">
+                  <div className="space-y-3">
+                    {activityLogs.map((log) => (
+                      <div key={log.id} className="flex items-start gap-3">
+                        <div className="mt-2 h-2 w-2 shrink-0 rounded-full bg-primary" />
+                        <div className="min-w-0 space-y-0.5">
+                          <p className="text-sm break-words">
+                            <span className="font-medium">{log.action}</span>
+                            {log.details && (
+                              <>
+                                {" "}
+                                <span className="text-muted-foreground">• {log.details}</span>
+                              </>
+                            )}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {log.userName} · {new Date(log.createdAt).toLocaleString("pt-BR")}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </ScrollArea>
+              )}
+            </CardContent>
+          </Card>
         )}
       </div>
 
