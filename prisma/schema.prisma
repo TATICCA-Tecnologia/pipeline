@@ -206,6 +206,8 @@ model Project {
   themeId      String?
   mainTool     MainTool?        @relation(fields: [mainToolId], references: [id], onDelete: SetNull)
   mainToolId   String?
+  projectKind  ProjectKind?     @relation(fields: [projectKindId], references: [id], onDelete: SetNull)
+  projectKindId String?
   features     ProjectFeature[]
   phases       ProjectPhase[]
   tasks        Task[]
@@ -514,6 +516,23 @@ model MainTool {
   updatedAt DateTime  @updatedAt
 
   @@map("main_tools")
+}
+
+// ==========================================
+// TAXONOMIA CONFIGURAVEL (TIPO DE PROJETO)
+// ==========================================
+
+model ProjectKind {
+  id        String    @id @default(cuid())
+  name      String
+  slug      String    @unique
+  isActive  Boolean   @default(true)
+  order     Int       @default(0)
+  projects  Project[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@map("project_kinds")
 }
 
 // ==========================================
