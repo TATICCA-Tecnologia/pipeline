@@ -121,10 +121,16 @@ export function KanbanBoard({
     // Não confia em event.over (a resolução de colisão do dnd-kit trava no
     // primeiro alvo detectado e não acompanha o restante do arrasto) — em vez
     // disso, olha o que está de verdade sob o ponteiro no momento em que
-    // soltou, via API nativa do navegador.
+    // soltou, via API nativa do navegador. Usa elementsFromPoint (plural) e
+    // não elementFromPoint: o elemento do topo nesse ponto é sempre o próprio
+    // DragOverlay (o "card fantasma" que segue o cursor), que não tem
+    // pointer-events-none no wrapper que o dnd-kit controla — então o
+    // elemento do topo nunca é uma coluna. Procura a coluna na pilha inteira.
     const { x, y } = pointerPositionRef.current;
-    const elementAtPoint = document.elementFromPoint(x, y);
-    const columnEl = elementAtPoint?.closest("[data-column-status]");
+    const elementsAtPoint = document.elementsFromPoint(x, y);
+    const columnEl = elementsAtPoint
+      .map((el) => el.closest("[data-column-status]"))
+      .find((el): el is Element => el !== null);
     const targetStatus = columnEl?.getAttribute("data-column-status") as
       | ProjectStatus
       | null
