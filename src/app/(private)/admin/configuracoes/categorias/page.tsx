@@ -9,6 +9,7 @@ type RouterOutputs = inferRouterOutputs<AppRouter>;
 type AreaItem = RouterOutputs["taxonomy"]["listAllAreas"][number];
 type SuggestionItem = RouterOutputs["taxonomy"]["listAllSuggestions"][number];
 type MainToolItem = RouterOutputs["taxonomy"]["listAllMainTools"][number];
+type ProjectKindItem = RouterOutputs["taxonomy"]["listAllProjectKinds"][number];
 type CostCategoryItem = RouterOutputs["taxonomy"]["listAllCostCategories"][number];
 
 import { Button } from "@/src/shared/components/ui/button";
@@ -52,6 +53,7 @@ import {
   Lightbulb,
   Database,
   Wrench,
+  Layers,
   Merge,
   Wallet,
 } from "lucide-react";
@@ -285,6 +287,42 @@ export default function CategoriasPage() {
     }
   }
 
+  // — TIPOS DE PROJETO —
+  const { data: projectKinds = [] } = trpc.taxonomy.listAllProjectKinds.useQuery();
+  const [projectKindDialog, setProjectKindDialog] = useState<{ open: boolean; editing?: { id: string; name: string; slug: string; order: number } }>({ open: false });
+  const [projectKindForm, setProjectKindForm] = useState({ name: "", slug: "", order: 0 });
+
+  const createProjectKind = trpc.taxonomy.createProjectKind.useMutation({
+    onSuccess: () => { utils.taxonomy.listAllProjectKinds.invalidate(); setProjectKindDialog({ open: false }); toast({ title: "Tipo de projeto criado" }); },
+    onError: (e: { message: string }) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
+  });
+  const updateProjectKind = trpc.taxonomy.updateProjectKind.useMutation({
+    onSuccess: () => { utils.taxonomy.listAllProjectKinds.invalidate(); setProjectKindDialog({ open: false }); toast({ title: "Tipo de projeto atualizado" }); },
+    onError: (e: { message: string }) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
+  });
+  const deleteProjectKind = trpc.taxonomy.deleteProjectKind.useMutation({
+    onSuccess: () => { utils.taxonomy.listAllProjectKinds.invalidate(); toast({ title: "Tipo de projeto removido" }); },
+  });
+  const toggleProjectKind = trpc.taxonomy.updateProjectKind.useMutation({
+    onSuccess: () => utils.taxonomy.listAllProjectKinds.invalidate(),
+  });
+
+  function openNewProjectKind() {
+    setProjectKindForm({ name: "", slug: "", order: projectKinds.length });
+    setProjectKindDialog({ open: true });
+  }
+  function openEditProjectKind(kind: { id: string; name: string; slug: string; order: number }) {
+    setProjectKindForm({ name: kind.name, slug: kind.slug, order: kind.order });
+    setProjectKindDialog({ open: true, editing: kind });
+  }
+  function submitProjectKind() {
+    if (projectKindDialog.editing) {
+      updateProjectKind.mutate({ id: projectKindDialog.editing.id, name: projectKindForm.name, order: projectKindForm.order });
+    } else {
+      createProjectKind.mutate({ name: projectKindForm.name, slug: projectKindForm.slug, order: projectKindForm.order });
+    }
+  }
+
   // — CATEGORIAS DE CUSTO —
   const { data: costCategories = [] } = trpc.taxonomy.listAllCostCategories.useQuery();
   const [costCategoryDialog, setCostCategoryDialog] = useState<{ open: boolean; editing?: { id: string; name: string; slug: string; order: number } }>({ open: false });
@@ -323,7 +361,7 @@ export default function CategoriasPage() {
   }
 
   // — DELETE CONFIRM —
-  const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; type?: "area" | "theme" | "suggestion" | "mainTool" | "costCategory"; id?: string; label?: string }>({ open: false });
+  const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; type?: "area" | "theme" | "suggestion" | "mainTool" | "projectKind" | "costCategory"; id?: string; label?: string }>({ open: false });
 
   function confirmDelete() {
     if (!deleteConfirm.id || !deleteConfirm.type) return;
@@ -331,6 +369,7 @@ export default function CategoriasPage() {
     if (deleteConfirm.type === "theme") deleteTheme.mutate({ id: deleteConfirm.id });
     if (deleteConfirm.type === "suggestion") deleteSugg.mutate({ id: deleteConfirm.id });
     if (deleteConfirm.type === "mainTool") deleteMainTool.mutate({ id: deleteConfirm.id });
+    if (deleteConfirm.type === "projectKind") deleteProjectKind.mutate({ id: deleteConfirm.id });
     if (deleteConfirm.type === "costCategory") deleteCostCategory.mutate({ id: deleteConfirm.id });
     setDeleteConfirm({ open: false });
   }
@@ -580,6 +619,56 @@ export default function CategoriasPage() {
                   </button>
                   <button
                     onClick={() => setDeleteConfirm({ open: true, type: "mainTool", id: tool.id, label: tool.name })}
+                    className="text-destructive/60 hover:text-destructive"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </button>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        )}
+      </div>
+
+      {/* Tipos de Projeto */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-semibold">Tipos de Projeto</h2>
+            <p className="text-sm text-muted-foreground">
+              Opções do campo &quot;Tipo de projeto&quot; na tela de arquitetura.
+            </p>
+          </div>
+          <Button size="sm" variant="outline" onClick={openNewProjectKind}>
+            <Plus className="mr-2 h-4 w-4" />
+            Novo tipo
+          </Button>
+        </div>
+        {projectKinds.length === 0 ? (
+          <Card className="flex flex-col items-center justify-center py-10 text-center">
+            <Layers className="mb-3 h-8 w-8 text-muted-foreground/50" />
+            <p className="text-sm font-medium">Nenhum tipo de projeto cadastrado</p>
+          </Card>
+        ) : (
+          <Card>
+            <CardContent className="flex flex-wrap gap-2 pt-4">
+              {projectKinds.map((kind: ProjectKindItem) => (
+                <div
+                  key={kind.id}
+                  className={`flex items-center gap-1 rounded-md border px-2 py-1 text-xs ${!kind.isActive ? "opacity-50" : ""}`}
+                >
+                  <span>{kind.name}</span>
+                  <Badge variant="secondary" className="text-[10px]">{kind.slug}</Badge>
+                  <Switch
+                    checked={kind.isActive}
+                    onCheckedChange={(v) => toggleProjectKind.mutate({ id: kind.id, isActive: v })}
+                    className="scale-75"
+                  />
+                  <button onClick={() => openEditProjectKind(kind)} className="text-muted-foreground hover:text-foreground">
+                    <Pencil className="h-3 w-3" />
+                  </button>
+                  <button
+                    onClick={() => setDeleteConfirm({ open: true, type: "projectKind", id: kind.id, label: kind.name })}
                     className="text-destructive/60 hover:text-destructive"
                   >
                     <Trash2 className="h-3 w-3" />
@@ -947,6 +1036,58 @@ export default function CategoriasPage() {
             <Button variant="outline" onClick={() => setMainToolDialog({ open: false })}>Cancelar</Button>
             <Button onClick={submitMainTool} disabled={!mainToolForm.name || (!mainToolDialog.editing && !mainToolForm.slug)}>
               {mainToolDialog.editing ? "Salvar" : "Criar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog: Tipo de Projeto */}
+      <Dialog open={projectKindDialog.open} onOpenChange={(o) => setProjectKindDialog({ open: o })}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{projectKindDialog.editing ? "Editar tipo de projeto" : "Novo tipo de projeto"}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <Label>Nome</Label>
+              <Input
+                value={projectKindForm.name}
+                onChange={(e) => {
+                  const name = e.target.value;
+                  setProjectKindForm((f) => ({
+                    ...f,
+                    name,
+                    slug: projectKindDialog.editing ? f.slug : slugify(name),
+                  }));
+                }}
+                placeholder="Ex: Automação"
+              />
+            </div>
+            {!projectKindDialog.editing && (
+              <div className="space-y-1.5">
+                <Label>Slug</Label>
+                <Input
+                  value={projectKindForm.slug}
+                  onChange={(e) => setProjectKindForm((f) => ({ ...f, slug: slugify(e.target.value) }))}
+                  placeholder="Ex: automacao"
+                />
+                <p className="text-xs text-muted-foreground">Identificador único. Não pode ser alterado após criação.</p>
+              </div>
+            )}
+            <div className="space-y-1.5">
+              <Label>Ordem</Label>
+              <Input
+                type="number"
+                min={0}
+                value={projectKindForm.order}
+                onChange={(e) => setProjectKindForm((f) => ({ ...f, order: Number(e.target.value) }))}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setProjectKindDialog({ open: false })}>Cancelar</Button>
+            <Button onClick={submitProjectKind} disabled={!projectKindForm.name || (!projectKindDialog.editing && !projectKindForm.slug)}>
+              {projectKindDialog.editing ? "Salvar" : "Criar"}
             </Button>
           </DialogFooter>
         </DialogContent>
