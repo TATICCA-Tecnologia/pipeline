@@ -9,6 +9,13 @@ import { STATUS_CONFIG, PRIORITY_CONFIG } from "@/shared/types";
 import { useModal } from "@/shared/context/modal-context";
 import { toast } from "sonner";
 import { Button } from "@/src/shared/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/src/shared/components/ui/select";
 import { Download } from "lucide-react";
 import { ProjectDetailsModal } from "./_components/project-details.modal";
 import {
@@ -16,6 +23,17 @@ import {
   filterProjectsByCompany,
   ALL_COMPANIES_VALUE,
 } from "@/shared/components/company-filter";
+import {
+  ProjectKindFilter,
+  filterProjectsByKind,
+  ALL_PROJECT_KINDS_VALUE,
+} from "@/shared/components/project-kind-filter";
+
+type SortBy = "updatedAt" | "createdAt";
+const SORT_OPTIONS: { value: SortBy; label: string }[] = [
+  { value: "updatedAt", label: "Edição mais recente" },
+  { value: "createdAt", label: "Criação mais recente" },
+];
 
 function escapeCSV(value: unknown): string {
   if (value === null || value === undefined) return "";
@@ -38,6 +56,7 @@ function downloadProjectsCSV(projects: Project[]) {
     "Status",
     "Prioridade",
     "Tipo",
+    "Tipo de Projeto",
     "Descrição",
     "Público-alvo",
     "Usuários esperados",
@@ -67,6 +86,7 @@ function downloadProjectsCSV(projects: Project[]) {
     STATUS_CONFIG[p.status]?.label ?? p.status,
     PRIORITY_CONFIG[p.priority]?.label ?? p.priority,
     p.projectType,
+    p.projectKind?.name ?? "",
     p.description,
     p.targetAudience,
     p.expectedUsers,
@@ -118,8 +138,13 @@ export default function AdminProjetosPage() {
   const { openModal } = useModal();
   const { isDemoMode } = useDemoMode();
   const [companyFilter, setCompanyFilter] = useState(ALL_COMPANIES_VALUE);
+  const [kindFilter, setKindFilter] = useState(ALL_PROJECT_KINDS_VALUE);
+  const [sortBy, setSortBy] = useState<SortBy>("updatedAt");
 
-  const filteredProjects = filterProjectsByCompany(projects, companyFilter);
+  const filteredProjects = filterProjectsByKind(
+    filterProjectsByCompany(projects, companyFilter),
+    kindFilter
+  ).sort((a, b) => new Date(b[sortBy]).getTime() - new Date(a[sortBy]).getTime());
 
   const handleMoveProject = (projectId: string, newStatus: ProjectStatus) => {
     moveProject(projectId, newStatus);
@@ -153,6 +178,23 @@ export default function AdminProjetosPage() {
             value={companyFilter}
             onChange={setCompanyFilter}
           />
+          <ProjectKindFilter
+            projects={projects}
+            value={kindFilter}
+            onChange={setKindFilter}
+          />
+          <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortBy)}>
+            <SelectTrigger className="w-48">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {SORT_OPTIONS.map((opt) => (
+                <SelectItem key={opt.value} value={opt.value}>
+                  {opt.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <p className="text-xs uppercase tracking-wider text-muted-foreground">
             {filteredProjects.length}{" "}
             {filteredProjects.length === 1 ? "projeto" : "projetos"}
