@@ -13,6 +13,7 @@ import { companyRouter } from "./routers/company.router";
 import { settingsRouter } from "./routers/settings.router";
 import { interviewRouter } from "./routers/interview.router";
 import { aiSettingsRouter } from "./routers/ai-settings.router";
+import { aiOpportunityRouter } from "./routers/ai-opportunity.router";
 
 export const appRouter = router({
   project: projectRouter,
@@ -29,6 +30,7 @@ export const appRouter = router({
   settings: settingsRouter,
   interview: interviewRouter,
   aiSettings: aiSettingsRouter,
+  aiOpportunity: aiOpportunityRouter,
 });
 
 export type AppRouter = typeof appRouter;
