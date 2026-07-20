@@ -25,6 +25,7 @@ interface KanbanColumnProps {
   activeId: string | null;
   canDrag?: boolean;
   onProjectClick?: (project: Project) => void;
+  locksByProjectId?: Record<string, { userId: string; userName: string }>;
 }
 
 export function KanbanColumn({
@@ -33,6 +34,7 @@ export function KanbanColumn({
   activeId,
   canDrag = false,
   onProjectClick,
+  locksByProjectId,
 }: KanbanColumnProps) {
   const { setNodeRef, isOver } = useDroppable({ id: status, disabled: !canDrag });
   const config = STATUS_CONFIG[status];
@@ -74,6 +76,7 @@ export function KanbanColumn({
                   project={project}
                   isActive={activeId === project.id}
                   onClick={() => onProjectClick?.(project)}
+                  lock={locksByProjectId?.[project.id]}
                 />
               ) : (
                 <div
@@ -87,6 +90,7 @@ export function KanbanColumn({
                   <ProjectCard
                     project={project}
                     onClick={() => onProjectClick?.(project)}
+                    lock={locksByProjectId?.[project.id]}
                   />
                 </div>
               ),
@@ -113,9 +117,10 @@ interface SortableCardProps {
   project: Project;
   isActive: boolean;
   onClick: () => void;
+  lock?: { userId: string; userName: string };
 }
 
-function SortableCard({ project, isActive, onClick }: SortableCardProps) {
+function SortableCard({ project, isActive, onClick, lock }: SortableCardProps) {
   const {
     attributes,
     listeners,
@@ -140,7 +145,7 @@ function SortableCard({ project, isActive, onClick }: SortableCardProps) {
       {...listeners}
       className="w-full min-w-0 touch-none"
     >
-      <ProjectCard project={project} onClick={onClick} />
+      <ProjectCard project={project} onClick={onClick} lock={lock} />
     </div>
   );
 }

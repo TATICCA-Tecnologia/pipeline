@@ -5,7 +5,7 @@ import { Badge } from "@/src/shared/components/ui/badge";
 import type { Project } from "@/shared/types";
 import { STATUS_CONFIG, PRIORITY_CONFIG } from "@/shared/types";
 import { formatDate } from "@/shared/utils";
-import { Calendar, ArrowRight, Presentation } from "lucide-react";
+import { Calendar, ArrowRight, Presentation, Lock } from "lucide-react";
 import { useAuth } from "@/shared/context/auth-context";
 import { useDemoMode } from "@/shared/context/demo-mode-context";
 import { useModal } from "@/shared/context/modal-context";
@@ -17,6 +17,7 @@ interface ProjectCardProps {
   draggable?: boolean;
   isDragging?: boolean;
   onDragStart?: (e: React.DragEvent) => void;
+  lock?: { userId: string; userName: string };
 }
 
 const PRIORITY_DOT: Record<string, string> = {
@@ -32,6 +33,7 @@ export function ProjectCard({
   draggable,
   isDragging = false,
   onDragStart,
+  lock,
 }: ProjectCardProps) {
   const priorityConfig = PRIORITY_CONFIG[project.priority];
   const statusConfig = STATUS_CONFIG[project.status];
@@ -40,6 +42,7 @@ export function ProjectCard({
   const { maskFreeText, maskCompanyName } = useDemoMode();
   const canSeeSlide =
     user?.role === "admin" || user?.role === "developer" || user?.role === "super_admin";
+  const isLockedByOther = !!lock && lock.userId !== user?.id;
 
   return (
     <Card
@@ -48,6 +51,9 @@ export function ProjectCard({
         "transition-all duration-200 ease-out",
         "hover:border-primary/40 hover:shadow-md hover:shadow-primary/5 hover:-translate-y-0.5 w-full min-w-0 max-w-[300px]",
         isDragging ? "card-dragging" : "",
+        isLockedByOther
+          ? "border-amber-400/70 bg-amber-50/60 dark:border-amber-500/40 dark:bg-amber-500/5"
+          : "",
       ].join(" ")}
       onClick={onClick}
       draggable={draggable}
@@ -83,6 +89,13 @@ export function ProjectCard({
       )}
 
       <CardContent className="space-y-1.5 p-2.5">
+        {isLockedByOther && (
+          <div className="flex items-center gap-1 rounded bg-amber-100 px-1.5 py-0.5 text-[9px] font-semibold text-amber-800 dark:bg-amber-500/20 dark:text-amber-300">
+            <Lock className="h-2.5 w-2.5 shrink-0" />
+            <span className="truncate">Editando: {lock!.userName}</span>
+          </div>
+        )}
+
         {/* Título + descrição */}
         <div className="min-w-0 space-y-0.5">
           <p className="line-clamp-2 text-[13px] font-semibold leading-snug text-foreground">
