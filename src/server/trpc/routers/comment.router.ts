@@ -87,20 +87,51 @@ export const commentRouter = router({
         include: { user: { select: { name: true, role: true } } },
       });
 
-      if (mentionedIds.length > 0) {
+      // Quem já mandou mensagem antes nesse mesmo canal (GLOBAL/INTERNAL)
+      // desse projeto também é notificado da resposta nova — exceto quem já
+      // vai receber a notificação de menção acima, pra não duplicar.
+      const priorParticipants = await ctx.db.comment.findMany({
+        where: {
+          projectId: input.projectId,
+          visibility: input.visibility,
+          userId: { not: ctx.userId },
+        },
+        distinct: ["userId"],
+        select: { userId: true },
+      });
+      const participantIds = priorParticipants
+        .map((p) => p.userId)
+        .filter((id) => !mentionedIds.includes(id));
+
+      if (mentionedIds.length > 0 || participantIds.length > 0) {
         const project = await ctx.db.project.findUnique({
           where: { id: input.projectId },
           select: { title: true },
         });
-        await ctx.db.notification.createMany({
-          data: mentionedIds.map((userId) => ({
-            userId,
-            type: "MENTION" as const,
-            title: "Você foi mencionado",
-            message: `${comment.user.name} mencionou você no chat do projeto "${project?.title ?? ""}"`,
-            link: `/projeto/${input.projectId}`,
-          })),
-        });
+
+        if (mentionedIds.length > 0) {
+          await ctx.db.notification.createMany({
+            data: mentionedIds.map((userId) => ({
+              userId,
+              type: "MENTION" as const,
+              title: "Você foi mencionado",
+              message: `${comment.user.name} mencionou você no chat do projeto "${project?.title ?? ""}"`,
+              link: `/projeto/${input.projectId}`,
+            })),
+          });
+        }
+
+        if (participantIds.length > 0) {
+          await ctx.db.notification.createMany({
+            data: participantIds.map((userId) => ({
+              userId,
+              type: "COMMENT" as const,
+              title: "Nova mensagem no chat",
+              message: `${comment.user.name} respondeu no chat do projeto "${project?.title ?? ""}"`,
+              link: `/projeto/${input.projectId}`,
+            })),
+          });
+        }
       }
 
       return {
