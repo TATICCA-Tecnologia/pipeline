@@ -35,14 +35,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/src/shared/components/ui/alert-dialog";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/src/shared/components/ui/dialog";
+import { useXmlOpportunityImporter } from "@/shared/hooks/use-xml-opportunity-importer";
+import { XmlOpportunityResolutionDialogs } from "@/shared/components/xml-opportunity-resolution-dialogs";
+import type { BatchContext } from "@/shared/hooks/use-xml-opportunity-importer";
 import { useToast } from "@/src/shared/hooks/use-toast";
 import { trpc } from "@/shared/trpc/client";
 import { useZodForm } from "@/shared/hooks/use-zod-form";
@@ -105,7 +100,6 @@ const QUALITATIVE_RATINGS = [
   { name: "ratingCompliance" as const, label: "Atendimento a políticas e leis" },
 ];
 
-type BatchContext = { fileName: string; index: number; total: number };
 type BatchImportResult = {
   fileName: string;
   ok: boolean;
@@ -288,55 +282,21 @@ export default function SolicitarProjetoPage() {
   const [xmlImportOutcome, setXmlImportOutcome] = useState<
     { ok: boolean; title: string; message: string } | null
   >(null);
-  const [pendingXmlImport, setPendingXmlImport] = useState<{
-    rawCompanyName: string;
-    batchContext?: BatchContext;
-  } | null>(null);
-  const [chosenCompanyId, setChosenCompanyId] = useState<string | undefined>();
-  // Guarda o `resolve` de uma Promise pendente enquanto o diálogo "Selecione a
-  // empresa" está aberto. Existe pra permitir que o loop sequencial de import
-  // em lote (`handleImportXmlFile`) dê `await` numa escolha do usuário no meio
-  // da iteração, em vez de processar tudo de uma vez ou empilhar diálogos.
-  // Toda forma de fechar o diálogo (confirmar, cancelar, Esc/clique fora) deve
-  // passar por `closeCompanyResolutionDialog` — se uma delas esquecer de
-  // resolver essa Promise, o import correspondente trava para sempre.
-  const companyResolverRef = useRef<((companyId: string | null) => void) | null>(null);
-  const [pendingTaxonomyResolution, setPendingTaxonomyResolution] = useState<{
-    kind: "area" | "theme";
-    rawValue: string;
-    // Ambos só usados quando kind === "theme", para a área já resolvida a que o tema pertence:
-    // areaIdForTheme é o id real (necessário pro createTheme), areaSlugForTheme é a chave usada
-    // por PROJECT_THEMES_BY_AREA (Record indexado por slug, não por id) para listar os temas dela.
-    areaIdForTheme?: string;
-    areaSlugForTheme?: string;
-    batchContext?: BatchContext;
-  } | null>(null);
-  const [chosenTaxonomyId, setChosenTaxonomyId] = useState<string | undefined>();
-  const [creatingNewTaxonomy, setCreatingNewTaxonomy] = useState(false);
   const [registerNewArea, setRegisterNewArea] = useState(false);
   const [registerNewTheme, setRegisterNewTheme] = useState(false);
-  // Guarda o resolve() da Promise que pausa importXmlEntry aguardando a escolha do usuário no
-  // diálogo de área/tema (mesmo padrão do companyResolverRef acima). Deve ser setado ANTES de abrir
-  // o diálogo (evita corrida) e limpo em um único lugar (closeTaxonomyResolutionDialog), alcançado por
-  // todo caminho que fecha o diálogo (Confirmar, "Manter como Outro", Escape/clique fora via onOpenChange).
-  // Se algum caminho de fechamento for adicionado sem passar por essa função, a Promise nunca resolve
-  // e o loop de importação trava indefinidamente nesse item.
-  const taxonomyResolverRef = useRef<((result: { id: string; slug: string; name: string } | null) => void) | null>(
-    null
-  );
-
   const utils = trpc.useUtils();
   const createAreaMutation = trpc.taxonomy.createArea.useMutation();
   const createThemeMutation = trpc.taxonomy.createTheme.useMutation();
-  // PROJECT_AREAS/PROJECT_THEMES_BY_AREA vêm de uma query com staleTime de 5min (useTaxonomy) e,
-  // dentro de um lote (.zip com vários XMLs), o loop de importXmlEntry já capturou esses valores
-  // no fechamento antes de rodar — invalidar a query não atualiza esse valor já capturado no meio
-  // do loop. Por isso, além de invalidar (pro resto do app, e pra próxima importação), guardamos
-  // aqui as áreas/temas resolvidos (mapeados OU cadastrados) nesta sessão, pra que o 2º arquivo do
-  // mesmo lote com o mesmo valor bruto (ex.: "Financeiro" duas vezes) reaproveite a escolha em vez
-  // de tentar cadastrar de novo (o que bateria no slug único e falharia) ou perguntar de novo.
-  const areaResolutionCacheRef = useRef<Map<string, { id: string; slug: string; name: string }>>(new Map());
-  const themeResolutionCacheRef = useRef<Map<string, { id: string; slug: string; name: string }>>(new Map());
+  // Resolução de empresa/área/tema ambíguos + criação do projeto a partir de um XML já
+  // parseado — extraído para um hook compartilhado (ver seu comentário de topo para o porquê
+  // do cache de área/tema por lote). Reaproveitado também pela geração de oportunidades por IA.
+  const importer = useXmlOpportunityImporter({
+    userId: user?.id,
+    areas: PROJECT_AREAS,
+    themesByArea: PROJECT_THEMES_BY_AREA,
+    companies: companyOptions,
+    buildTypeLabel: buildClienteProjectTypeLabel,
+  });
   const [batchImportResults, setBatchImportResults] = useState<BatchImportResult[] | null>(null);
   const [selectedCompanyId, setSelectedCompanyId] = useState<string | undefined>();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -382,148 +342,6 @@ export default function SolicitarProjetoPage() {
     setAttachedFiles(Array.from(files));
   }
 
-  // Única forma de fechar o diálogo "Selecione a empresa": resolve a Promise
-  // pendente (null = cancelado) e limpa o estado. Centralizado aqui pra evitar
-  // que uma nova forma de fechar o diálogo esqueça de resolver a Promise, o
-  // que travaria o import (single ou lote) esperando para sempre.
-  function closeCompanyResolutionDialog(companyId: string | null) {
-    companyResolverRef.current?.(companyId);
-    companyResolverRef.current = null;
-    setPendingXmlImport(null);
-    setChosenCompanyId(undefined);
-  }
-
-  function resolveCompanyAmbiguity(
-    rawCompanyName: string,
-    batchContext?: BatchContext
-  ): Promise<string | null> {
-    return new Promise((resolve) => {
-      companyResolverRef.current = resolve;
-      setPendingXmlImport({ rawCompanyName, batchContext });
-      setChosenCompanyId(companyOptions.length === 1 ? companyOptions[0].id : undefined);
-    });
-  }
-
-  // Único ponto de saída do diálogo de área/tema — resolve a Promise pendente (ou entrega null se
-  // cancelado) e limpa todo o estado relacionado. Toda forma de fechar o diálogo deve passar por aqui.
-  function closeTaxonomyResolutionDialog(result: { id: string; slug: string; name: string } | null) {
-    taxonomyResolverRef.current?.(result);
-    taxonomyResolverRef.current = null;
-    setPendingTaxonomyResolution(null);
-    setChosenTaxonomyId(undefined);
-    setCreatingNewTaxonomy(false);
-  }
-
-  function resolveTaxonomyAmbiguity(
-    kind: "area" | "theme",
-    rawValue: string,
-    areaIdForTheme?: string,
-    areaSlugForTheme?: string,
-    batchContext?: BatchContext
-  ): Promise<{ id: string; slug: string; name: string } | null> {
-    return new Promise((resolve) => {
-      taxonomyResolverRef.current = resolve;
-      setPendingTaxonomyResolution({ kind, rawValue, areaIdForTheme, areaSlugForTheme, batchContext });
-      setChosenTaxonomyId(undefined);
-      setCreatingNewTaxonomy(false);
-    });
-  }
-
-  async function importXmlEntry(
-    xmlText: string,
-    batchContext?: BatchContext
-  ): Promise<{ ok: true; title: string; hasWarnings: boolean } | { ok: false; error: string }> {
-    // Defensivo: handleImportXmlFile já barra a ausência de usuário antes de
-    // chamar esta função (nos dois branches, zip e arquivo único). Mantido
-    // aqui caso importXmlEntry seja reaproveitada em outro ponto de entrada.
-    if (!user?.id) return { ok: false, error: "Faça login para importar um XML." };
-
-    const result = parseSolicitacaoXml(xmlText, {
-      areas: PROJECT_AREAS,
-      themesByArea: PROJECT_THEMES_BY_AREA,
-      companies: companyOptions,
-    });
-
-    if (!result.ok) return { ok: false, error: result.error };
-
-    let companyId = result.companyId;
-    if (result.companyUnresolved) {
-      if (companyOptions.length === 0) {
-        return {
-          ok: false,
-          error: result.rawCompanyName
-            ? `A tag <empresa> tem o valor '${result.rawCompanyName}', mas não há nenhuma empresa disponível para associar este processo.`
-            : "Não há nenhuma empresa disponível para associar este processo.",
-        };
-      }
-      const chosen = await resolveCompanyAmbiguity(result.rawCompanyName, batchContext);
-      if (!chosen) return { ok: false, error: "Empresa não resolvida (seleção cancelada)." };
-      companyId = chosen;
-    }
-
-    // area/tema já vêm com o id real quando <area>/<tema> bateram direto com uma opção
-    // cadastrada (caminho feliz, sem diálogo) — só cai no fluxo de resolução abaixo quando
-    // o valor não bateu com nada ("outro").
-    let resolvedAreaId: string | undefined = result.areaId;
-    let resolvedAreaSlug: string | undefined =
-      result.formData.projectArea !== "outro" ? result.formData.projectArea : undefined;
-    let resolvedThemeId: string | undefined = result.themeId;
-
-    if (result.formData.projectArea === "outro" && result.formData.customProjectArea.trim()) {
-      const rawArea = result.formData.customProjectArea.trim();
-      const areaCacheKey = rawArea.toLowerCase();
-      const cachedArea = areaResolutionCacheRef.current.get(areaCacheKey);
-      const resolvedArea =
-        cachedArea ?? (await resolveTaxonomyAmbiguity("area", rawArea, undefined, undefined, batchContext));
-      if (resolvedArea) {
-        if (!cachedArea) areaResolutionCacheRef.current.set(areaCacheKey, resolvedArea);
-        resolvedAreaId = resolvedArea.id;
-        resolvedAreaSlug = resolvedArea.slug;
-        result.formData.projectArea = resolvedArea.slug;
-        result.formData.customProjectArea = resolvedArea.slug === "outro" ? result.formData.customProjectArea : "";
-      }
-      // Se o usuário cancelar (resolvedArea === null), mantém "outro" + texto livre — comportamento de hoje.
-      // Não é cacheado: um próximo arquivo do lote com o mesmo valor bruto pergunta de novo.
-    }
-
-    if (result.formData.projectTheme === "outro" && result.formData.customProjectTheme.trim()) {
-      const rawTheme = result.formData.customProjectTheme.trim();
-      // Chave inclui a área resolvida porque o mesmo nome de tema pode existir em áreas diferentes.
-      const themeCacheKey = `${resolvedAreaSlug ?? ""}::${rawTheme.toLowerCase()}`;
-      const cachedTheme = themeResolutionCacheRef.current.get(themeCacheKey);
-      const resolvedTheme =
-        cachedTheme ??
-        (await resolveTaxonomyAmbiguity("theme", rawTheme, resolvedAreaId, resolvedAreaSlug, batchContext));
-      if (resolvedTheme) {
-        if (!cachedTheme) themeResolutionCacheRef.current.set(themeCacheKey, resolvedTheme);
-        resolvedThemeId = resolvedTheme.id;
-        result.formData.projectTheme = resolvedTheme.slug;
-        result.formData.customProjectTheme = "";
-      }
-    }
-
-    try {
-      const payload = buildProjectPayload({
-        data: result.formData,
-        features: result.features,
-        benefits: result.benefits,
-        clientId: user.id,
-        companyId,
-        areaId: resolvedAreaId,
-        themeId: resolvedThemeId,
-        areas: PROJECT_AREAS,
-        themesByArea: PROJECT_THEMES_BY_AREA,
-        buildTypeLabel: buildClienteProjectTypeLabel,
-      });
-      await addProject(payload);
-      return { ok: true, title: result.formData.title, hasWarnings: result.warnings.length > 0 };
-    } catch (error) {
-      console.error("Erro ao criar processo a partir do XML:", error);
-      const message = error instanceof Error ? error.message : "Tente novamente.";
-      return { ok: false, error: `Não foi possível criar o processo: ${message}` };
-    }
-  }
-
   async function handleImportXmlFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     e.target.value = "";
@@ -564,8 +382,8 @@ export default function SolicitarProjetoPage() {
         const results: BatchImportResult[] = [];
         for (let i = 0; i < entries.length; i++) {
           const entry = entries[i];
-          const outcome = await importXmlEntry(entry.xmlText, {
-            fileName: entry.fileName,
+          const outcome = await importer.importXmlEntry(entry.xmlText, {
+            label: entry.fileName,
             index: i + 1,
             total: entries.length,
           });
@@ -578,7 +396,7 @@ export default function SolicitarProjetoPage() {
         setBatchImportResults(results);
       } else {
         const xmlText = await file.text();
-        const outcome = await importXmlEntry(xmlText);
+        const outcome = await importer.importXmlEntry(xmlText);
         if (outcome.ok) {
           const warningsNote = outcome.hasWarnings
             ? ` Alguns valores do XML não foram reconhecidos e foram registrados em "Informações adicionais" para revisão.`
@@ -725,13 +543,6 @@ export default function SolicitarProjetoPage() {
       setIsSubmitting(false);
     }
   }
-
-  // PROJECT_THEMES_BY_AREA é indexado por slug da área, não por id — por isso o lookup de temas usa
-  // areaSlugForTheme (não areaIdForTheme, que serve só para o createTheme mais abaixo).
-  const availableTaxonomyOptions =
-    pendingTaxonomyResolution?.kind === "area"
-      ? PROJECT_AREAS
-      : PROJECT_THEMES_BY_AREA[pendingTaxonomyResolution?.areaSlugForTheme ?? ""] ?? [];
 
   return (
     <TooltipProvider>
@@ -1712,65 +1523,6 @@ export default function SolicitarProjetoPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <Dialog
-        open={pendingXmlImport !== null}
-        onOpenChange={(open) => {
-          if (!open) closeCompanyResolutionDialog(null);
-        }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Selecione a empresa</DialogTitle>
-            <DialogDescription>
-              {pendingXmlImport?.batchContext && (
-                <span className="mb-1 block font-medium text-foreground">
-                  Arquivo {pendingXmlImport.batchContext.index} de {pendingXmlImport.batchContext.total}:{" "}
-                  {pendingXmlImport.batchContext.fileName}
-                </span>
-              )}
-              {pendingXmlImport?.rawCompanyName
-                ? `O XML indica a empresa "${pendingXmlImport.rawCompanyName}", que não corresponde a nenhuma empresa disponível.`
-                : "O XML não indica uma empresa."}{" "}
-              Escolha para qual empresa este processo deve ser criado.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-2">
-            <Label>Empresa</Label>
-            <Select value={chosenCompanyId} onValueChange={setChosenCompanyId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione a empresa" />
-              </SelectTrigger>
-              <SelectContent>
-                {companyOptions.map((company) => (
-                  <SelectItem key={company.id} value={company.id}>
-                    {company.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => closeCompanyResolutionDialog(null)}>
-              Cancelar
-            </Button>
-            <Button
-              // isSubmitting fica `true` durante todo o import (único ou lote
-              // inteiro), incluindo enquanto este diálogo está aberto esperando
-              // o usuário — não incluir isSubmitting aqui, senão o botão fica
-              // permanentemente desabilitado e o diálogo trava sem forma de
-              // confirmar.
-              disabled={!chosenCompanyId}
-              onClick={() => {
-                if (!chosenCompanyId) return;
-                closeCompanyResolutionDialog(chosenCompanyId);
-              }}
-            >
-              Confirmar e criar processo
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
       <AlertDialog
         open={batchImportResults !== null}
         onOpenChange={(open) => {
@@ -1822,123 +1574,21 @@ export default function SolicitarProjetoPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <Dialog
-        open={pendingTaxonomyResolution !== null}
-        onOpenChange={(open) => {
-          if (!open) closeTaxonomyResolutionDialog(null);
-        }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              {pendingTaxonomyResolution?.kind === "area" ? "Área não cadastrada" : "Tema não cadastrado"}
-            </DialogTitle>
-            <DialogDescription>
-              {pendingTaxonomyResolution?.batchContext && (
-                <span className="mb-1 block font-medium text-foreground">
-                  Arquivo {pendingTaxonomyResolution.batchContext.index} de{" "}
-                  {pendingTaxonomyResolution.batchContext.total}: {pendingTaxonomyResolution.batchContext.fileName}
-                </span>
-              )}
-              O XML indica{" "}
-              {pendingTaxonomyResolution?.kind === "area" ? "a área" : "o tema"} &quot;
-              {pendingTaxonomyResolution?.rawValue}&quot;, que não corresponde a nenhuma opção cadastrada.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-3">
-            <div className="space-y-2">
-              <Label>
-                Usar {pendingTaxonomyResolution?.kind === "area" ? "uma área" : "um tema"} já cadastrado
-              </Label>
-              <Select
-                value={creatingNewTaxonomy ? "" : chosenTaxonomyId}
-                onValueChange={(value) => {
-                  setChosenTaxonomyId(value);
-                  setCreatingNewTaxonomy(false);
-                }}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione" />
-                </SelectTrigger>
-                <SelectContent>
-                  {availableTaxonomyOptions
-                    .filter((opt): opt is typeof opt & { id: string } => Boolean(opt.id))
-                    .map((opt) => (
-                      <SelectItem key={opt.id} value={opt.id}>
-                        {opt.label}
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {canRegisterTaxonomy &&
-              !(pendingTaxonomyResolution?.kind === "theme" && !pendingTaxonomyResolution?.areaIdForTheme) && (
-                <div className="flex items-center gap-2 rounded-md border border-dashed border-border p-3">
-                  <Checkbox
-                    checked={creatingNewTaxonomy}
-                    onCheckedChange={(checked) => {
-                      setCreatingNewTaxonomy(checked === true);
-                      if (checked === true) setChosenTaxonomyId(undefined);
-                    }}
-                  />
-                  <span className="text-sm">
-                    Cadastrar &quot;{pendingTaxonomyResolution?.rawValue}&quot; como{" "}
-                    {pendingTaxonomyResolution?.kind === "area" ? "nova área" : "novo tema"} permanente
-                  </span>
-                </div>
-              )}
-          </div>
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => closeTaxonomyResolutionDialog(null)}>
-              Manter como &quot;Outro&quot;
-            </Button>
-            <Button
-              disabled={(!chosenTaxonomyId && !creatingNewTaxonomy) || createAreaMutation.isPending || createThemeMutation.isPending}
-              onClick={async () => {
-                if (!pendingTaxonomyResolution) return;
-                if (creatingNewTaxonomy) {
-                  const name = pendingTaxonomyResolution.rawValue;
-                  const slug = slugify(name);
-                  try {
-                    if (pendingTaxonomyResolution.kind === "area") {
-                      const created = await createAreaMutation.mutateAsync({ name, slug, order: 0 });
-                      utils.taxonomy.listAreas.invalidate();
-                      closeTaxonomyResolutionDialog({ id: created.id, slug: created.slug, name: created.name });
-                    } else if (pendingTaxonomyResolution.areaIdForTheme) {
-                      const created = await createThemeMutation.mutateAsync({
-                        name,
-                        slug,
-                        areaId: pendingTaxonomyResolution.areaIdForTheme,
-                        order: 0,
-                      });
-                      utils.taxonomy.listAreas.invalidate();
-                      closeTaxonomyResolutionDialog({ id: created.id, slug: created.slug, name: created.name });
-                    }
-                  } catch (error) {
-                    console.error("Erro ao cadastrar categoria:", error);
-                    const message = error instanceof Error ? error.message : "Tente novamente.";
-                    toast({
-                      title: "Não foi possível cadastrar a categoria",
-                      description: message,
-                      variant: "destructive",
-                    });
-                  }
-                } else if (chosenTaxonomyId) {
-                  const picked = availableTaxonomyOptions.find((o) => o.id === chosenTaxonomyId);
-                  if (picked?.id) {
-                    closeTaxonomyResolutionDialog({ id: picked.id, slug: picked.value, name: picked.label });
-                  }
-                }
-              }}
-            >
-              {createAreaMutation.isPending || createThemeMutation.isPending ? "Salvando..." : "Confirmar"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <XmlOpportunityResolutionDialogs
+        pendingXmlImport={importer.pendingXmlImport}
+        chosenCompanyId={importer.chosenCompanyId}
+        setChosenCompanyId={importer.setChosenCompanyId}
+        closeCompanyResolutionDialog={importer.closeCompanyResolutionDialog}
+        companies={companyOptions}
+        pendingTaxonomyResolution={importer.pendingTaxonomyResolution}
+        chosenTaxonomyId={importer.chosenTaxonomyId}
+        setChosenTaxonomyId={importer.setChosenTaxonomyId}
+        creatingNewTaxonomy={importer.creatingNewTaxonomy}
+        setCreatingNewTaxonomy={importer.setCreatingNewTaxonomy}
+        closeTaxonomyResolutionDialog={importer.closeTaxonomyResolutionDialog}
+        availableTaxonomyOptions={importer.availableTaxonomyOptions}
+        canRegisterTaxonomy={canRegisterTaxonomy}
+      />
     </TooltipProvider>
   );
 }
