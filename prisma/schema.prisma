@@ -619,6 +619,15 @@ model SystemSettings {
   pixEnabled       Boolean  @default(true)
   pixKey           String?
 
+  // Integração de IA (geração de oportunidades a partir de transcrição, ver
+  // ai-settings.router.ts / ai-opportunity.router.ts). aiApiKey é o único
+  // campo sensível aqui — nunca é retornado em texto puro por nenhum
+  // procedure, só mascarado (ver maskApiKey em ai-settings.router.ts).
+  aiProvider String? // "openai" | "anthropic" | "gemini" | "custom"
+  aiModel    String?
+  aiApiKey   String?
+  aiBaseUrl  String? // só usado quando aiProvider = "custom"
+
   // Pesos de priorização (motor de scoring)
   qualWeightErrorReduction     Float @default(0.24)
   qualWeightProcessCriticality Float @default(0.28)
