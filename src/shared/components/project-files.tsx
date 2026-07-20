@@ -21,6 +21,7 @@ import {
   DialogTitle,
 } from "@/src/shared/components/ui/dialog";
 import { useToast } from "@/src/shared/hooks/use-toast";
+import { getTrpcUserId } from "@/shared/trpc/auth-header";
 import { cn } from "@/src/shared/utils";
 import {
   Upload,
@@ -139,7 +140,12 @@ export function ProjectFiles({ projectId, maxSizeMB = 50 }: ProjectFilesProps) {
     setFileToDelete(null);
   }
 
-  function handleDownload(file: ProjectFile) {
+  // A rota /api/files/[fileId] exige o header x-user-id (mesma auth do resto
+  // do app), que uma navegação simples de <a href>/window.open não
+  // incluiria — por isso fazemos um fetch manual com o header, convertemos em
+  // blob e disparamos o download/preview por um link/aba temporário (mesmo
+  // padrão de handleExportDeck em admin/empresas/page.tsx).
+  async function handleDownload(file: ProjectFile) {
     if (!file.url || file.url === "#") {
       toast({
         title: "Download indisponível",
@@ -149,16 +155,35 @@ export function ProjectFiles({ projectId, maxSizeMB = 50 }: ProjectFilesProps) {
       return;
     }
 
-    const link = document.createElement("a");
-    link.href = file.url; // URL pública gerada pelo MinIO
-    link.download = file.name;
-    link.target = "_blank";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    try {
+      const response = await fetch(file.url, {
+        headers: { "x-user-id": getTrpcUserId() },
+      });
+      if (!response.ok) {
+        throw new Error(await response.text());
+      }
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      link.download = file.name;
+      try {
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+      } finally {
+        URL.revokeObjectURL(blobUrl);
+      }
+    } catch {
+      toast({
+        title: "Falha no download",
+        description: `Não foi possível baixar o arquivo ${file.name}.`,
+        variant: "destructive",
+      });
+    }
   }
 
-  function handlePreview(file: ProjectFile) {
+  async function handlePreview(file: ProjectFile) {
     if (!file.url || file.url === "#") {
       toast({
         title: "Pré-visualização indisponível",
@@ -168,7 +193,32 @@ export function ProjectFiles({ projectId, maxSizeMB = 50 }: ProjectFilesProps) {
       return;
     }
 
-    window.open(file.url, "_blank");
+    // Abre a aba já na hora do clique (gesto síncrono do usuário) pra não
+    // ser bloqueada por bloqueador de pop-up — só depois navega ela pro blob,
+    // uma vez que o fetch autenticado terminar.
+    const previewWindow = window.open("", "_blank");
+    try {
+      const response = await fetch(file.url, {
+        headers: { "x-user-id": getTrpcUserId() },
+      });
+      if (!response.ok) {
+        throw new Error(await response.text());
+      }
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      if (previewWindow) {
+        previewWindow.location.href = blobUrl;
+      } else {
+        window.open(blobUrl, "_blank");
+      }
+    } catch {
+      previewWindow?.close();
+      toast({
+        title: "Falha na pré-visualização",
+        description: `Não foi possível abrir o arquivo ${file.name}.`,
+        variant: "destructive",
+      });
+    }
   }
 
   return (
