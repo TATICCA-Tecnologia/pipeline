@@ -14,6 +14,7 @@ import { settingsRouter } from "./routers/settings.router";
 import { interviewRouter } from "./routers/interview.router";
 import { aiSettingsRouter } from "./routers/ai-settings.router";
 import { aiOpportunityRouter } from "./routers/ai-opportunity.router";
+import { notificationRouter } from "./routers/notification.router";
 
 export const appRouter = router({
   project: projectRouter,
@@ -31,6 +32,7 @@ export const appRouter = router({
   interview: interviewRouter,
   aiSettings: aiSettingsRouter,
   aiOpportunity: aiOpportunityRouter,
+  notification: notificationRouter,
 });
 
 export type AppRouter = typeof appRouter;
