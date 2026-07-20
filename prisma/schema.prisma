@@ -376,12 +376,13 @@ enum TaskStatus {
 // ==========================================
 
 model Comment {
-  id          String            @id @default(cuid())
-  content     String
-  visibility  CommentVisibility @default(GLOBAL)
-  isIncident  Boolean           @default(false)
-  createdAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
+  id               String            @id @default(cuid())
+  content          String
+  visibility       CommentVisibility @default(GLOBAL)
+  isIncident       Boolean           @default(false)
+  mentionedUserIds Json? // array de userId (string[]) mencionados nesta mensagem
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
 
   // Relacionamentos
   project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
@@ -445,6 +446,7 @@ enum NotificationType {
   STATUS_CHANGE
   PAYMENT
   SYSTEM
+  MENTION
 }
 
 // ==========================================
