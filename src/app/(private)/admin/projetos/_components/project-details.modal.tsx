@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import type { ModalProps } from "@/shared/types/modal";
 import type { Project } from "@/shared/types";
@@ -132,6 +132,42 @@ export function ProjectDetailsModal({
     },
   });
 
+  // Lock de presença (soft, apenas aviso): ao montar, avisa o servidor que
+  // este usuário está com o card aberto, com heartbeat a cada 20s pra manter
+  // o lock vivo (TTL no servidor é 45s) enquanto o modal continuar montado.
+  const acquireLockMutation = trpc.project.acquireLock.useMutation();
+  const releaseLockMutation = trpc.project.releaseLock.useMutation();
+  const [lockHolder, setLockHolder] = useState<{ userId: string; userName: string } | null>(
+    null
+  );
+
+  useEffect(() => {
+    const projectId = data?.project.id;
+    if (!projectId) return;
+
+    let cancelled = false;
+    const acquire = () => {
+      acquireLockMutation.mutate(
+        { projectId },
+        {
+          onSuccess: (lock) => {
+            if (!cancelled) setLockHolder({ userId: lock.userId, userName: lock.userName });
+          },
+        }
+      );
+    };
+
+    acquire();
+    const heartbeat = setInterval(acquire, 20_000);
+
+    return () => {
+      cancelled = true;
+      clearInterval(heartbeat);
+      releaseLockMutation.mutate({ projectId });
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data?.project.id]);
+
   if (!data) return null;
 
   const { project: cachedProject } = data;
@@ -162,6 +198,13 @@ export function ProjectDetailsModal({
             ? "Carregando detalhes completos..."
             : "Todos os dados coletados na solicitação ou na importação de XML."}
         </p>
+
+        {lockHolder && lockHolder.userId !== user?.id && (
+          <div className="mb-5 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
+            {lockHolder.userName} está editando este projeto agora — suas alterações podem ser
+            sobrescritas.
+          </div>
+        )}
 
         {(user?.role === "admin" ||
           user?.role === "developer" ||
