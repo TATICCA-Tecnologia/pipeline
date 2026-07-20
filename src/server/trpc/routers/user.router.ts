@@ -69,6 +69,35 @@ export const userRouter = router({
     }));
   }),
 
+  // Usuários mencionáveis no chat de um projeto: o cliente-dono do projeto +
+  // todo ADMIN/SUPER_ADMIN/DEVELOPER (não só o dev atribuído a este projeto
+  // específico — combinado com o usuário, qualquer developer pode ser
+  // mencionado). protectedProcedure (não adminProcedure) porque o cliente
+  // também precisa dessa lista pra mencionar no canal GLOBAL.
+  listMentionable: protectedProcedure
+    .input(z.object({ projectId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const project = await ctx.db.project.findUnique({
+        where: { id: input.projectId },
+        select: { clientId: true },
+      });
+      if (!project) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Projeto não encontrado" });
+      }
+
+      const users = await ctx.db.user.findMany({
+        where: {
+          OR: [
+            { id: project.clientId },
+            { role: { in: ["ADMIN", "SUPER_ADMIN", "DEVELOPER"] } },
+          ],
+        },
+        select: { id: true, name: true, role: true },
+        orderBy: { name: "asc" },
+      });
+      return users.map((u) => ({ id: u.id, name: u.name, role: toFrontendRole(u.role) }));
+    }),
+
   byId: publicProcedure.input(z.object({ id: z.string() })).query(async ({ ctx, input }) => {
     const user = await ctx.db.user.findUnique({
       where: { id: input.id },
