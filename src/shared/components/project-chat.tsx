@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useAuth } from "@/shared/context/auth-context";
 import { useComments } from "@/shared/context/comments-context";
+import { trpc } from "@/shared/trpc/client";
 import { Button } from "@/src/shared/components/ui/button";
 import { Textarea } from "@/src/shared/components/ui/textarea";
 import { ScrollArea } from "@/src/shared/components/ui/scroll-area";
@@ -24,6 +25,42 @@ interface ProjectChatProps {
 
 type ChatTab = "global" | "internal";
 
+// Texto depois do último "@" antes do cursor, contanto que não tenha espaço
+// no meio (ou seja, ainda "dentro" de uma menção sendo digitada). null =
+// dropdown de menção fechado.
+function getActiveMentionQuery(text: string, cursorPos: number): string | null {
+  const upToCursor = text.slice(0, cursorPos);
+  const atIndex = upToCursor.lastIndexOf("@");
+  if (atIndex === -1) return null;
+  const between = upToCursor.slice(atIndex + 1);
+  if (/\s/.test(between)) return null;
+  return between;
+}
+
+// Envolve cada ocorrência de "@Nome" (pra cada usuário em mentionedUsers) num
+// <strong> — mesmo texto da mensagem, só destacando as menções.
+function highlightMentions(
+  content: string,
+  mentionedUsers?: { id: string; name: string }[]
+): React.ReactNode {
+  const names = (mentionedUsers ?? []).map((u) => u.name).filter(Boolean);
+  if (names.length === 0) return content;
+
+  const escaped = names.map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  const pattern = new RegExp(`(@(?:${escaped.join("|")}))`, "g");
+  const parts = content.split(pattern);
+
+  return parts.map((part, i) =>
+    part.startsWith("@") && names.includes(part.slice(1)) ? (
+      <strong key={i} className="font-semibold text-primary">
+        {part}
+      </strong>
+    ) : (
+      <span key={i}>{part}</span>
+    )
+  );
+}
+
 export function ProjectChat({ projectId }: ProjectChatProps) {
   const { user } = useAuth();
   const { comments, addComment, updateComment, deleteComment } = useComments(projectId);
@@ -36,6 +73,18 @@ export function ProjectChat({ projectId }: ProjectChatProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editContent, setEditContent] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Autocomplete de @menção no campo de nova mensagem.
+  const [mentionQuery, setMentionQuery] = useState<string | null>(null);
+  const [selectedMentions, setSelectedMentions] = useState<Map<string, string>>(new Map());
+  const { data: mentionableUsers = [] } = trpc.user.listMentionable.useQuery({ projectId });
+  const mentionCandidates =
+    mentionQuery === null
+      ? []
+      : mentionableUsers.filter((u) =>
+          u.name.toLowerCase().includes(mentionQuery.toLowerCase())
+        );
 
   const globalComments = comments.filter((c) => c.visibility === "GLOBAL");
   const internalComments = comments.filter((c) => c.visibility === "INTERNAL");
@@ -50,6 +99,11 @@ export function ProjectChat({ projectId }: ProjectChatProps) {
   function handleSendMessage() {
     if (!newMessage.trim() || !user) return;
     const visibility: CommentVisibility = activeTab === "internal" ? "INTERNAL" : "GLOBAL";
+    // Só manda como mencionado quem ainda aparece como "@Nome" no texto final
+    // — cobre o caso de o usuário escolher uma menção e depois apagá-la.
+    const mentionedUserIds = Array.from(selectedMentions.entries())
+      .filter(([name]) => newMessage.includes(`@${name}`))
+      .map(([, id]) => id);
     addComment({
       projectId,
       userId: user.id,
@@ -57,14 +111,52 @@ export function ProjectChat({ projectId }: ProjectChatProps) {
       userRole: user.role,
       content: newMessage.trim(),
       visibility,
+      mentionedUserIds,
     }).catch(() => {});
     setNewMessage("");
+    setSelectedMentions(new Map());
+    setMentionQuery(null);
   }
 
-  function handleKeyDown(e: React.KeyboardEvent) {
+  function handleMessageChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
+    const value = e.target.value;
+    setNewMessage(value);
+    setMentionQuery(getActiveMentionQuery(value, e.target.selectionStart));
+  }
+
+  function handleSelectMention(candidate: { id: string; name: string }) {
+    const cursorPos = textareaRef.current?.selectionStart ?? newMessage.length;
+    const upToCursor = newMessage.slice(0, cursorPos);
+    const atIndex = upToCursor.lastIndexOf("@");
+    if (atIndex === -1) return;
+
+    const before = newMessage.slice(0, atIndex);
+    const after = newMessage.slice(cursorPos);
+    const inserted = `@${candidate.name} `;
+    setNewMessage(before + inserted + after);
+    setSelectedMentions((prev) => new Map(prev).set(candidate.name, candidate.id));
+    setMentionQuery(null);
+
+    requestAnimationFrame(() => {
+      const el = textareaRef.current;
+      if (!el) return;
+      const cursor = (before + inserted).length;
+      el.focus();
+      el.setSelectionRange(cursor, cursor);
+    });
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
+      if (mentionQuery !== null && mentionCandidates.length > 0) {
+        handleSelectMention(mentionCandidates[0]);
+        return;
+      }
       handleSendMessage();
+    }
+    if (e.key === "Escape" && mentionQuery !== null) {
+      setMentionQuery(null);
     }
   }
 
@@ -195,7 +287,9 @@ export function ProjectChat({ projectId }: ProjectChatProps) {
                 </div>
               ) : (
                 <>
-                  <p className="text-sm whitespace-pre-wrap">{comment.content}</p>
+                  <p className="text-sm whitespace-pre-wrap">
+                    {highlightMentions(comment.content, comment.mentionedUsers)}
+                  </p>
                   {isOwn && (
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
@@ -292,10 +386,11 @@ export function ProjectChat({ projectId }: ProjectChatProps) {
       {/* Input — cliente não pode enviar no canal de execução */}
       {(!isClient || activeTab === "global") ? (
         <div className="p-4 border-t border-border">
-          <div className="flex gap-2">
+          <div className="relative flex gap-2">
             <Textarea
+              ref={textareaRef}
               value={newMessage}
-              onChange={(e) => setNewMessage(e.target.value)}
+              onChange={handleMessageChange}
               onKeyDown={handleKeyDown}
               placeholder={
                 activeTab === "internal"
@@ -308,9 +403,29 @@ export function ProjectChat({ projectId }: ProjectChatProps) {
             <Button onClick={handleSendMessage} disabled={!newMessage.trim()} size="icon" className="shrink-0">
               <Send className="h-4 w-4" />
             </Button>
+
+            {mentionQuery !== null && mentionCandidates.length > 0 && (
+              <div className="absolute bottom-full left-0 z-20 mb-1 max-h-48 w-64 overflow-y-auto rounded-md border border-border bg-popover shadow-md">
+                {mentionCandidates.map((candidate) => (
+                  <button
+                    key={candidate.id}
+                    type="button"
+                    onClick={() => handleSelectMention(candidate)}
+                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-accent"
+                  >
+                    <Avatar className="h-6 w-6 shrink-0">
+                      <AvatarFallback className="text-[10px] bg-secondary">
+                        {candidate.name.split(" ").map((n) => n[0]).join("").slice(0, 2)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <span className="truncate">{candidate.name}</span>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
           <p className="text-xs text-muted-foreground mt-1">
-            Enter para enviar · Shift+Enter para nova linha
+            Enter para enviar · Shift+Enter para nova linha · @ para mencionar
           </p>
         </div>
       ) : null}
