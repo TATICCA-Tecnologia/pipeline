@@ -14,6 +14,14 @@ import {
   type SettingsSection,
 } from "@/shared/components";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/src/shared/components/ui/select";
+import { AI_PROVIDERS, type AiProvider } from "@/server/ai/ai-provider-client";
+import {
   Building,
   Bell,
   Shield,
@@ -22,7 +30,15 @@ import {
   Tag,
   ChevronRight,
   SlidersHorizontal,
+  Sparkles,
 } from "lucide-react";
+
+const AI_PROVIDER_LABELS: Record<AiProvider, string> = {
+  openai: "OpenAI",
+  anthropic: "Anthropic (Claude)",
+  gemini: "Google Gemini",
+  custom: "Custom (endpoint compatível com OpenAI)",
+};
 
 // Pesos de priorização (motor de scoring) — agrupados para a UI.
 const QUAL_WEIGHT_FIELDS = [
@@ -90,6 +106,32 @@ export default function AdminConfiguracoesPage() {
   });
 
   const [isLoading, setIsLoading] = useState(false);
+
+  // ── Integração de IA (dados reais) ─────────────────────────────────────
+  const aiConfigQuery = trpc.aiSettings.getAiConfig.useQuery();
+  const updateAiConfig = trpc.aiSettings.updateAiConfig.useMutation({
+    onSuccess: async () => {
+      await utils.aiSettings.getAiConfig.invalidate();
+      setAiApiKeyInput("");
+      toast({ title: "Configuração de IA salva", description: "A integração foi atualizada." });
+    },
+    onError: (error) => {
+      toast({ title: "Erro ao salvar", description: error.message, variant: "destructive" });
+    },
+  });
+  const testAiConnection = trpc.aiSettings.testAiConnection.useMutation();
+
+  const [aiProvider, setAiProvider] = useState<AiProvider>("openai");
+  const [aiModel, setAiModel] = useState("");
+  const [aiApiKeyInput, setAiApiKeyInput] = useState("");
+  const [aiBaseUrl, setAiBaseUrl] = useState("");
+
+  useEffect(() => {
+    if (!aiConfigQuery.data) return;
+    setAiProvider(aiConfigQuery.data.provider ?? "openai");
+    setAiModel(aiConfigQuery.data.model ?? "");
+    setAiBaseUrl(aiConfigQuery.data.baseUrl ?? "");
+  }, [aiConfigQuery.data]);
 
   // ── Pesos de priorização (dados reais) ────────────────────────────────
   const settingsQuery = trpc.settings.getSettings.useQuery();
@@ -750,6 +792,112 @@ export default function AdminConfiguracoesPage() {
                   disabled={!weightsValid || updateWeights.isPending}
                 >
                   {updateWeights.isPending ? "Salvando..." : "Salvar Pesos"}
+                </Button>
+              </div>
+            </>
+          )}
+        </div>
+      ),
+    },
+    {
+      id: "ia-integracao",
+      label: "Integração de IA",
+      description: "Configure o provedor de IA usado para gerar oportunidades a partir de transcrições",
+      icon: Sparkles,
+      content: (
+        <div className="space-y-4">
+          {aiConfigQuery.isLoading ? (
+            <p className="text-sm text-muted-foreground">Carregando...</p>
+          ) : (
+            <>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Provedor</label>
+                  <Select value={aiProvider} onValueChange={(v) => setAiProvider(v as AiProvider)}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {AI_PROVIDERS.map((provider) => (
+                        <SelectItem key={provider} value={provider}>
+                          {AI_PROVIDER_LABELS[provider]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Modelo</label>
+                  <Input
+                    value={aiModel}
+                    onChange={(e) => setAiModel(e.target.value)}
+                    placeholder="Ex.: gpt-4o, claude-sonnet-4-5, gemini-2.0-flash"
+                  />
+                </div>
+              </div>
+
+              {aiProvider === "custom" && (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">URL base</label>
+                  <Input
+                    value={aiBaseUrl}
+                    onChange={(e) => setAiBaseUrl(e.target.value)}
+                    placeholder="https://minha-api.exemplo.com/v1"
+                  />
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">API Key</label>
+                <Input
+                  type="password"
+                  value={aiApiKeyInput}
+                  onChange={(e) => setAiApiKeyInput(e.target.value)}
+                  placeholder={
+                    aiConfigQuery.data?.hasApiKey
+                      ? `Já configurada (${aiConfigQuery.data.apiKeyMasked}) — deixe em branco para manter`
+                      : "sk-..."
+                  }
+                />
+              </div>
+
+              {testAiConnection.isSuccess && (
+                <p className="text-xs text-emerald-600">
+                  Conexão OK. Resposta de teste: &quot;{testAiConnection.data?.sample}&quot;
+                </p>
+              )}
+              {testAiConnection.isError && (
+                <p className="text-xs text-destructive">{testAiConnection.error?.message}</p>
+              )}
+
+              <div className="flex justify-end gap-2 pt-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={!aiModel.trim() || testAiConnection.isPending}
+                  onClick={() =>
+                    testAiConnection.mutate({
+                      provider: aiProvider,
+                      model: aiModel.trim(),
+                      apiKey: aiApiKeyInput.trim() || undefined,
+                      baseUrl: aiProvider === "custom" ? aiBaseUrl.trim() : undefined,
+                    })
+                  }
+                >
+                  {testAiConnection.isPending ? "Testando..." : "Testar conexão"}
+                </Button>
+                <Button
+                  disabled={!aiModel.trim() || updateAiConfig.isPending}
+                  onClick={() =>
+                    updateAiConfig.mutate({
+                      provider: aiProvider,
+                      model: aiModel.trim(),
+                      apiKey: aiApiKeyInput.trim() || undefined,
+                      baseUrl: aiProvider === "custom" ? aiBaseUrl.trim() : undefined,
+                    })
+                  }
+                >
+                  {updateAiConfig.isPending ? "Salvando..." : "Salvar"}
                 </Button>
               </div>
             </>
