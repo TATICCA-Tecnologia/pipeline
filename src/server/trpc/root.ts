@@ -12,6 +12,7 @@ import { taxonomyRouter } from "./routers/taxonomy.router";
 import { companyRouter } from "./routers/company.router";
 import { settingsRouter } from "./routers/settings.router";
 import { interviewRouter } from "./routers/interview.router";
+import { aiSettingsRouter } from "./routers/ai-settings.router";
 
 export const appRouter = router({
   project: projectRouter,
@@ -27,6 +28,7 @@ export const appRouter = router({
   company: companyRouter,
   settings: settingsRouter,
   interview: interviewRouter,
+  aiSettings: aiSettingsRouter,
 });
 
 export type AppRouter = typeof appRouter;
