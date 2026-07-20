@@ -14,6 +14,7 @@ import { Textarea } from "@/src/shared/components/ui/textarea";
 import { Label } from "@/src/shared/components/ui/label";
 import { Checkbox } from "@/src/shared/components/ui/checkbox";
 import { Card, CardContent, CardHeader, CardTitle } from "@/src/shared/components/ui/card";
+import { Alert, AlertTitle, AlertDescription } from "@/src/shared/components/ui/alert";
 import {
   Select,
   SelectContent,
@@ -22,7 +23,7 @@ import {
   SelectValue,
 } from "@/src/shared/components/ui/select";
 import { useToast } from "@/src/shared/hooks/use-toast";
-import { ArrowLeft, Sparkles, Upload, Loader2 } from "lucide-react";
+import { ArrowLeft, Sparkles, Upload, Loader2, AlertTriangle } from "lucide-react";
 
 interface ReviewEntry {
   xmlText: string;
@@ -109,9 +110,11 @@ export default function GerarOportunidadesPorIaPage() {
         };
       });
       setReviewEntries(entries);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Erro desconhecido";
-      toast({ title: "Falha ao gerar oportunidades", description: message, variant: "destructive" });
+    } catch {
+      // Erro já fica exposto de forma persistente na tela via generateMutation.error
+      // (renderizado logo abaixo do botão "Gerar oportunidades") — evita um toast
+      // efêmero para mensagens que podem ser longas (ex.: resposta bruta da IA
+      // quando nenhum XML é reconhecido, ver ai-opportunity.router.ts).
     }
   }
 
@@ -212,6 +215,18 @@ export default function GerarOportunidadesPorIaPage() {
               rows={16}
             />
           </div>
+
+          {generateMutation.isError && (
+            <Alert variant="destructive">
+              <AlertTriangle />
+              <AlertTitle>Falha ao gerar oportunidades</AlertTitle>
+              <AlertDescription>
+                <p className="max-h-64 w-full overflow-y-auto whitespace-pre-wrap break-words">
+                  {generateMutation.error.message}
+                </p>
+              </AlertDescription>
+            </Alert>
+          )}
 
           <div className="flex justify-end">
             <Button
