@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   DndContext,
   DragOverlay,
@@ -16,6 +16,7 @@ import {
 } from "@dnd-kit/core";
 import { sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import type { Project, ProjectStatus } from "@/shared/types";
+import { trpc } from "@/shared/trpc/client";
 import { KanbanColumn } from "./kanban-column";
 import { ProjectCard } from "./project-card";
 
@@ -44,6 +45,19 @@ export function KanbanBoard({
 }: KanbanBoardProps) {
   const [items, setItems] = useState<Project[]>(projects);
   const [activeId, setActiveId] = useState<string | null>(null);
+
+  // Polling leve (10s) dos locks de presença ativos — ver
+  // docs/superpowers/specs/2026-07-20-lock-visual-card-editando-design.md.
+  const { data: activeLocks = [] } = trpc.project.activeLocks.useQuery(undefined, {
+    refetchInterval: 10_000,
+  });
+  const locksByProjectId = useMemo(() => {
+    const map: Record<string, { userId: string; userName: string }> = {};
+    for (const lock of activeLocks) {
+      map[lock.projectId] = { userId: lock.userId, userName: lock.userName };
+    }
+    return map;
+  }, [activeLocks]);
   // Posição real do ponteiro, rastreada de forma independente do sistema de
   // colisão do dnd-kit (que não está resolvendo o alvo corretamente durante
   // o arrasto). Usada em handleDragEnd para achar o alvo real via
@@ -150,6 +164,7 @@ export function KanbanBoard({
             activeId={null}
             canDrag={false}
             onProjectClick={onProjectClick}
+            locksByProjectId={locksByProjectId}
           />
         ))}
       </div>
@@ -175,6 +190,7 @@ export function KanbanBoard({
             activeId={activeId}
             canDrag
             onProjectClick={onProjectClick}
+            locksByProjectId={locksByProjectId}
           />
         ))}
       </div>
