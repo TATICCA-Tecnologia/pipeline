@@ -90,6 +90,15 @@ export interface Project {
 
 export type RobotOperationalStatus = "ACTIVE" | "PAUSED" | "ISSUE";
 
+// Lock de presença "sendo editado por" — ver project.router.ts (acquireLock/
+// releaseLock/activeLocks) e docs/superpowers/specs/2026-07-20-lock-visual-card-editando-design.md
+export interface ProjectLock {
+  projectId: string;
+  userId: string;
+  userName: string;
+  lockedAt: Date;
+}
+
 // Tarefa dentro de um projeto
 export interface Task {
   id: string;
