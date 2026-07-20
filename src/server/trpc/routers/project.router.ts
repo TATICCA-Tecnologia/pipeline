@@ -42,6 +42,12 @@ const projectStatusSchema = z.enum([
 
 const complexitySchema = z.enum(["baixa", "media", "alta"]);
 
+// TTL do lock de presença "sendo editado por" (soft lock — ver acquireLock/
+// releaseLock/activeLocks abaixo). O modal manda heartbeat a cada 20s
+// enquanto estiver aberto, então 45s dá margem segura contra latência de
+// rede antes do lock ser considerado expirado.
+const LOCK_TTL_MS = 45_000;
+
 // Campos que só admin/super_admin (o "arquiteto" do sistema — não existe role
 // separado) pode alterar via project.update. Um cliente que tentar enviar
 // qualquer uma dessas chaves recebe FORBIDDEN.
@@ -694,6 +700,77 @@ export const projectRouter = router({
       await ctx.db.project.delete({ where: { id: input.id } });
       return { success: true };
     }),
+
+  // Lock de presença "sendo editado por" (soft, só aviso). Chamado ao abrir o
+  // modal de detalhes e depois a cada heartbeat (20s no client) enquanto o
+  // modal continuar aberto.
+  acquireLock: protectedProcedure
+    .input(z.object({ projectId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const [existing, caller] = await Promise.all([
+        ctx.db.projectLock.findUnique({ where: { projectId: input.projectId } }),
+        ctx.db.user.findUnique({ where: { id: ctx.userId }, select: { name: true } }),
+      ]);
+
+      const isExpired = !existing || Date.now() - existing.lockedAt.getTime() > LOCK_TTL_MS;
+      const isOwnLock = existing?.userId === ctx.userId;
+
+      // Só grava/atualiza o lock se estiver livre, expirado, ou já for do
+      // próprio usuário (heartbeat) — nunca sobrescreve o lock de outra
+      // pessoa ainda ativa, senão o "dono" ficaria trocando a cada heartbeat
+      // enquanto dois usuários tivessem o mesmo card aberto.
+      if (isExpired || isOwnLock) {
+        const lock = await ctx.db.projectLock.upsert({
+          where: { projectId: input.projectId },
+          create: {
+            projectId: input.projectId,
+            userId: ctx.userId,
+            userName: caller?.name ?? "Usuário",
+          },
+          update: {
+            userId: ctx.userId,
+            userName: caller?.name ?? "Usuário",
+          },
+        });
+        return {
+          projectId: lock.projectId,
+          userId: lock.userId,
+          userName: lock.userName,
+          lockedAt: lock.lockedAt,
+        };
+      }
+
+      return {
+        projectId: existing!.projectId,
+        userId: existing!.userId,
+        userName: existing!.userName,
+        lockedAt: existing!.lockedAt,
+      };
+    }),
+
+  releaseLock: protectedProcedure
+    .input(z.object({ projectId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      // deleteMany (não delete) porque é um no-op silencioso e seguro quando
+      // quem chama não é o dono atual do lock (ex.: um segundo usuário que
+      // nunca chegou a "ganhar" o lock fechando o próprio modal).
+      await ctx.db.projectLock.deleteMany({
+        where: { projectId: input.projectId, userId: ctx.userId },
+      });
+      return { success: true };
+    }),
+
+  activeLocks: protectedProcedure.query(async ({ ctx }) => {
+    const locks = await ctx.db.projectLock.findMany({
+      where: { lockedAt: { gte: new Date(Date.now() - LOCK_TTL_MS) } },
+    });
+    return locks.map((l) => ({
+      projectId: l.projectId,
+      userId: l.userId,
+      userName: l.userName,
+      lockedAt: l.lockedAt,
+    }));
+  }),
 
   // Agregação de projetos por área (contagem, saving estimado e horas atuais).
   // adminProcedure: soma de saving por área é um dado sensível, não deve vazar
