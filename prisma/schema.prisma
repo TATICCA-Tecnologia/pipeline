@@ -214,6 +214,7 @@ model Project {
   comments     Comment[]
   files        ProjectFile[]
   activityLogs ActivityLog[]
+  projectLock  ProjectLock?
 
   @@map("projects")
 }
@@ -464,6 +465,21 @@ model ActivityLog {
   userId    String
 
   @@map("activity_logs")
+}
+
+// Lock de presença (soft lock, só aviso — nunca bloqueia salvar): uma linha
+// por projeto representa quem está com o card/modal aberto agora. Sem job de
+// limpeza — um lock é considerado ativo só se lockedAt estiver dentro do TTL
+// (LOCK_TTL_MS em project.router.ts), então uma aba fechada sem chamar
+// releaseLock simplesmente para de "contar" depois de 45s.
+model ProjectLock {
+  projectId String   @id
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  userId    String
+  userName  String
+  lockedAt  DateTime @updatedAt
+
+  @@map("project_locks")
 }
 
 // ==========================================
