@@ -148,18 +148,38 @@ export interface Comment {
   visibility: CommentVisibility;
   isIncident?: boolean;
   attachments?: ProjectFile[];
+  mentionedUsers?: { id: string; name: string }[];
   createdAt: Date;
   updatedAt?: Date;
 }
 
-// Notificação
+// Usuário mencionável no chat de um projeto — ver user.router.ts (listMentionable)
+export interface MentionableUser {
+  id: string;
+  name: string;
+  role: UserRole;
+}
+
+// Notificação — ver notification.router.ts. `type` bate com o enum
+// NotificationType do Prisma (nenhum consumidor usava o formato antigo, então
+// não é uma mudança que quebra nada).
+export type NotificationType =
+  | "PROJECT_UPDATE"
+  | "COMMENT"
+  | "FILE_UPLOAD"
+  | "STATUS_CHANGE"
+  | "PAYMENT"
+  | "SYSTEM"
+  | "MENTION";
+
 export interface Notification {
   id: string;
   userId: string;
   title: string;
   message: string;
   read: boolean;
-  type: "info" | "success" | "warning";
+  type: NotificationType;
+  link: string | null;
   createdAt: Date;
 }
 
