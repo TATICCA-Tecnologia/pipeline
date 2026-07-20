@@ -4,6 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/shared/context/auth-context";
+import { NotificationBell } from "./notification-bell";
 import { cn, getInitials } from "@/shared/utils";
 import { Avatar, AvatarFallback } from "@/src/shared/components/ui/avatar";
 import {
@@ -128,22 +129,22 @@ export function AppSidebar() {
 
   return (
     <aside className="fixed left-0 top-0 z-40 flex h-screen w-64 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground">
-      <Link
-        href="/"
-        className="flex items-center gap-2.5 px-5 py-5 border-b border-sidebar-border/60"
-      >
-        <Image
-          src="/logo.png"
-          alt="TATICCA Pipeline"
-          width={28}
-          height={28}
-          className="rounded"
-        />
-        <span className="text-sm font-semibold tracking-tight">
-          TATICCA{" "}
-          <span className="text-muted-foreground/80 font-normal">Pipeline</span>
-        </span>
-      </Link>
+      <div className="flex items-center justify-between gap-2 px-5 py-5 border-b border-sidebar-border/60">
+        <Link href="/" className="flex min-w-0 items-center gap-2.5">
+          <Image
+            src="/logo.png"
+            alt="TATICCA Pipeline"
+            width={28}
+            height={28}
+            className="rounded shrink-0"
+          />
+          <span className="truncate text-sm font-semibold tracking-tight">
+            TATICCA{" "}
+            <span className="text-muted-foreground/80 font-normal">Pipeline</span>
+          </span>
+        </Link>
+        {user && <NotificationBell />}
+      </div>
 
       <nav className="flex-1 overflow-y-auto px-3 py-4">
         {sections.map((section) => (
