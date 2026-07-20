@@ -16,6 +16,7 @@ interface CommentsContextType {
     comment: Omit<Comment, "id" | "createdAt"> & {
       visibility?: CommentVisibility;
       isIncident?: boolean;
+      mentionedUserIds?: string[];
     }
   ) => Promise<void>;
   updateComment: (id: string, content: string) => void;
@@ -57,6 +58,7 @@ export function CommentsProvider({ children }: { children: ReactNode }) {
       comment: Omit<Comment, "id" | "createdAt"> & {
         visibility?: CommentVisibility;
         isIncident?: boolean;
+        mentionedUserIds?: string[];
       }
     ) => {
       await createComment.mutateAsync({
@@ -64,6 +66,7 @@ export function CommentsProvider({ children }: { children: ReactNode }) {
         content: comment.content,
         visibility: comment.visibility ?? "GLOBAL",
         isIncident: comment.isIncident ?? false,
+        mentionedUserIds: comment.mentionedUserIds ?? [],
       });
     },
     [createComment]
@@ -105,6 +108,9 @@ function mapComment(c: Record<string, unknown>): Comment {
     content: c.content as string,
     visibility: (c.visibility as CommentVisibility) ?? "GLOBAL",
     isIncident: (c.isIncident as boolean) ?? false,
+    mentionedUsers: Array.isArray(c.mentionedUsers)
+      ? (c.mentionedUsers as { id: string; name: string }[])
+      : [],
     createdAt: c.createdAt instanceof Date ? c.createdAt : new Date(c.createdAt as string),
     updatedAt: c.updatedAt
       ? c.updatedAt instanceof Date
