@@ -91,6 +91,9 @@ export interface Project {
   projectKindId?: string;
   executionStrategy?: string;
   architectNotes?: string;
+  implementationEffortDays?: number;
+  implementationWave?: number;
+  waveOrder?: number;
   // Operacao pos-entrega (admin escreve, cliente sempre ve)
   operationalStatus?: RobotOperationalStatus;
   accumulatedSavingBRL?: number;
