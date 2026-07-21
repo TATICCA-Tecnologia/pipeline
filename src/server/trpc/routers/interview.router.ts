@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { router, protectedProcedure, adminProcedure } from "../trpc";
+import { resolvePersonIds } from "./person.router";
 
 const interviewStatusSchema = z.enum(["realizado", "agendado", "cancelado"]);
 
@@ -9,7 +10,7 @@ export const interviewRouter = router({
     .query(async ({ ctx, input }) => {
       return ctx.db.interview.findMany({
         where: { companyId: input.companyId },
-        include: { area: true },
+        include: { area: true, participants: { include: { person: true } } },
         orderBy: { scheduledDate: "desc" },
       });
     }),
@@ -18,22 +19,25 @@ export const interviewRouter = router({
     .input(
       z.object({
         companyId: z.string(),
-        participantName: z.string().trim().min(1),
+        personIds: z.array(z.string()).min(1),
         status: interviewStatusSchema.default("realizado"),
         scheduledDate: z.coerce.date(),
         areaId: z.string().nullable().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
+      const resolvedIds = Array.from(
+        new Set(await resolvePersonIds(ctx.db, input.companyId, input.personIds))
+      );
       return ctx.db.interview.create({
         data: {
           companyId: input.companyId,
-          participantName: input.participantName.trim(),
           status: input.status,
           scheduledDate: input.scheduledDate,
           areaId: input.areaId || null,
+          participants: { create: resolvedIds.map((personId) => ({ personId })) },
         },
-        include: { area: true },
+        include: { area: true, participants: { include: { person: true } } },
       });
     }),
 
@@ -41,24 +45,34 @@ export const interviewRouter = router({
     .input(
       z.object({
         id: z.string(),
-        participantName: z.string().trim().min(1).optional(),
+        personIds: z.array(z.string()).min(1).optional(),
         status: interviewStatusSchema.optional(),
         scheduledDate: z.coerce.date().optional(),
         areaId: z.string().nullable().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
-      const { id, ...data } = input;
+      const { id, personIds, ...data } = input;
+      if (personIds) {
+        const interview = await ctx.db.interview.findUniqueOrThrow({
+          where: { id },
+          select: { companyId: true },
+        });
+        const resolvedIds = Array.from(
+          new Set(await resolvePersonIds(ctx.db, interview.companyId, personIds))
+        );
+        await ctx.db.interviewParticipant.deleteMany({ where: { interviewId: id } });
+        await ctx.db.interviewParticipant.createMany({
+          data: resolvedIds.map((personId) => ({ interviewId: id, personId })),
+        });
+      }
       return ctx.db.interview.update({
         where: { id },
         data: {
           ...data,
-          ...(data.participantName !== undefined && {
-            participantName: data.participantName.trim(),
-          }),
           ...(data.areaId !== undefined && { areaId: data.areaId || null }),
         },
-        include: { area: true },
+        include: { area: true, participants: { include: { person: true } } },
       });
     }),
 
