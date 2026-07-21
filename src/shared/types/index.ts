@@ -27,6 +27,13 @@ export type ProjectStatus =
 // Prioridade do projeto
 export type Priority = "low" | "medium" | "high" | "urgent";
 
+export interface PersonOfInterest {
+  id: string;
+  name: string;
+  role?: string;
+  userId?: string;
+}
+
 // Projeto
 export interface Project {
   id: string;
@@ -47,6 +54,7 @@ export interface Project {
   expectedUsers?: string;
   urgency?: string;
   features?: string[];
+  peopleOfInterest?: PersonOfInterest[];
   // Campos da solicitação detalhada
   additionalInfo?: string;
   hasExistingSystem?: string;
