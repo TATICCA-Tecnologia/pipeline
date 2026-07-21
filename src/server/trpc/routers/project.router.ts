@@ -2,7 +2,13 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { router, publicProcedure, protectedProcedure, adminProcedure } from "../trpc";
 import { toFrontendStatus, toPrismaStatus } from "../mappers";
-import { resolvePersonIds } from "./person.router";
+import { resolvePersonIds, resolvePersonIdsByName } from "./person.router";
+import {
+  findOrCreateProjectArea,
+  findOrCreateProjectTheme,
+  findOrCreateMainTool,
+  findOrCreateProjectKind,
+} from "./project-import-xml-helpers";
 import type { FrontendProjectStatus } from "../mappers";
 import { PROCESS_FREQUENCY_MULTIPLIERS } from "@/shared/constants/project-taxonomy";
 import {
@@ -1130,5 +1136,194 @@ export const projectRouter = router({
       });
 
       return { success: true };
+    }),
+
+  importXml: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        title: z.string().min(1).optional(),
+        areaName: z.string().optional(),
+        themeName: z.string().optional(),
+        platform: z.string().optional(),
+        description: z.string().optional(),
+        targetAudience: z.string().optional(),
+        expectedUsers: z.string().optional(),
+        hasExistingSystem: z.string().optional(),
+        existingSystemDetails: z.string().optional(),
+        hasCurrentApplication: z.string().optional(),
+        currentApplicationDetails: z.string().optional(),
+        peopleInvolved: z.number().int().optional(),
+        taskDurationHours: z.number().optional(),
+        processFrequency: z.string().optional(),
+        projectNarrative: z.string().optional(),
+        features: z.array(z.string()).optional(),
+        benefits: z.array(z.string()).optional(),
+        benefitsDetails: z.string().optional(),
+        monthlyHoursSaved: z.number().optional(),
+        ratingErrorReduction: z.number().int().min(1).max(5).optional(),
+        ratingProcessCriticality: z.number().int().min(1).max(5).optional(),
+        ratingInternalImpact: z.number().int().min(1).max(5).optional(),
+        ratingExternalImpact: z.number().int().min(1).max(5).optional(),
+        ratingCompliance: z.number().int().min(1).max(5).optional(),
+        urgency: z.string().optional(),
+        estimatedDeadline: z.coerce.date().optional(),
+        additionalInfo: z.string().optional(),
+        mainToolName: z.string().optional(),
+        projectKindName: z.string().optional(),
+        peopleOfInterestNames: z.array(z.string()).optional(),
+        complexity: z.string().optional(),
+        robotSchedule: z.string().optional(),
+        hourlyRateBRL: z.number().optional(),
+        estimatedAnnualSavingBRL: z.number().optional(),
+        executionStrategy: z.string().optional(),
+        solutionTypes: z.array(z.string()).optional(),
+        architectNotes: z.string().optional(),
+        implementationEffortDays: z.number().int().optional(),
+        implementationWave: z.number().int().optional(),
+        waveOrder: z.number().int().optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const caller = await ctx.db.user.findUnique({
+        where: { id: ctx.userId },
+        select: { role: true },
+      });
+      const canImport =
+        caller?.role === "ADMIN" || caller?.role === "SUPER_ADMIN" || caller?.role === "DEVELOPER";
+      if (!canImport) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Apenas admin ou developer podem importar XML de projeto.",
+        });
+      }
+
+      const current = await ctx.db.project.findUnique({ where: { id: input.projectId } });
+      if (!current) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Projeto não encontrado" });
+      }
+
+      const warnings: string[] = [];
+      const data: Record<string, unknown> = {};
+
+      if (input.title !== undefined) data.title = input.title;
+      if (input.platform !== undefined) data.platform = input.platform;
+      if (input.description !== undefined) data.description = input.description;
+      if (input.targetAudience !== undefined) data.targetAudience = input.targetAudience;
+      if (input.expectedUsers !== undefined) data.expectedUsers = input.expectedUsers;
+      if (input.hasExistingSystem !== undefined) data.hasExistingSystem = input.hasExistingSystem;
+      if (input.existingSystemDetails !== undefined)
+        data.existingSystemDetails = input.existingSystemDetails;
+      if (input.hasCurrentApplication !== undefined)
+        data.hasCurrentApplication = input.hasCurrentApplication;
+      if (input.currentApplicationDetails !== undefined)
+        data.currentApplicationDetails = input.currentApplicationDetails;
+      if (input.peopleInvolved !== undefined) data.peopleInvolved = input.peopleInvolved;
+      if (input.taskDurationHours !== undefined || input.processFrequency !== undefined) {
+        const nextDuration = input.taskDurationHours ?? current.taskDurationHours;
+        const nextFrequency = input.processFrequency ?? current.processFrequency;
+        data.taskDurationHours = nextDuration;
+        data.processFrequency = nextFrequency;
+        data.currentAnnualHours = computeCurrentAnnualHours(nextDuration, nextFrequency);
+      }
+      if (input.projectNarrative !== undefined) data.projectNarrative = input.projectNarrative;
+      if (input.benefits !== undefined) data.benefits = input.benefits;
+      if (input.benefitsDetails !== undefined) data.benefitsDetails = input.benefitsDetails;
+      if (input.monthlyHoursSaved !== undefined) data.monthlyHoursSaved = input.monthlyHoursSaved;
+      if (input.ratingErrorReduction !== undefined)
+        data.ratingErrorReduction = input.ratingErrorReduction;
+      if (input.ratingProcessCriticality !== undefined)
+        data.ratingProcessCriticality = input.ratingProcessCriticality;
+      if (input.ratingInternalImpact !== undefined)
+        data.ratingInternalImpact = input.ratingInternalImpact;
+      if (input.ratingExternalImpact !== undefined)
+        data.ratingExternalImpact = input.ratingExternalImpact;
+      if (input.ratingCompliance !== undefined) data.ratingCompliance = input.ratingCompliance;
+      if (input.urgency !== undefined) data.urgency = input.urgency;
+      if (input.estimatedDeadline !== undefined) data.deadline = input.estimatedDeadline;
+      if (input.additionalInfo !== undefined) data.additionalInfo = input.additionalInfo;
+      if (input.complexity !== undefined) data.complexity = input.complexity;
+      if (input.robotSchedule !== undefined) data.robotSchedule = input.robotSchedule;
+      if (input.hourlyRateBRL !== undefined) data.hourlyRateBRL = input.hourlyRateBRL;
+      if (input.estimatedAnnualSavingBRL !== undefined)
+        data.estimatedAnnualSavingBRL = input.estimatedAnnualSavingBRL;
+      if (input.executionStrategy !== undefined) data.executionStrategy = input.executionStrategy;
+      if (input.solutionTypes !== undefined) data.solutionTypes = input.solutionTypes;
+      if (input.architectNotes !== undefined) data.architectNotes = input.architectNotes;
+      if (input.implementationEffortDays !== undefined)
+        data.implementationEffortDays = input.implementationEffortDays;
+      if (input.implementationWave !== undefined) data.implementationWave = input.implementationWave;
+      if (input.waveOrder !== undefined) data.waveOrder = input.waveOrder;
+
+      let resolvedAreaId: string | undefined;
+      if (input.areaName !== undefined) {
+        const area = await findOrCreateProjectArea(ctx.db, input.areaName, warnings);
+        if (area) {
+          resolvedAreaId = area.id;
+          data.areaId = area.id;
+        }
+      }
+      if (input.themeName !== undefined) {
+        const areaIdForTheme = resolvedAreaId ?? current.areaId ?? undefined;
+        if (areaIdForTheme) {
+          const theme = await findOrCreateProjectTheme(ctx.db, areaIdForTheme, input.themeName, warnings);
+          if (theme) data.themeId = theme.id;
+        } else {
+          warnings.push(`Tema "${input.themeName}" ignorado — nenhuma área definida para o projeto.`);
+        }
+      }
+      if (input.mainToolName !== undefined) {
+        const tool = await findOrCreateMainTool(ctx.db, input.mainToolName, warnings);
+        if (tool) data.mainToolId = tool.id;
+      }
+      if (input.projectKindName !== undefined) {
+        const kind = await findOrCreateProjectKind(ctx.db, input.projectKindName, warnings);
+        if (kind) data.projectKindId = kind.id;
+      }
+
+      await ctx.db.project.update({ where: { id: input.projectId }, data });
+
+      if (input.features !== undefined) {
+        const existingFeatures = await ctx.db.projectFeature.findMany({
+          where: { projectId: input.projectId },
+        });
+        const keep = new Set(input.features);
+        const toDelete = existingFeatures.filter((f) => !keep.has(f.name));
+        const existingNames = new Set(existingFeatures.map((f) => f.name));
+        const toCreate = input.features.filter((name) => !existingNames.has(name));
+        if (toDelete.length > 0) {
+          await ctx.db.projectFeature.deleteMany({
+            where: { id: { in: toDelete.map((f) => f.id) } },
+          });
+        }
+        if (toCreate.length > 0) {
+          await ctx.db.projectFeature.createMany({
+            data: toCreate.map((name) => ({ projectId: input.projectId, name })),
+          });
+        }
+      }
+
+      if (input.peopleOfInterestNames !== undefined && current.companyId) {
+        const personIds = await resolvePersonIdsByName(
+          ctx.db,
+          current.companyId,
+          input.peopleOfInterestNames
+        );
+        await ctx.db.projectPersonOfInterest.deleteMany({ where: { projectId: input.projectId } });
+        await ctx.db.projectPersonOfInterest.createMany({
+          data: personIds.map((personId) => ({ projectId: input.projectId, personId })),
+        });
+      }
+
+      await ctx.db.activityLog.create({
+        data: {
+          projectId: input.projectId,
+          userId: ctx.userId,
+          action: "Projeto importado via XML",
+          details: warnings.length > 0 ? warnings.join(" | ") : undefined,
+        },
+      });
+
+      return { warnings };
     }),
 });
