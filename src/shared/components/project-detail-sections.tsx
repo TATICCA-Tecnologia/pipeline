@@ -9,6 +9,7 @@ import { useState } from "react";
 import { Button } from "@/src/shared/components/ui/button";
 import { Pencil } from "lucide-react";
 import { ProjectRequestEditForm } from "@/shared/components/project-request-edit-form";
+import { ProjectPeopleOfInterestCard } from "@/shared/components/project-people-of-interest-card";
 import {
   HAS_EXISTING_SYSTEM_OPTIONS,
   HAS_CURRENT_APPLICATION_OPTIONS,
@@ -128,6 +129,8 @@ export function ProjectDetailSections({
         />
         <FieldRow label="Horas anuais no processo atual" value={project.currentAnnualHours} />
       </DetailSection>
+
+      <ProjectPeopleOfInterestCard project={project} canEdit={canEdit} />
 
       <DetailSection title="Funcionalidades & benefícios">
         <FieldRow label="Funcionalidades" value={project.features} />
