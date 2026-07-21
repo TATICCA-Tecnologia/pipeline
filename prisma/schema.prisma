@@ -40,6 +40,7 @@ model User {
   assignedPhases   ProjectPhase[] @relation("PhaseAssignee")
   sessions         Session[]
   accounts         Account[]
+  personLinks      Person[]
 
   @@map("users")
 }
@@ -114,6 +115,7 @@ model Company {
   projects   Project[]
   interviews Interview[]
   costItems  CompanyCostItem[]
+  people     Person[]
 
   @@map("companies")
 }
@@ -140,29 +142,29 @@ model Project {
   updatedAt   DateTime  @updatedAt
 
   // Detalhes da solicitacao
-  targetAudience        String?
-  expectedUsers         String?
-  designPreference      String?
-  references            String?
-  urgency               String?
-  additionalInfo        String?
-  hasExistingSystem     String? // "nao" | "sim-substituir" | "sim-integrar" | "sim-melhorar"
-  existingSystemDetails String?
+  targetAudience            String?
+  expectedUsers             String?
+  designPreference          String?
+  references                String?
+  urgency                   String?
+  additionalInfo            String?
+  hasExistingSystem         String? // "nao" | "sim-substituir" | "sim-integrar" | "sim-melhorar"
+  existingSystemDetails     String?
   hasCurrentApplication     String? // "sim" | "nao" - já existe uma aplicação/app para o processo hoje
   currentApplicationDetails String?
-  projectNarrative      String?
+  projectNarrative          String?
 
   // Beneficios e impacto esperado
-  benefits          Json?  // array de chaves selecionadas
+  benefits          Json? // array de chaves selecionadas
   benefitsDetails   String?
   monthlyHoursSaved Float?
 
   // Diagnostico de processo - operacional (preenchido pelo cliente, opcional)
-  peopleInvolved     Int?    // colaboradores envolvidos na execução manual hoje
+  peopleInvolved        Int? // colaboradores envolvidos na execução manual hoje
   peopleInvolvedDetails String? // nomes/observações sobre quem está envolvido (texto livre)
-  taskDurationHours  Float?  // duração total de cada execução (somando todos os envolvidos), em horas
-  processFrequency   String? // "diario" | "duas-vezes-semana" | "tres-vezes-semana" | "semanal" | "mensal" | "anual"
-  currentAnnualHours Float?  // calculado: taskDurationHours * multiplicador(processFrequency) - horas gastas HOJE no processo manual
+  taskDurationHours     Float? // duração total de cada execução (somando todos os envolvidos), em horas
+  processFrequency      String? // "diario" | "duas-vezes-semana" | "tres-vezes-semana" | "semanal" | "mensal" | "anual"
+  currentAnnualHours    Float? // calculado: taskDurationHours * multiplicador(processFrequency) - horas gastas HOJE no processo manual
 
   // Avaliacao qualitativa (1-5)
   ratingErrorReduction     Int?
@@ -172,15 +174,15 @@ model Project {
   ratingCompliance         Int?
 
   // Arquitetura tecnica (preenchido pelo arquiteto)
-  solutionTypes      Json?   // array de chaves: rpa, api, ia-ocr, power-platform, python, integracao, dashboard, outro
-  executionStrategy  String? // agendada, manual, trigger-email, trigger-api, tempo-real
-  architectNotes     String?
+  solutionTypes     Json? // array de chaves: rpa, api, ia-ocr, power-platform, python, integracao, dashboard, outro
+  executionStrategy String? // agendada, manual, trigger-email, trigger-api, tempo-real
+  architectNotes    String?
 
   // Diagnostico de processo - tecnico/financeiro (preenchido pelo arquiteto, nunca exposto ao cliente)
   complexity               String? // "baixa" | "media" | "alta"
   robotSchedule            String? // texto livre curto, ex.: "Hora fixa, uma vez por dia"
-  hourlyRateBRL            Float?  // taxa horária usada no cálculo do saving; null = usa SystemSettings.defaultHourlyRateBRL
-  estimatedAnnualSavingBRL Float?  // saving estimado anual em reais = monthlyHoursSaved * 12 * taxa horária efetiva
+  hourlyRateBRL            Float? // taxa horária usada no cálculo do saving; null = usa SystemSettings.defaultHourlyRateBRL
+  estimatedAnnualSavingBRL Float? // saving estimado anual em reais = monthlyHoursSaved * 12 * taxa horária efetiva
 
   // Esforço de implementação (preenchido pelo arquiteto, nunca exposto ao cliente)
   implementationEffortDays Int? // dias úteis estimados de desenvolvimento do robô
@@ -194,27 +196,28 @@ model Project {
   operationalStatusUpdatedAt DateTime?
 
   // Relacionamentos
-  client       User             @relation("ProjectClient", fields: [clientId], references: [id])
-  clientId     String
-  company      Company?         @relation(fields: [companyId], references: [id])
-  companyId    String?
-  developer    User?            @relation("ProjectDeveloper", fields: [developerId], references: [id])
-  developerId  String?
-  area         ProjectArea?     @relation(fields: [areaId], references: [id], onDelete: SetNull)
-  areaId       String?
-  theme        ProjectTheme?    @relation(fields: [themeId], references: [id], onDelete: SetNull)
-  themeId      String?
-  mainTool     MainTool?        @relation(fields: [mainToolId], references: [id], onDelete: SetNull)
-  mainToolId   String?
-  projectKind  ProjectKind?     @relation(fields: [projectKindId], references: [id], onDelete: SetNull)
-  projectKindId String?
-  features     ProjectFeature[]
-  phases       ProjectPhase[]
-  tasks        Task[]
-  comments     Comment[]
-  files        ProjectFile[]
-  activityLogs ActivityLog[]
-  projectLock  ProjectLock?
+  client           User                      @relation("ProjectClient", fields: [clientId], references: [id])
+  clientId         String
+  company          Company?                  @relation(fields: [companyId], references: [id])
+  companyId        String?
+  developer        User?                     @relation("ProjectDeveloper", fields: [developerId], references: [id])
+  developerId      String?
+  area             ProjectArea?              @relation(fields: [areaId], references: [id], onDelete: SetNull)
+  areaId           String?
+  theme            ProjectTheme?             @relation(fields: [themeId], references: [id], onDelete: SetNull)
+  themeId          String?
+  mainTool         MainTool?                 @relation(fields: [mainToolId], references: [id], onDelete: SetNull)
+  mainToolId       String?
+  projectKind      ProjectKind?              @relation(fields: [projectKindId], references: [id], onDelete: SetNull)
+  projectKindId    String?
+  features         ProjectFeature[]
+  phases           ProjectPhase[]
+  tasks            Task[]
+  comments         Comment[]
+  files            ProjectFile[]
+  activityLogs     ActivityLog[]
+  projectLock      ProjectLock?
+  peopleOfInterest ProjectPersonOfInterest[]
 
   @@map("projects")
 }
@@ -394,7 +397,7 @@ model Comment {
 }
 
 enum CommentVisibility {
-  GLOBAL   // visivel para cliente, admin e dev
+  GLOBAL // visivel para cliente, admin e dev
   INTERNAL // visivel apenas para admin e dev
 }
 
@@ -581,8 +584,8 @@ model CompanyCostItem {
   amountBRL  Float
   startDate  DateTime
   endDate    DateTime? // só relevante pra "recorrente"; null = em andamento
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
+  createdAt  DateTime            @default(now())
+  updatedAt  DateTime            @updatedAt
 
   @@map("company_cost_items")
 }
@@ -603,13 +606,53 @@ model Interview {
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
 
+  participants InterviewParticipant[]
+
   @@map("interviews")
+}
+
+model Person {
+  id        String   @id @default(cuid())
+  name      String
+  role      String?
+  companyId String
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  interviewLinks InterviewParticipant[]
+  projectLinks   ProjectPersonOfInterest[]
+
+  @@unique([companyId, userId])
+  @@map("people")
+}
+
+model InterviewParticipant {
+  interviewId String
+  personId    String
+  interview   Interview @relation(fields: [interviewId], references: [id], onDelete: Cascade)
+  person      Person    @relation(fields: [personId], references: [id], onDelete: Cascade)
+
+  @@id([interviewId, personId])
+  @@map("interview_participants")
+}
+
+model ProjectPersonOfInterest {
+  projectId String
+  personId  String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  person    Person  @relation(fields: [personId], references: [id], onDelete: Cascade)
+
+  @@id([projectId, personId])
+  @@map("project_people_of_interest")
 }
 
 model FeatureSuggestion {
   id        String   @id @default(cuid())
   label     String
-  areaSlug  String   // vinculado ao slug da area
+  areaSlug  String // vinculado ao slug da area
   isActive  Boolean  @default(true)
   order     Int      @default(0)
   createdAt DateTime @default(now())
@@ -623,18 +666,18 @@ model FeatureSuggestion {
 // ==========================================
 
 model SystemSettings {
-  id               String   @id @default("default")
-  companyName      String   @default("Minha Empresa")
+  id               String  @id @default("default")
+  companyName      String  @default("Minha Empresa")
   companyEmail     String?
   companyPhone     String?
   companyAddress   String?
   companyWebsite   String?
-  maxFileSize      Int      @default(52428800) // 50MB em bytes
+  maxFileSize      Int     @default(52428800) // 50MB em bytes
   allowedFileTypes String? // JSON array
-  maintenanceMode  Boolean  @default(false)
-  requireTwoFactor Boolean  @default(false)
-  sessionTimeout   Int      @default(30) // minutos
-  pixEnabled       Boolean  @default(true)
+  maintenanceMode  Boolean @default(false)
+  requireTwoFactor Boolean @default(false)
+  sessionTimeout   Int     @default(30) // minutos
+  pixEnabled       Boolean @default(true)
   pixKey           String?
 
   // Integração de IA (geração de oportunidades a partir de transcrição, ver
@@ -664,8 +707,8 @@ model SystemSettings {
   // de monthlyHoursSaved, quando o projeto não tem hourlyRateBRL próprio.
   defaultHourlyRateBRL Float @default(90)
 
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("system_settings")
 }
