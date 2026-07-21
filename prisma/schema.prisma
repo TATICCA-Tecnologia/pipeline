@@ -595,16 +595,15 @@ model CompanyCostItem {
 // ==========================================
 
 model Interview {
-  id              String       @id @default(cuid())
-  participantName String
-  status          String       @default("realizado") // "realizado" | "agendado" | "cancelado"
-  scheduledDate   DateTime
-  company         Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  companyId       String
-  area            ProjectArea? @relation(fields: [areaId], references: [id], onDelete: SetNull)
-  areaId          String?
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
+  id            String       @id @default(cuid())
+  status        String       @default("realizado") // "realizado" | "agendado" | "cancelado"
+  scheduledDate DateTime
+  company       Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  companyId     String
+  area          ProjectArea? @relation(fields: [areaId], references: [id], onDelete: SetNull)
+  areaId        String?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
 
   participants InterviewParticipant[]
 

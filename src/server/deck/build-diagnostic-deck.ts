@@ -606,7 +606,7 @@ export function addInterviewsSlide(pres: PptxGenJS, interviews: Interviews): voi
   ];
 
   const rows: TableRow[] = interviews.map((interview) => [
-    { text: interview.participantName },
+    { text: interview.participants.map((p) => p.person.name).join(", ") },
     { text: interview.area?.name ?? "-" },
     { text: formatDate(new Date(interview.scheduledDate)) },
     { text: INTERVIEW_STATUS_LABEL[interview.status] ?? interview.status },
