@@ -2,6 +2,7 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { router, publicProcedure, protectedProcedure, adminProcedure } from "../trpc";
 import { toFrontendStatus, toPrismaStatus } from "../mappers";
+import { resolvePersonIds } from "./person.router";
 import type { FrontendProjectStatus } from "../mappers";
 import { PROCESS_FREQUENCY_MULTIPLIERS } from "@/shared/constants/project-taxonomy";
 import {
@@ -168,6 +169,7 @@ export const projectRouter = router({
           },
           projectKind: { select: { id: true, name: true, slug: true } },
           features: true,
+          peopleOfInterest: { include: { person: true } },
         },
         orderBy: { updatedAt: "desc" },
       });
@@ -190,6 +192,12 @@ export const projectRouter = router({
         expectedUsers: p.expectedUsers ?? undefined,
         urgency: p.urgency ?? undefined,
         features: p.features?.map((f) => f.name) ?? [],
+        peopleOfInterest: p.peopleOfInterest.map((link) => ({
+          id: link.person.id,
+          name: link.person.name,
+          role: link.person.role ?? undefined,
+          userId: link.person.userId ?? undefined,
+        })),
         hasExistingSystem: p.hasExistingSystem ?? undefined,
         existingSystemDetails: p.existingSystemDetails ?? undefined,
         hasCurrentApplication: p.hasCurrentApplication ?? undefined,
@@ -244,6 +252,7 @@ export const projectRouter = router({
           projectKind: { select: { id: true, name: true, slug: true } },
           tasks: true,
           features: true,
+          peopleOfInterest: { include: { person: true } },
         },
       });
       if (!project)
@@ -310,6 +319,12 @@ export const projectRouter = router({
             name: f.name,
             completedAt: f.completedAt ?? undefined,
           })) ?? [],
+        peopleOfInterest: project.peopleOfInterest.map((link) => ({
+          id: link.person.id,
+          name: link.person.name,
+          role: link.person.role ?? undefined,
+          userId: link.person.userId ?? undefined,
+        })),
         tasks: project.tasks.map((t) => ({
           id: t.id,
           title: t.title,
@@ -1053,5 +1068,57 @@ export const projectRouter = router({
         }),
       ]);
       return { pipelineWithoutArea, deliveredWithoutArea };
+    }),
+
+  updatePeopleOfInterest: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        personIds: z.array(z.string()),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const current = await ctx.db.project.findUnique({ where: { id: input.projectId } });
+      if (!current) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Projeto não encontrado" });
+      }
+      if (!current.companyId) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Projeto sem empresa vinculada não pode ter pessoas de interesse.",
+        });
+      }
+
+      const caller = await ctx.db.user.findUnique({
+        where: { id: ctx.userId },
+        select: { role: true },
+      });
+      const isArchitect = caller?.role === "ADMIN" || caller?.role === "SUPER_ADMIN";
+      const isOwner = current.clientId === ctx.userId;
+      if (!isArchitect) {
+        if (!isOwner) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "Você não tem permissão para editar este projeto.",
+          });
+        }
+        if (current.status === "DONE" || current.status === "CANCELLED") {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message:
+              "Este projeto já foi concluído ou cancelado. Peça a um administrador para reabrir a edição.",
+          });
+        }
+      }
+
+      const resolvedIds = Array.from(
+        new Set(await resolvePersonIds(ctx.db, current.companyId, input.personIds))
+      );
+      await ctx.db.projectPersonOfInterest.deleteMany({ where: { projectId: input.projectId } });
+      await ctx.db.projectPersonOfInterest.createMany({
+        data: resolvedIds.map((personId) => ({ projectId: input.projectId, personId })),
+      });
+
+      return { success: true };
     }),
 });
