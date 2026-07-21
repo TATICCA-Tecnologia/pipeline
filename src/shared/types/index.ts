@@ -47,6 +47,9 @@ export interface Project {
   companyName?: string;
   areaId?: string;
   themeId?: string;
+  area?: { id: string; name: string; slug: string };
+  theme?: { id: string; name: string; slug: string };
+  platform?: string;
   estimatedDeadline?: Date;
   estimatedBudget?: number;
   projectType: string;
