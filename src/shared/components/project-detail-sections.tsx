@@ -10,6 +10,7 @@ import { Button } from "@/src/shared/components/ui/button";
 import { Pencil } from "lucide-react";
 import { ProjectRequestEditForm } from "@/shared/components/project-request-edit-form";
 import { ProjectPeopleOfInterestCard } from "@/shared/components/project-people-of-interest-card";
+import { ProjectXmlImportExport } from "@/shared/components/project-xml-import-export";
 import {
   HAS_EXISTING_SYSTEM_OPTIONS,
   HAS_CURRENT_APPLICATION_OPTIONS,
@@ -78,12 +79,15 @@ export function ProjectDetailSections({
 
   return (
     <div className="space-y-6">
-      {canEdit && (
-        <div className="flex justify-end">
-          <Button variant="outline" size="sm" onClick={() => setIsEditing(true)}>
-            <Pencil className="mr-1.5 h-3.5 w-3.5" />
-            Editar
-          </Button>
+      {(canEdit || canSeeTechnical) && (
+        <div className="flex justify-end gap-2">
+          {canSeeTechnical && <ProjectXmlImportExport project={project} />}
+          {canEdit && (
+            <Button variant="outline" size="sm" onClick={() => setIsEditing(true)}>
+              <Pencil className="mr-1.5 h-3.5 w-3.5" />
+              Editar
+            </Button>
+          )}
         </div>
       )}
 
