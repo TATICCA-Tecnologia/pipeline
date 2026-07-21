@@ -34,6 +34,28 @@ export async function resolvePersonIds(
   return resolved;
 }
 
+export async function resolvePersonIdsByName(
+  db: PrismaClient,
+  companyId: string,
+  names: string[]
+): Promise<string[]> {
+  const ids: string[] = [];
+  for (const rawName of names) {
+    const name = rawName.trim();
+    if (!name) continue;
+    const existing = await db.person.findFirst({
+      where: { companyId, name: { equals: name, mode: "insensitive" } },
+    });
+    if (existing) {
+      ids.push(existing.id);
+    } else {
+      const created = await db.person.create({ data: { companyId, name } });
+      ids.push(created.id);
+    }
+  }
+  return Array.from(new Set(ids));
+}
+
 export const personRouter = router({
   list: protectedProcedure
     .input(z.object({ companyId: z.string() }))
