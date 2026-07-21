@@ -43,6 +43,10 @@ import {
   AlertDialogTitle,
 } from "@/src/shared/components/ui/alert-dialog";
 import { ArrowLeft, Plus, Pencil, Trash2, Users } from "lucide-react";
+import {
+  MultiCreatableCombobox,
+  type MultiCreatableComboboxOption,
+} from "@/src/shared/components/ui/multi-creatable-combobox";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -89,12 +93,12 @@ function parseLocalDateInputValue(value: string): Date {
 }
 
 const EMPTY_FORM: {
-  participantName: string;
+  personIds: string[];
   status: InterviewStatus;
   scheduledDate: string;
   areaId: string;
 } = {
-  participantName: "",
+  personIds: [],
   status: "realizado",
   scheduledDate: toLocalDateInputValue(new Date()),
   areaId: AREA_NONE,
@@ -109,8 +113,25 @@ export default function EntrevistasPage({ params }: Props) {
   const { isDemoMode, maskCompanyName, maskPersonName } = useDemoMode();
 
   const { data: areas = [] } = trpc.taxonomy.listAreas.useQuery();
+  const { data: personOptions = [] } = trpc.person.list.useQuery({ companyId });
 
   const { data: interviews = [], isLoading } = trpc.interview.list.useQuery({ companyId });
+
+  const createPersonMutation = trpc.person.create.useMutation({
+    onSuccess: (person) => {
+      utils.person.list.invalidate({ companyId });
+      setForm((f) => ({ ...f, personIds: [...f.personIds, person.id] }));
+    },
+    onError: (error) => {
+      toast.error("Erro ao criar pessoa", { description: error.message });
+    },
+  });
+
+  const comboboxOptions: MultiCreatableComboboxOption[] = personOptions.map((p) => ({
+    value: p.id,
+    label: p.name,
+    meta: { isUnlinkedUser: p.isUnlinkedUser },
+  }));
 
   const [dialog, setDialog] = useState<{ open: boolean; editingId?: string }>({ open: false });
   const [form, setForm] = useState(EMPTY_FORM);
@@ -159,7 +180,7 @@ export default function EntrevistasPage({ params }: Props) {
 
   function openEdit(interview: (typeof interviews)[number]) {
     setForm({
-      participantName: interview.participantName,
+      personIds: interview.participants.map((p) => p.personId),
       status: interview.status as InterviewStatus,
       scheduledDate: toLocalDateInputValue(new Date(interview.scheduledDate)),
       areaId: interview.areaId ?? AREA_NONE,
@@ -169,7 +190,7 @@ export default function EntrevistasPage({ params }: Props) {
 
   function submit() {
     const payload = {
-      participantName: form.participantName,
+      personIds: form.personIds,
       status: form.status,
       scheduledDate: parseLocalDateInputValue(form.scheduledDate),
       areaId: form.areaId === AREA_NONE ? null : form.areaId,
@@ -234,7 +255,13 @@ export default function EntrevistasPage({ params }: Props) {
                 interviews.map((interview) => (
                   <TableRow key={interview.id}>
                     <TableCell className="font-medium">
-                      {maskPersonName(interview.id, interview.participantName, "cliente")}
+                      <div className="flex flex-wrap gap-1">
+                        {interview.participants.map((p) => (
+                          <Badge key={p.personId} variant="secondary">
+                            {maskPersonName(p.personId, p.person.name, "cliente")}
+                          </Badge>
+                        ))}
+                      </div>
                     </TableCell>
                     <TableCell className="text-muted-foreground">
                       {interview.area?.name ?? "-"}
@@ -266,9 +293,13 @@ export default function EntrevistasPage({ params }: Props) {
                             setDeleteConfirm({
                               open: true,
                               id: interview.id,
-                              label:
-                                maskPersonName(interview.id, interview.participantName, "cliente") ??
-                                interview.participantName,
+                              label: interview.participants
+                                .map(
+                                  (p) =>
+                                    maskPersonName(p.personId, p.person.name, "cliente") ??
+                                    p.person.name
+                                )
+                                .join(", "),
                             })
                           }
                         >
@@ -293,11 +324,14 @@ export default function EntrevistasPage({ params }: Props) {
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-1.5">
-              <Label>Participante</Label>
-              <Input
-                value={form.participantName}
-                onChange={(e) => setForm((f) => ({ ...f, participantName: e.target.value }))}
-                placeholder="Nome do participante"
+              <Label>Participantes</Label>
+              <MultiCreatableCombobox
+                options={comboboxOptions}
+                value={form.personIds}
+                onChange={(personIds) => setForm((f) => ({ ...f, personIds }))}
+                onCreate={(name) => createPersonMutation.mutate({ companyId, name })}
+                placeholder="Selecionar ou criar pessoa..."
+                emptyText="Nenhuma pessoa encontrada."
               />
             </div>
             <div className="space-y-1.5">
@@ -355,7 +389,7 @@ export default function EntrevistasPage({ params }: Props) {
             <Button
               onClick={submit}
               disabled={
-                !form.participantName.trim() ||
+                form.personIds.length === 0 ||
                 !form.scheduledDate ||
                 createMutation.isPending ||
                 updateMutation.isPending
