@@ -1,5 +1,6 @@
 "use client";
 
+import { trpc } from "@/shared/trpc/client";
 import type { Project, UserRole } from "@/shared/types";
 import { STATUS_CONFIG, PRIORITY_CONFIG } from "@/shared/types";
 import { useDemoMode } from "@/shared/context/demo-mode-context";
@@ -15,7 +16,6 @@ import {
   HAS_EXISTING_SYSTEM_OPTIONS,
   HAS_CURRENT_APPLICATION_OPTIONS,
   PROCESS_FREQUENCIES,
-  URGENCY_LEVELS,
   BENEFIT_OPTIONS,
   COMPLEXITY_LEVELS,
   resolveLabel,
@@ -39,6 +39,8 @@ export function ProjectDetailSections({
 }) {
   const [isEditing, setIsEditing] = useState(false);
   const { maskFreeText, maskCompanyName } = useDemoMode();
+  const { data: dbUrgencyLevels = [] } = trpc.taxonomy.listUrgencyLevels.useQuery();
+  const urgencyLevelOptions = dbUrgencyLevels.map((u) => ({ value: u.slug, label: u.name }));
   const statusConfig = STATUS_CONFIG[project.status] ?? {
     label: project.status,
     color: "bg-muted",
@@ -154,7 +156,7 @@ export function ProjectDetailSections({
 
       <DetailSection title="Narrativa & prazo">
         <FieldRow label="Narrativa do processo" value={maskFreeText(project.projectNarrative)} />
-        <FieldRow label="Urgência" value={resolveLabel(project.urgency, URGENCY_LEVELS)} />
+        <FieldRow label="Urgência" value={resolveLabel(project.urgency, urgencyLevelOptions)} />
         <FieldRow
           label="Prazo limite"
           value={project.estimatedDeadline ? formatDate(project.estimatedDeadline) : undefined}
