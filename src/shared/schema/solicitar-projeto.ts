@@ -41,7 +41,6 @@ export const solicitarProjetoSchema = z
     ratingCompliance: ratingScale,
     projectNarrative: z.string().optional().default(""),
     urgency: z.string().optional().default(""),
-    customUrgency: z.string().optional().default(""),
     deadline: z.string().optional().default(""),
     additionalInfo: z.string().optional().default(""),
   })
@@ -93,13 +92,6 @@ export const solicitarProjetoSchema = z
         code: z.ZodIssueCode.custom,
         path: ["customProcessFrequency"],
         message: "Informe a periodicidade",
-      });
-    }
-    if (data.urgency === "outro" && !data.customUrgency.trim()) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["customUrgency"],
-        message: "Informe o nível de urgência",
       });
     }
   });
