@@ -543,4 +543,56 @@ export const taxonomyRouter = router({
       await ctx.db.companyCostCategory.delete({ where: { id: input.id } });
       return { success: true };
     }),
+
+  // ==========================================
+  // NIVEL DE URGENCIA
+  // ==========================================
+
+  listUrgencyLevels: publicProcedure.query(async ({ ctx }) => {
+    return ctx.db.urgencyLevel.findMany({
+      where: { isActive: true },
+      orderBy: { order: "asc" },
+    });
+  }),
+
+  listAllUrgencyLevels: protectedProcedure.query(async ({ ctx }) => {
+    return ctx.db.urgencyLevel.findMany({
+      orderBy: { order: "asc" },
+    });
+  }),
+
+  createUrgencyLevel: adminProcedure
+    .input(
+      z.object({
+        name: z.string().min(1),
+        slug: z.string().min(1).regex(/^[a-z0-9-]+$/, "Slug deve ter apenas letras minúsculas, números e hífens"),
+        order: z.number().int().default(0),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const exists = await ctx.db.urgencyLevel.findUnique({ where: { slug: input.slug } });
+      if (exists) throw new TRPCError({ code: "CONFLICT", message: "Já existe um nível de urgência com este slug" });
+      return ctx.db.urgencyLevel.create({ data: input });
+    }),
+
+  updateUrgencyLevel: adminProcedure
+    .input(
+      z.object({
+        id: z.string(),
+        name: z.string().min(1).optional(),
+        isActive: z.boolean().optional(),
+        order: z.number().int().optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const { id, ...data } = input;
+      return ctx.db.urgencyLevel.update({ where: { id }, data });
+    }),
+
+  deleteUrgencyLevel: adminProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      await ctx.db.urgencyLevel.delete({ where: { id: input.id } });
+      return { success: true };
+    }),
 });
