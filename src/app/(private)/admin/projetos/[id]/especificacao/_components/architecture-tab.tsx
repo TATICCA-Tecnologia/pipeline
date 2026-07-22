@@ -17,7 +17,7 @@ import {
 } from "@/src/shared/components/ui/select";
 import { Loader2, Plus, Save, Trash2, Wrench, ListChecks } from "lucide-react";
 import { toast } from "sonner";
-import { SOLUTION_TYPES, EXECUTION_STRATEGIES } from "../_constants/architecture";
+import { EXECUTION_STRATEGIES } from "../_constants/architecture";
 import { CreatableCombobox } from "@/src/shared/components/ui/creatable-combobox";
 import { COMPLEXITY_LEVELS } from "@/shared/constants/project-taxonomy";
 import { computeAnnualSavingBRL } from "@/shared/lib/savings";
@@ -73,21 +73,30 @@ export function ArchitectureTab({ projectId }: ArchitectureTabProps) {
   });
 
   const { data: projectKinds = [] } = trpc.taxonomy.listProjectKinds.useQuery();
-  const projectKindOptions = useMemo(() => {
+  const solutionTypeOptions = useMemo(() => {
     const opts = projectKinds.map((k) => ({ value: k.id, label: k.name }));
-    if (project?.projectKind && !opts.some((o) => o.value === project.projectKind!.id)) {
-      opts.push({ value: project.projectKind.id, label: project.projectKind.name });
+    for (const st of project?.solutionTypes ?? []) {
+      if (!opts.some((o) => o.value === st.id)) {
+        opts.push({ value: st.id, label: st.name });
+      }
     }
     return opts;
-  }, [projectKinds, project?.projectKind]);
+  }, [projectKinds, project?.solutionTypes]);
+  const [newSolutionTypeName, setNewSolutionTypeName] = useState("");
   const createProjectKind = trpc.taxonomy.createProjectKind.useMutation({
     onSuccess: (created) => {
       utils.taxonomy.listProjectKinds.invalidate();
-      setProjectKindId(created.id);
-      toast.success(`Tipo de projeto "${created.name}" criado`);
+      setSolutionTypeIds((prev) => [...prev, created.id]);
+      setNewSolutionTypeName("");
+      toast.success(`Tipo de solução "${created.name}" criado`);
     },
-    onError: (err) => toast.error("Falha ao criar tipo de projeto", { description: err.message }),
+    onError: (err) => toast.error("Falha ao criar tipo de solução", { description: err.message }),
   });
+  function handleCreateSolutionType() {
+    const trimmed = newSolutionTypeName.trim();
+    if (!trimmed) return;
+    createProjectKind.mutate({ name: trimmed, slug: slugify(trimmed), order: projectKinds.length });
+  }
 
   const createPhase = trpc.specification.createPhase.useMutation({
     onSuccess: () => utils.specification.getByProject.invalidate({ projectId }),
@@ -102,9 +111,8 @@ export function ArchitectureTab({ projectId }: ArchitectureTabProps) {
     onError: (err) => toast.error("Falha ao excluir fase", { description: err.message }),
   });
 
-  const [solutionTypes, setSolutionTypes] = useState<string[]>([]);
+  const [solutionTypeIds, setSolutionTypeIds] = useState<string[]>([]);
   const [mainToolId, setMainToolId] = useState<string>("");
-  const [projectKindId, setProjectKindId] = useState<string>("");
   const [executionStrategy, setExecutionStrategy] = useState<string>("");
   const [architectNotes, setArchitectNotes] = useState<string>("");
   const [complexity, setComplexity] = useState<string>("");
@@ -117,9 +125,8 @@ export function ArchitectureTab({ projectId }: ArchitectureTabProps) {
 
   useEffect(() => {
     if (project) {
-      setSolutionTypes(project.solutionTypes ?? []);
+      setSolutionTypeIds((project.solutionTypes ?? []).map((k) => k.id));
       setMainToolId(project.mainTool?.id ?? "");
-      setProjectKindId(project.projectKind?.id ?? "");
       setExecutionStrategy(project.executionStrategy ?? "");
       setArchitectNotes(project.architectNotes ?? "");
       setComplexity(project.complexity ?? "");
@@ -175,7 +182,7 @@ export function ArchitectureTab({ projectId }: ArchitectureTabProps) {
 
   const toggleSolutionType = (value: string, checked: boolean | "indeterminate") => {
     const isChecked = checked === true;
-    setSolutionTypes((prev) =>
+    setSolutionTypeIds((prev) =>
       isChecked ? [...prev, value] : prev.filter((v) => v !== value)
     );
   };
@@ -192,9 +199,8 @@ export function ArchitectureTab({ projectId }: ArchitectureTabProps) {
     const parsedWaveOrder = parseInt(waveOrder, 10);
     updateProject.mutate({
       id: projectId,
-      solutionTypes,
+      solutionTypeIds,
       mainToolId: mainToolId || null,
-      projectKindId: projectKindId || null,
       executionStrategy: executionStrategy || null,
       architectNotes: architectNotes || null,
       complexity: (complexity || null) as "baixa" | "media" | "alta" | null,
@@ -238,22 +244,40 @@ export function ArchitectureTab({ projectId }: ArchitectureTabProps) {
               Selecione todos que se aplicam.
             </p>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-              {SOLUTION_TYPES.map((opt) => (
+              {solutionTypeOptions.map((opt) => (
                 <label
                   key={opt.value}
                   className="flex items-center gap-2 rounded-md border border-border px-3 py-2 cursor-pointer hover:bg-accent transition-colors"
                 >
                   <Checkbox
-                    checked={solutionTypes.includes(opt.value)}
+                    checked={solutionTypeIds.includes(opt.value)}
                     onCheckedChange={(v) => toggleSolutionType(opt.value, v)}
                   />
                   <span className="text-sm">{opt.label}</span>
                 </label>
               ))}
             </div>
+            <div className="flex gap-2 pt-1">
+              <Input
+                value={newSolutionTypeName}
+                onChange={(e) => setNewSolutionTypeName(e.target.value)}
+                placeholder="Novo tipo de solução"
+                className="h-8 max-w-xs"
+              />
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={handleCreateSolutionType}
+                disabled={!newSolutionTypeName.trim() || createProjectKind.isPending}
+              >
+                <Plus className="h-3.5 w-3.5 mr-1" />
+                Adicionar
+              </Button>
+            </div>
           </div>
 
-          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-5 sm:grid-cols-2">
             <div className="space-y-2">
               <Label>Ferramenta principal</Label>
               <CreatableCombobox
@@ -269,24 +293,6 @@ export function ArchitectureTab({ projectId }: ArchitectureTabProps) {
                 }
                 placeholder="Selecione ou crie"
                 disabled={createMainTool.isPending}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label>Tipo de projeto</Label>
-              <CreatableCombobox
-                options={projectKindOptions}
-                value={projectKindId}
-                onChange={setProjectKindId}
-                onCreate={(label) =>
-                  createProjectKind.mutate({
-                    name: label,
-                    slug: slugify(label),
-                    order: projectKinds.length,
-                  })
-                }
-                placeholder="Selecione ou crie"
-                disabled={createProjectKind.isPending}
               />
             </div>
 
