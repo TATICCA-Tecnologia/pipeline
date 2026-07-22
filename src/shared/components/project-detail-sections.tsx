@@ -170,7 +170,13 @@ export function ProjectDetailSections({
             label="Complexidade"
             value={resolveLabel(project.complexity, COMPLEXITY_LEVELS)}
           />
-          <FieldRow label="Ferramenta principal" value={project.mainTool?.name} />
+          <FieldRow
+            label="Ferramenta principal"
+            value={
+              [project.mainToolCategory?.name, project.mainTool?.name].filter(Boolean).join(" — ") ||
+              undefined
+            }
+          />
           <FieldRow
             label="Estratégia de execução"
             value={resolveLabel(project.executionStrategy, EXECUTION_STRATEGIES)}

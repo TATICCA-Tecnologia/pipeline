@@ -333,7 +333,8 @@ export function ProjectExecutiveSlide({ project }: { project: Project }) {
             {areaEntrevistada && (
               <p className="mt-1 text-sm font-semibold text-teal-600">{areaEntrevistada}</p>
             )}
-            {((project.solutionTypes && project.solutionTypes.length > 0) || project.mainTool) && (
+            {((project.solutionTypes && project.solutionTypes.length > 0) ||
+              project.mainToolCategory) && (
               <div className="mt-2 flex flex-wrap gap-1.5">
                 {project.solutionTypes?.map((k) => (
                   <span
@@ -343,9 +344,11 @@ export function ProjectExecutiveSlide({ project }: { project: Project }) {
                     {k.name}
                   </span>
                 ))}
-                {project.mainTool && (
+                {project.mainToolCategory && (
                   <span className="inline-block rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-semibold text-slate-700">
-                    {project.mainTool.name}
+                    {project.mainTool
+                      ? `${project.mainToolCategory.name} — ${project.mainTool.name}`
+                      : project.mainToolCategory.name}
                   </span>
                 )}
               </div>
