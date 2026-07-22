@@ -10,10 +10,7 @@ import {
   BENEFIT_OPTIONS,
   resolveLabel,
 } from "@/shared/constants/project-taxonomy";
-import {
-  SOLUTION_TYPES,
-  EXECUTION_STRATEGIES,
-} from "@/src/app/(private)/admin/projetos/[id]/especificacao/_constants/architecture";
+import { EXECUTION_STRATEGIES } from "@/src/app/(private)/admin/projetos/[id]/especificacao/_constants/architecture";
 import { useDemoMode } from "@/shared/context/demo-mode-context";
 
 // Página de tamanho fixo (16:9, mesma proporção de um slide de verdade) — o conteúdo
@@ -236,9 +233,7 @@ export function ProjectExecutiveSlide({ project }: { project: Project }) {
     { label: "Público-alvo", value: maskFreeText(project.targetAudience) ?? undefined },
   ]);
 
-  const solutionTypeLabels = (project.solutionTypes ?? []).map(
-    (v) => SOLUTION_TYPES.find((s) => s.value === v)?.label ?? v
-  );
+  const solutionTypeLabels = (project.solutionTypes ?? []).map((k) => k.name);
   const construcaoLines = buildLabeledLines([
     { label: "Solução", value: solutionTypeLabels.length > 0 ? solutionTypeLabels.join(", ") : undefined },
     { label: "Execução", value: resolveLabel(project.executionStrategy, EXECUTION_STRATEGIES) },
@@ -338,13 +333,16 @@ export function ProjectExecutiveSlide({ project }: { project: Project }) {
             {areaEntrevistada && (
               <p className="mt-1 text-sm font-semibold text-teal-600">{areaEntrevistada}</p>
             )}
-            {(project.projectKind || project.mainTool) && (
+            {((project.solutionTypes && project.solutionTypes.length > 0) || project.mainTool) && (
               <div className="mt-2 flex flex-wrap gap-1.5">
-                {project.projectKind && (
-                  <span className="inline-block rounded-full bg-teal-50 px-2.5 py-0.5 text-[11px] font-semibold text-teal-700">
-                    {project.projectKind.name}
+                {project.solutionTypes?.map((k) => (
+                  <span
+                    key={k.id}
+                    className="inline-block rounded-full bg-teal-50 px-2.5 py-0.5 text-[11px] font-semibold text-teal-700"
+                  >
+                    {k.name}
                   </span>
-                )}
+                ))}
                 {project.mainTool && (
                   <span className="inline-block rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-semibold text-slate-700">
                     {project.mainTool.name}

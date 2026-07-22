@@ -29,10 +29,7 @@ import {
   COMPLEXITY_LEVELS,
   resolveLabel,
 } from "@/shared/constants/project-taxonomy";
-import {
-  SOLUTION_TYPES,
-  EXECUTION_STRATEGIES,
-} from "@/src/app/(private)/admin/projetos/[id]/especificacao/_constants/architecture";
+import { EXECUTION_STRATEGIES } from "@/src/app/(private)/admin/projetos/[id]/especificacao/_constants/architecture";
 import { useTaxonomy } from "@/src/app/(private)/cliente/solicitar/utils/use-taxonomy";
 
 function toDateInputValue(date: Date | string | undefined): string {
@@ -208,9 +205,7 @@ export function ProjectRequestEditForm({
     color: "bg-muted",
   };
   const priorityConfig = PRIORITY_CONFIG[project.priority];
-  const solutionTypeLabels = (project.solutionTypes ?? []).map(
-    (key) => SOLUTION_TYPES.find((s) => s.value === key)?.label ?? key
-  );
+  const solutionTypeLabels = (project.solutionTypes ?? []).map((k) => k.name);
 
   return (
     <div className="space-y-6">

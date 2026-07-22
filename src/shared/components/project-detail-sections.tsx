@@ -20,10 +20,7 @@ import {
   COMPLEXITY_LEVELS,
   resolveLabel,
 } from "@/shared/constants/project-taxonomy";
-import {
-  SOLUTION_TYPES,
-  EXECUTION_STRATEGIES,
-} from "@/src/app/(private)/admin/projetos/[id]/especificacao/_constants/architecture";
+import { EXECUTION_STRATEGIES } from "@/src/app/(private)/admin/projetos/[id]/especificacao/_constants/architecture";
 
 function formatRating(value: number | null | undefined): string | undefined {
   return value != null ? `${value}/5` : undefined;
@@ -73,9 +70,7 @@ export function ProjectDetailSections({
   const benefitLabels = (project.benefits ?? []).map(
     (key) => BENEFIT_OPTIONS.find((b) => b.key === key)?.label ?? key
   );
-  const solutionTypeLabels = (project.solutionTypes ?? []).map(
-    (key) => SOLUTION_TYPES.find((s) => s.value === key)?.label ?? key
-  );
+  const solutionTypeLabels = (project.solutionTypes ?? []).map((k) => k.name);
 
   return (
     <div className="space-y-6">
