@@ -21,10 +21,8 @@ export function ProjectKindFilter({ projects, value, onChange }: ProjectKindFilt
   const kinds = Array.from(
     new Map(
       projects
-        .filter((p): p is Project & { projectKind: { id: string; name: string } } =>
-          Boolean(p.projectKind)
-        )
-        .map((p) => [p.projectKind!.id, p.projectKind!.name] as const)
+        .flatMap((p) => p.solutionTypes ?? [])
+        .map((k) => [k.id, k.name] as const)
     ).entries()
   ).sort((a, b) => a[1].localeCompare(b[1]));
 
@@ -47,10 +45,10 @@ export function ProjectKindFilter({ projects, value, onChange }: ProjectKindFilt
   );
 }
 
-export function filterProjectsByKind<T extends { projectKindId?: string }>(
+export function filterProjectsByKind<T extends { solutionTypes?: { id: string }[] }>(
   projects: T[],
   kindFilter: string
 ): T[] {
   if (kindFilter === ALL_PROJECT_KINDS_VALUE) return projects;
-  return projects.filter((p) => p.projectKindId === kindFilter);
+  return projects.filter((p) => p.solutionTypes?.some((k) => k.id === kindFilter));
 }
