@@ -849,40 +849,43 @@ export const projectRouter = router({
         .sort((a, b) => b.projectCount - a.projectCount);
     }),
 
-  // Agregação de projetos por ferramenta principal (contagem), mesmo padrão de
-  // getAreaSummary mas agrupado por mainToolId — usado pela aba "Resumo
-  // Executivo" da Priorização. adminProcedure pelo mesmo motivo de segurança
-  // (contagem por ferramenta é dado interno do diagnóstico).
+  // Agregação de projetos por categoria de ferramenta (contagem), mesmo
+  // padrão de getAreaSummary mas agrupado por mainToolCategoryId — usado pela
+  // aba "Resumo Executivo" da Priorização. adminProcedure pelo mesmo motivo
+  // de segurança (contagem por ferramenta é dado interno do diagnóstico).
+  // Agrupa por CATEGORIA, não pelo produto específico (mainToolId), porque a
+  // categoria é o campo "principal" agora — muitos projetos vão ter só ela
+  // preenchida, sem produto específico.
   getToolSummary: adminProcedure
     .input(z.object({ companyId: z.string().optional() }))
     .query(async ({ ctx, input }) => {
       const grouped = await ctx.db.project.groupBy({
-        by: ["mainToolId"],
+        by: ["mainToolCategoryId"],
         _count: true,
         where: {
-          mainToolId: { not: null },
+          mainToolCategoryId: { not: null },
           hasCurrentApplication: { not: "sim" },
           status: { notIn: ["DONE", "CANCELLED"] },
           ...(input.companyId ? { companyId: input.companyId } : {}),
         },
       });
 
-      const toolIds = grouped
-        .map((g) => g.mainToolId)
+      const categoryIds = grouped
+        .map((g) => g.mainToolCategoryId)
         .filter((id): id is string => id != null);
 
-      const tools = await ctx.db.mainTool.findMany({
-        where: { id: { in: toolIds } },
+      const categories = await ctx.db.mainToolCategory.findMany({
+        where: { id: { in: categoryIds } },
       });
-      const toolById = new Map(tools.map((t) => [t.id, t]));
+      const categoryById = new Map(categories.map((c) => [c.id, c]));
 
       return grouped
-        .filter((g) => g.mainToolId != null && toolById.has(g.mainToolId))
+        .filter((g) => g.mainToolCategoryId != null && categoryById.has(g.mainToolCategoryId))
         .map((g) => {
-          const tool = toolById.get(g.mainToolId as string)!;
+          const category = categoryById.get(g.mainToolCategoryId as string)!;
           return {
-            toolId: tool.id,
-            toolName: tool.name,
+            toolId: category.id,
+            toolName: category.name,
             projectCount: g._count,
           };
         })
@@ -1100,38 +1103,38 @@ export const projectRouter = router({
         .sort((a, b) => b.projectCount - a.projectCount);
     }),
 
-  // Resumo por ferramenta das automações já existentes/entregues — mesmo
-  // padrão de getToolSummary, com o filtro invertido (igual
+  // Resumo por categoria de ferramenta das automações já existentes/entregues
+  // — mesmo padrão de getToolSummary, com o filtro invertido (igual
   // getExistingAutomationsAreaSummary faz para área).
   getExistingAutomationsToolSummary: adminProcedure
     .input(z.object({ companyId: z.string().optional() }))
     .query(async ({ ctx, input }) => {
       const grouped = await ctx.db.project.groupBy({
-        by: ["mainToolId"],
+        by: ["mainToolCategoryId"],
         _count: true,
         where: {
-          mainToolId: { not: null },
+          mainToolCategoryId: { not: null },
           OR: [{ hasCurrentApplication: "sim" }, { status: "DONE" }],
           ...(input.companyId ? { companyId: input.companyId } : {}),
         },
       });
 
-      const toolIds = grouped
-        .map((g) => g.mainToolId)
+      const categoryIds = grouped
+        .map((g) => g.mainToolCategoryId)
         .filter((id): id is string => id != null);
 
-      const tools = await ctx.db.mainTool.findMany({
-        where: { id: { in: toolIds } },
+      const categories = await ctx.db.mainToolCategory.findMany({
+        where: { id: { in: categoryIds } },
       });
-      const toolById = new Map(tools.map((t) => [t.id, t]));
+      const categoryById = new Map(categories.map((c) => [c.id, c]));
 
       return grouped
-        .filter((g) => g.mainToolId != null && toolById.has(g.mainToolId))
+        .filter((g) => g.mainToolCategoryId != null && categoryById.has(g.mainToolCategoryId))
         .map((g) => {
-          const tool = toolById.get(g.mainToolId as string)!;
+          const category = categoryById.get(g.mainToolCategoryId as string)!;
           return {
-            toolId: tool.id,
-            toolName: tool.name,
+            toolId: category.id,
+            toolName: category.name,
             projectCount: g._count,
           };
         })
@@ -1168,7 +1171,7 @@ export const projectRouter = router({
           ctx.db.project.count({
             where: {
               companyId: input.companyId,
-              mainToolId: null,
+              mainToolCategoryId: null,
               hasCurrentApplication: { not: "sim" },
               status: { notIn: ["DONE", "CANCELLED"] },
             },
@@ -1176,7 +1179,7 @@ export const projectRouter = router({
           ctx.db.project.count({
             where: {
               companyId: input.companyId,
-              mainToolId: null,
+              mainToolCategoryId: null,
               OR: [{ hasCurrentApplication: "sim" }, { status: "DONE" }],
             },
           }),
