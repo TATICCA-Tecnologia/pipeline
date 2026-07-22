@@ -63,9 +63,8 @@ const ARCHITECT_ONLY_FIELDS = new Set([
   "priority",
   "developerId",
   "companyId",
-  "solutionTypes",
+  "solutionTypeIds",
   "mainToolId",
-  "projectKindId",
   "executionStrategy",
   "architectNotes",
   "complexity",
@@ -515,9 +514,8 @@ export const projectRouter = router({
         areaId: z.string().nullable().optional(),
         themeId: z.string().nullable().optional(),
         estimatedDeadline: z.date().nullable().optional(),
-        solutionTypes: z.array(z.string()).optional(),
+        solutionTypeIds: z.array(z.string()).optional(),
         mainToolId: z.string().nullable().optional(),
-        projectKindId: z.string().nullable().optional(),
         executionStrategy: z.string().nullable().optional(),
         architectNotes: z.string().nullable().optional(),
         peopleInvolved: z.number().int().min(0).nullable().optional(),
@@ -604,9 +602,10 @@ export const projectRouter = router({
       if (rest.areaId !== undefined) data.areaId = rest.areaId;
       if (rest.themeId !== undefined) data.themeId = rest.themeId;
       if (rest.estimatedDeadline !== undefined) data.deadline = rest.estimatedDeadline;
-      if (rest.solutionTypes !== undefined) data.solutionTypes = rest.solutionTypes;
+      if (rest.solutionTypeIds !== undefined) {
+        data.solutionTypes = { set: rest.solutionTypeIds.map((id) => ({ id })) };
+      }
       if (rest.mainToolId !== undefined) data.mainToolId = rest.mainToolId;
-      if (rest.projectKindId !== undefined) data.projectKindId = rest.projectKindId;
       if (rest.executionStrategy !== undefined) data.executionStrategy = rest.executionStrategy;
       if (rest.architectNotes !== undefined) data.architectNotes = rest.architectNotes;
       if (rest.complexity !== undefined) data.complexity = rest.complexity;
