@@ -5,6 +5,7 @@ import {
   PROJECT_AREAS as FALLBACK_AREAS,
   PROJECT_THEMES_BY_AREA as FALLBACK_THEMES,
   FEATURE_SUGGESTION_GROUPS as FALLBACK_SUGGESTIONS,
+  URGENCY_LEVELS as FALLBACK_URGENCY_LEVELS,
 } from "@/shared/constants/project-taxonomy";
 
 /**
@@ -21,8 +22,22 @@ export function useTaxonomy() {
     { staleTime: 1000 * 60 * 5 }
   );
 
+  const { data: dbUrgencyLevels, isLoading: isLoadingUrgencyLevels } =
+    trpc.taxonomy.listUrgencyLevels.useQuery(undefined, {
+      staleTime: 1000 * 60 * 5,
+    });
+
   // Se o banco ainda não tem dados (não seeded), usa os hardcoded
   const useDb = !isLoading && dbAreas && dbAreas.length > 0;
+
+  const useDbUrgencyLevels =
+    !isLoadingUrgencyLevels && dbUrgencyLevels && dbUrgencyLevels.length > 0;
+  const urgencyLevels = useDbUrgencyLevels
+    ? dbUrgencyLevels!.map((u) => ({ value: u.slug, label: u.name }))
+    : FALLBACK_URGENCY_LEVELS.filter((u) => u.value !== "outro").map((u) => ({
+        value: u.value,
+        label: u.label,
+      }));
 
   const areas = useDb
     ? dbAreas!.map((a) => ({ value: a.slug, label: a.name, id: a.id as string | undefined }))
@@ -71,6 +86,7 @@ export function useTaxonomy() {
     areas,
     themesByArea,
     suggestionGroups,
+    urgencyLevels,
     buildTypeLabel,
     isLoading,
   };
