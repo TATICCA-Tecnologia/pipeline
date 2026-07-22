@@ -37,6 +37,7 @@ export interface XmlOpportunityImporterOptions {
   userId: string | undefined;
   areas: { value: string; label: string; id?: string }[];
   themesByArea: Record<string, { value: string; label: string; id?: string }[]>;
+  urgencyLevels: { value: string; label: string }[];
   companies: { id: string; name: string }[];
   buildTypeLabel: (areaValue: string, themeValue: string) => string;
   /**
@@ -61,7 +62,7 @@ export interface XmlOpportunityImporterOptions {
  * senão a Promise nunca resolve e o import trava indefinidamente naquele item.
  */
 export function useXmlOpportunityImporter(options: XmlOpportunityImporterOptions) {
-  const { userId, areas, themesByArea, companies, buildTypeLabel, forcedCompanyId } = options;
+  const { userId, areas, themesByArea, urgencyLevels, companies, buildTypeLabel, forcedCompanyId } = options;
   const { addProject } = useProjects();
 
   const [pendingXmlImport, setPendingXmlImport] = useState<{
@@ -127,7 +128,7 @@ export function useXmlOpportunityImporter(options: XmlOpportunityImporterOptions
   ): Promise<XmlImportOutcome> {
     if (!userId) return { ok: false, error: "Faça login para importar um XML." };
 
-    const result = parseSolicitacaoXml(xmlText, { areas, themesByArea, companies });
+    const result = parseSolicitacaoXml(xmlText, { areas, themesByArea, urgencyLevels, companies });
     if (!result.ok) return { ok: false, error: result.error };
 
     let companyId = forcedCompanyId ?? result.companyId;

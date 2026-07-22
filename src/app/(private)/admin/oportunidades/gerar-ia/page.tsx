@@ -42,7 +42,12 @@ export default function GerarOportunidadesPorIaPage() {
   const canRegisterTaxonomy = actualUser?.role === "admin" || actualUser?.role === "super_admin";
 
   const { data: companies = [], isLoading: companiesLoading } = trpc.company.list.useQuery();
-  const { areas: PROJECT_AREAS, themesByArea: PROJECT_THEMES_BY_AREA, buildTypeLabel } = useTaxonomy();
+  const {
+    areas: PROJECT_AREAS,
+    themesByArea: PROJECT_THEMES_BY_AREA,
+    urgencyLevels: URGENCY_LEVELS,
+    buildTypeLabel,
+  } = useTaxonomy();
 
   const [companyId, setCompanyId] = useState<string | undefined>();
   const [transcript, setTranscript] = useState("");
@@ -55,6 +60,7 @@ export default function GerarOportunidadesPorIaPage() {
     userId: user?.id,
     areas: PROJECT_AREAS,
     themesByArea: PROJECT_THEMES_BY_AREA,
+    urgencyLevels: URGENCY_LEVELS,
     companies,
     buildTypeLabel,
     forcedCompanyId: companyId,
@@ -76,6 +82,7 @@ export default function GerarOportunidadesPorIaPage() {
         const parsed = parseSolicitacaoXml(xmlText, {
           areas: PROJECT_AREAS,
           themesByArea: PROJECT_THEMES_BY_AREA,
+          urgencyLevels: URGENCY_LEVELS,
           companies,
         });
         if (!parsed.ok) {

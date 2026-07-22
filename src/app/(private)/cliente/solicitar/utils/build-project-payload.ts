@@ -54,7 +54,6 @@ export function buildProjectPayload(params: {
     data.processFrequency === "outro"
       ? data.customProcessFrequency.trim()
       : data.processFrequency;
-  const urgencyValue = data.urgency === "outro" ? data.customUrgency.trim() : data.urgency;
 
   const monthlyHours = data.monthlyHoursSaved ? Number(data.monthlyHoursSaved) : undefined;
   const peopleInvolvedValue = data.peopleInvolved ? Number(data.peopleInvolved) : undefined;
@@ -81,7 +80,7 @@ export function buildProjectPayload(params: {
     projectType: projectTypeWithPlatform,
     targetAudience: targetAudienceValue,
     expectedUsers: data.expectedUsers,
-    urgency: urgencyValue,
+    urgency: data.urgency,
     features,
     estimatedDeadline: data.deadline ? new Date(data.deadline) : undefined,
     additionalInfo: data.additionalInfo || undefined,

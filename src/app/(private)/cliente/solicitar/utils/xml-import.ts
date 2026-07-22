@@ -2,7 +2,6 @@ import type { SolicitarProjetoFormData } from "@/shared/schema/solicitar-projeto
 import {
   PLATFORMS,
   TARGET_AUDIENCES,
-  URGENCY_LEVELS,
   DEFAULT_PLATFORM_VALUE,
   PROCESS_FREQUENCIES,
   HAS_EXISTING_SYSTEM_OPTIONS,
@@ -13,6 +12,7 @@ import {
 export interface XmlImportContext {
   areas: { value: string; label: string; id?: string }[];
   themesByArea: Record<string, { value: string; label: string; id?: string }[]>;
+  urgencyLevels: { value: string; label: string }[];
   companies: { id: string; name: string }[];
 }
 
@@ -311,17 +311,16 @@ export function parseSolicitacaoXml(
   const ratingExternalImpact = parseRating("avaliacaoImpactoExterno");
   const ratingCompliance = parseRating("avaliacaoAtendimentoPoliticas");
 
-  // <urgencia> — com fallback "Outro"
+  // <urgencia>
   const urgenciaTag = getDirectChildText(root, "urgencia");
   let urgency = "";
-  let customUrgency = "";
   if (urgenciaTag) {
-    const match = matchByLabel(urgenciaTag, URGENCY_LEVELS);
-    urgency = match ? match.value : "outro";
-    customUrgency = match ? "" : urgenciaTag;
-    if (!match) {
+    const match = matchByLabel(urgenciaTag, context.urgencyLevels);
+    if (match) {
+      urgency = match.value;
+    } else {
       warnings.push(
-        `<urgencia> com valor '${urgenciaTag}' não corresponde a nenhuma opção conhecida; foi tratado como "Outro" e o texto original foi preservado.`
+        `<urgencia> com valor '${urgenciaTag}' não corresponde a nenhuma opção cadastrada e foi ignorado.`
       );
     }
   }
@@ -382,7 +381,6 @@ export function parseSolicitacaoXml(
     ratingCompliance,
     projectNarrative,
     urgency,
-    customUrgency,
     deadline,
     additionalInfo,
   };
