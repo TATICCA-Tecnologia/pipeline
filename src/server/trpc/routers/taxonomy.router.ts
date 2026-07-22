@@ -394,6 +394,7 @@ export const taxonomyRouter = router({
 
   listAllMainTools: protectedProcedure.query(async ({ ctx }) => {
     return ctx.db.mainTool.findMany({
+      include: { category: { select: { id: true, name: true, slug: true } } },
       orderBy: { order: "asc" },
     });
   }),
@@ -404,6 +405,7 @@ export const taxonomyRouter = router({
         name: z.string().min(1),
         slug: z.string().min(1).regex(/^[a-z0-9-]+$/, "Slug deve ter apenas letras minúsculas, números e hífens"),
         order: z.number().int().default(0),
+        categoryId: z.string().nullable().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -419,6 +421,7 @@ export const taxonomyRouter = router({
         name: z.string().min(1).optional(),
         isActive: z.boolean().optional(),
         order: z.number().int().optional(),
+        categoryId: z.string().nullable().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -541,6 +544,58 @@ export const taxonomyRouter = router({
         });
       }
       await ctx.db.companyCostCategory.delete({ where: { id: input.id } });
+      return { success: true };
+    }),
+
+  // ==========================================
+  // CATEGORIA DE FERRAMENTA
+  // ==========================================
+
+  listMainToolCategories: publicProcedure.query(async ({ ctx }) => {
+    return ctx.db.mainToolCategory.findMany({
+      where: { isActive: true },
+      orderBy: { order: "asc" },
+    });
+  }),
+
+  listAllMainToolCategories: protectedProcedure.query(async ({ ctx }) => {
+    return ctx.db.mainToolCategory.findMany({
+      orderBy: { order: "asc" },
+    });
+  }),
+
+  createMainToolCategory: adminProcedure
+    .input(
+      z.object({
+        name: z.string().min(1),
+        slug: z.string().min(1).regex(/^[a-z0-9-]+$/, "Slug deve ter apenas letras minúsculas, números e hífens"),
+        order: z.number().int().default(0),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const exists = await ctx.db.mainToolCategory.findUnique({ where: { slug: input.slug } });
+      if (exists) throw new TRPCError({ code: "CONFLICT", message: "Já existe uma categoria de ferramenta com este slug" });
+      return ctx.db.mainToolCategory.create({ data: input });
+    }),
+
+  updateMainToolCategory: adminProcedure
+    .input(
+      z.object({
+        id: z.string(),
+        name: z.string().min(1).optional(),
+        isActive: z.boolean().optional(),
+        order: z.number().int().optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const { id, ...data } = input;
+      return ctx.db.mainToolCategory.update({ where: { id }, data });
+    }),
+
+  deleteMainToolCategory: adminProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      await ctx.db.mainToolCategory.delete({ where: { id: input.id } });
       return { success: true };
     }),
 
