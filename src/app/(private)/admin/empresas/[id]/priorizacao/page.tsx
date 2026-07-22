@@ -59,6 +59,7 @@ import { PaybackChart } from "@/src/shared/components/payback-chart";
 import { AreaSummaryChart } from "@/src/shared/components/area-summary-chart";
 import { ExistingAutomationsAreaSummaryChart } from "@/src/shared/components/existing-automations-area-summary-chart";
 import { TotalAreaSummaryChart } from "@/src/shared/components/total-area-summary-chart";
+import { ExecutiveOnePager } from "@/src/shared/components/executive-one-pager";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -413,13 +414,18 @@ export default function PriorizacaoPage({ params }: Props) {
         </div>
       </div>
 
-      <Tabs defaultValue="ranking" className="w-full">
+      <Tabs defaultValue="resumo-executivo" className="w-full">
         <TabsList>
+          <TabsTrigger value="resumo-executivo">Resumo Executivo</TabsTrigger>
           <TabsTrigger value="ranking">Ranking</TabsTrigger>
           <TabsTrigger value="cronograma">Cronograma</TabsTrigger>
           <TabsTrigger value="payback">Payback</TabsTrigger>
           <TabsTrigger value="resumo-area">Resumo por Área</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="resumo-executivo" className="space-y-6 mt-4">
+          <ExecutiveOnePager companyId={companyId} />
+        </TabsContent>
 
         <TabsContent value="ranking" className="space-y-6 mt-4">
           <div className="flex gap-2">
