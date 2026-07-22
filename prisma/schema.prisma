@@ -555,6 +555,24 @@ model ProjectKind {
 }
 
 // ==========================================
+// TAXONOMIA CONFIGURAVEL (NIVEL DE URGENCIA)
+// ==========================================
+
+// Sem relação com Project — Project.urgency continua sendo um campo texto
+// livre (sem FK); esta tabela só fornece as opções selecionáveis nas telas.
+model UrgencyLevel {
+  id        String    @id @default(cuid())
+  name      String
+  slug      String    @unique
+  isActive  Boolean   @default(true)
+  order     Int       @default(0)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@map("urgency_levels")
+}
+
+// ==========================================
 // CUSTOS E ESTRUTURA DA EMPRESA
 // ==========================================
 
