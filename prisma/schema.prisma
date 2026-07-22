@@ -174,7 +174,6 @@ model Project {
   ratingCompliance         Int?
 
   // Arquitetura tecnica (preenchido pelo arquiteto)
-  solutionTypes     Json? // array de chaves: rpa, api, ia-ocr, power-platform, python, integracao, dashboard, outro
   executionStrategy String? // agendada, manual, trigger-email, trigger-api, tempo-real
   architectNotes    String?
 
@@ -208,8 +207,7 @@ model Project {
   themeId          String?
   mainTool         MainTool?                 @relation(fields: [mainToolId], references: [id], onDelete: SetNull)
   mainToolId       String?
-  projectKind      ProjectKind?              @relation(fields: [projectKindId], references: [id], onDelete: SetNull)
-  projectKindId    String?
+  solutionTypes    ProjectKind[]             @relation("ProjectSolutionTypes")
   features         ProjectFeature[]
   phases           ProjectPhase[]
   tasks            Task[]
@@ -549,7 +547,7 @@ model ProjectKind {
   slug      String    @unique
   isActive  Boolean   @default(true)
   order     Int       @default(0)
-  projects  Project[]
+  projects  Project[] @relation("ProjectSolutionTypes")
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 
