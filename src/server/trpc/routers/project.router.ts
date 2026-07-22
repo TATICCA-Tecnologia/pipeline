@@ -65,6 +65,7 @@ const ARCHITECT_ONLY_FIELDS = new Set([
   "companyId",
   "solutionTypeIds",
   "mainToolId",
+  "mainToolCategoryId",
   "executionStrategy",
   "architectNotes",
   "complexity",
@@ -260,6 +261,7 @@ export const projectRouter = router({
           area: { select: { id: true, name: true, slug: true } },
           theme: { select: { id: true, name: true, slug: true } },
           mainTool: { select: { id: true, name: true, slug: true } },
+          mainToolCategory: { select: { id: true, name: true, slug: true } },
           solutionTypes: { select: { id: true, name: true, slug: true } },
           tasks: true,
           features: true,
@@ -323,6 +325,8 @@ export const projectRouter = router({
         solutionTypes: project.solutionTypes,
         mainTool: project.mainTool ?? undefined,
         mainToolId: project.mainToolId ?? undefined,
+        mainToolCategory: project.mainToolCategory ?? undefined,
+        mainToolCategoryId: project.mainToolCategoryId ?? undefined,
         executionStrategy: project.executionStrategy ?? undefined,
         architectNotes: project.architectNotes ?? undefined,
         features:
@@ -516,6 +520,7 @@ export const projectRouter = router({
         estimatedDeadline: z.date().nullable().optional(),
         solutionTypeIds: z.array(z.string()).optional(),
         mainToolId: z.string().nullable().optional(),
+        mainToolCategoryId: z.string().nullable().optional(),
         executionStrategy: z.string().nullable().optional(),
         architectNotes: z.string().nullable().optional(),
         peopleInvolved: z.number().int().min(0).nullable().optional(),
@@ -606,6 +611,7 @@ export const projectRouter = router({
         data.solutionTypes = { set: rest.solutionTypeIds.map((id) => ({ id })) };
       }
       if (rest.mainToolId !== undefined) data.mainToolId = rest.mainToolId;
+      if (rest.mainToolCategoryId !== undefined) data.mainToolCategoryId = rest.mainToolCategoryId;
       if (rest.executionStrategy !== undefined) data.executionStrategy = rest.executionStrategy;
       if (rest.architectNotes !== undefined) data.architectNotes = rest.architectNotes;
       if (rest.complexity !== undefined) data.complexity = rest.complexity;
