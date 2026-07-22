@@ -92,3 +92,23 @@ export async function findOrCreateProjectKind(db: PrismaClient, name: string, wa
   warnings.push(`Tipo de projeto "${trimmed}" não existia e foi criado.`);
   return created;
 }
+
+export async function findOrCreateMainToolCategory(db: PrismaClient, name: string, warnings: string[]) {
+  const trimmed = name.trim();
+  if (!trimmed) return undefined;
+  const existing = await db.mainToolCategory.findFirst({
+    where: { name: { equals: trimmed, mode: "insensitive" } },
+  });
+  if (existing) return existing;
+  const slug = slugify(trimmed);
+  const slugTaken = await db.mainToolCategory.findUnique({ where: { slug } });
+  if (slugTaken) {
+    warnings.push(
+      `Categoria de ferramenta "${trimmed}" não encontrada e o slug gerado já está em uso — categoria não alterada.`
+    );
+    return undefined;
+  }
+  const created = await db.mainToolCategory.create({ data: { name: trimmed, slug, order: 0 } });
+  warnings.push(`Categoria de ferramenta "${trimmed}" não existia e foi criada.`);
+  return created;
+}
