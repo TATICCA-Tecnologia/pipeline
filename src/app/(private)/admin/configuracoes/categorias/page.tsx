@@ -293,15 +293,15 @@ export default function CategoriasPage() {
   const [projectKindForm, setProjectKindForm] = useState({ name: "", slug: "", order: 0 });
 
   const createProjectKind = trpc.taxonomy.createProjectKind.useMutation({
-    onSuccess: () => { utils.taxonomy.listAllProjectKinds.invalidate(); setProjectKindDialog({ open: false }); toast({ title: "Tipo de projeto criado" }); },
+    onSuccess: () => { utils.taxonomy.listAllProjectKinds.invalidate(); setProjectKindDialog({ open: false }); toast({ title: "Tipo de solução criado" }); },
     onError: (e: { message: string }) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
   });
   const updateProjectKind = trpc.taxonomy.updateProjectKind.useMutation({
-    onSuccess: () => { utils.taxonomy.listAllProjectKinds.invalidate(); setProjectKindDialog({ open: false }); toast({ title: "Tipo de projeto atualizado" }); },
+    onSuccess: () => { utils.taxonomy.listAllProjectKinds.invalidate(); setProjectKindDialog({ open: false }); toast({ title: "Tipo de solução atualizado" }); },
     onError: (e: { message: string }) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
   });
   const deleteProjectKind = trpc.taxonomy.deleteProjectKind.useMutation({
-    onSuccess: () => { utils.taxonomy.listAllProjectKinds.invalidate(); toast({ title: "Tipo de projeto removido" }); },
+    onSuccess: () => { utils.taxonomy.listAllProjectKinds.invalidate(); toast({ title: "Tipo de solução removido" }); },
   });
   const toggleProjectKind = trpc.taxonomy.updateProjectKind.useMutation({
     onSuccess: () => utils.taxonomy.listAllProjectKinds.invalidate(),
@@ -634,20 +634,20 @@ export default function CategoriasPage() {
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-lg font-semibold">Tipos de Projeto</h2>
+            <h2 className="text-lg font-semibold">Tipos de Solução</h2>
             <p className="text-sm text-muted-foreground">
-              Opções do campo &quot;Tipo de projeto&quot; na tela de arquitetura.
+              Opções do campo &quot;Tipo de Solução&quot; na tela de arquitetura.
             </p>
           </div>
           <Button size="sm" variant="outline" onClick={openNewProjectKind}>
             <Plus className="mr-2 h-4 w-4" />
-            Novo tipo
+            Novo tipo de solução
           </Button>
         </div>
         {projectKinds.length === 0 ? (
           <Card className="flex flex-col items-center justify-center py-10 text-center">
             <Layers className="mb-3 h-8 w-8 text-muted-foreground/50" />
-            <p className="text-sm font-medium">Nenhum tipo de projeto cadastrado</p>
+            <p className="text-sm font-medium">Nenhum tipo de solução cadastrado</p>
           </Card>
         ) : (
           <Card>
@@ -1045,7 +1045,7 @@ export default function CategoriasPage() {
       <Dialog open={projectKindDialog.open} onOpenChange={(o) => setProjectKindDialog({ open: o })}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{projectKindDialog.editing ? "Editar tipo de projeto" : "Novo tipo de projeto"}</DialogTitle>
+            <DialogTitle>{projectKindDialog.editing ? "Editar tipo de solução" : "Novo tipo de solução"}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-1.5">
