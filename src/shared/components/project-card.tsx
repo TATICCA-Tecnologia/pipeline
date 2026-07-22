@@ -134,12 +134,24 @@ export function ProjectCard({
               {project.projectType}
             </span>
           )}
-          {project.projectKind && (
+          {project.solutionTypes?.slice(0, 2).map((k) => (
             <span
+              key={k.id}
               className="inline-block max-w-[170px] truncate rounded bg-primary/10 px-1.5 py-px text-[10px] font-medium text-primary"
-              title={project.projectKind.name}
+              title={k.name}
             >
-              {project.projectKind.name}
+              {k.name}
+            </span>
+          ))}
+          {project.solutionTypes && project.solutionTypes.length > 2 && (
+            <span
+              className="inline-block rounded bg-primary/10 px-1.5 py-px text-[10px] font-medium text-primary"
+              title={project.solutionTypes
+                .slice(2)
+                .map((k) => k.name)
+                .join(", ")}
+            >
+              +{project.solutionTypes.length - 2}
             </span>
           )}
           {project.companyName && (
