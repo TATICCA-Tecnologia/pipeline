@@ -28,6 +28,16 @@ import {
   filterProjectsByKind,
   ALL_PROJECT_KINDS_VALUE,
 } from "@/shared/components/project-kind-filter";
+import {
+  BusinessAreaFilter,
+  filterProjectsByBusinessArea,
+  ALL_BUSINESS_AREAS_VALUE,
+} from "@/shared/components/business-area-filter";
+import {
+  OpportunityKindFilter,
+  filterProjectsByOpportunityKind,
+  ALL_OPPORTUNITY_KINDS_VALUE,
+} from "@/shared/components/opportunity-kind-filter";
 
 type SortBy = "updatedAt" | "createdAt";
 const SORT_OPTIONS: { value: SortBy; label: string }[] = [
@@ -139,10 +149,18 @@ export default function AdminProjetosPage() {
   const { isDemoMode } = useDemoMode();
   const [companyFilter, setCompanyFilter] = useState(ALL_COMPANIES_VALUE);
   const [kindFilter, setKindFilter] = useState(ALL_PROJECT_KINDS_VALUE);
+  const [businessAreaFilter, setBusinessAreaFilter] = useState(ALL_BUSINESS_AREAS_VALUE);
+  const [opportunityKindFilter, setOpportunityKindFilter] = useState(ALL_OPPORTUNITY_KINDS_VALUE);
   const [sortBy, setSortBy] = useState<SortBy>("updatedAt");
 
   const filteredProjects = [
-    ...filterProjectsByKind(filterProjectsByCompany(projects, companyFilter), kindFilter),
+    ...filterProjectsByOpportunityKind(
+      filterProjectsByBusinessArea(
+        filterProjectsByKind(filterProjectsByCompany(projects, companyFilter), kindFilter),
+        businessAreaFilter
+      ),
+      opportunityKindFilter
+    ),
   ].sort((a, b) => new Date(b[sortBy]).getTime() - new Date(a[sortBy]).getTime());
 
   const handleMoveProject = (projectId: string, newStatus: ProjectStatus) => {
@@ -181,6 +199,15 @@ export default function AdminProjetosPage() {
             projects={projects}
             value={kindFilter}
             onChange={setKindFilter}
+          />
+          <BusinessAreaFilter
+            projects={projects}
+            value={businessAreaFilter}
+            onChange={setBusinessAreaFilter}
+          />
+          <OpportunityKindFilter
+            value={opportunityKindFilter}
+            onChange={setOpportunityKindFilter}
           />
           <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortBy)}>
             <SelectTrigger className="w-48">

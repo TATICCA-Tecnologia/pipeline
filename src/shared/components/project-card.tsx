@@ -10,6 +10,7 @@ import { useAuth } from "@/shared/context/auth-context";
 import { useDemoMode } from "@/shared/context/demo-mode-context";
 import { useModal } from "@/shared/context/modal-context";
 import { ProjectExecutiveSlideModal } from "@/src/app/(private)/admin/projetos/_components/project-executive-slide.modal";
+import { isExistingAutomation } from "@/shared/lib/opportunity-classification";
 
 interface ProjectCardProps {
   project: Project;
@@ -110,20 +111,22 @@ export function ProjectCard({
 
         {/* Badges */}
         <div className="flex min-w-0 flex-col items-start gap-1">
-          {(project.hasCurrentApplication === "sim" || project.hasCurrentApplication === "nao") && (
+          {(project.hasCurrentApplication === "sim" ||
+            project.hasCurrentApplication === "nao" ||
+            project.status === "completed") && (
             <span
               className={`inline-block rounded px-1.5 py-px text-[9px] font-semibold uppercase ${
-                project.hasCurrentApplication === "sim"
+                isExistingAutomation(project)
                   ? "bg-amber-100 text-amber-800"
                   : "bg-emerald-100 text-emerald-800"
               }`}
               title={
-                project.hasCurrentApplication === "sim"
-                  ? "Já existe uma automação/aplicação hoje para este processo"
+                isExistingAutomation(project)
+                  ? "Já existe uma automação/aplicação hoje para este processo, ou o robô já foi entregue"
                   : "Processo do zero, sem automação existente hoje"
               }
             >
-              {project.hasCurrentApplication === "sim" ? "Melhoria" : "Novo"}
+              {isExistingAutomation(project) ? "Melhoria" : "Novo"}
             </span>
           )}
           {project.projectType && (
