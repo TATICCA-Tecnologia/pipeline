@@ -11,6 +11,7 @@ type SuggestionItem = RouterOutputs["taxonomy"]["listAllSuggestions"][number];
 type MainToolItem = RouterOutputs["taxonomy"]["listAllMainTools"][number];
 type ProjectKindItem = RouterOutputs["taxonomy"]["listAllProjectKinds"][number];
 type CostCategoryItem = RouterOutputs["taxonomy"]["listAllCostCategories"][number];
+type UrgencyLevelItem = RouterOutputs["taxonomy"]["listAllUrgencyLevels"][number];
 
 import { Button } from "@/src/shared/components/ui/button";
 import { Input } from "@/src/shared/components/ui/input";
@@ -56,6 +57,7 @@ import {
   Layers,
   Merge,
   Wallet,
+  Flame,
 } from "lucide-react";
 
 function slugify(text: string) {
@@ -360,8 +362,44 @@ export default function CategoriasPage() {
     }
   }
 
+  // — NÍVEIS DE URGÊNCIA —
+  const { data: urgencyLevels = [] } = trpc.taxonomy.listAllUrgencyLevels.useQuery();
+  const [urgencyLevelDialog, setUrgencyLevelDialog] = useState<{ open: boolean; editing?: { id: string; name: string; slug: string; order: number } }>({ open: false });
+  const [urgencyLevelForm, setUrgencyLevelForm] = useState({ name: "", slug: "", order: 0 });
+
+  const createUrgencyLevel = trpc.taxonomy.createUrgencyLevel.useMutation({
+    onSuccess: () => { utils.taxonomy.listAllUrgencyLevels.invalidate(); setUrgencyLevelDialog({ open: false }); toast({ title: "Nível de urgência criado" }); },
+    onError: (e: { message: string }) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
+  });
+  const updateUrgencyLevel = trpc.taxonomy.updateUrgencyLevel.useMutation({
+    onSuccess: () => { utils.taxonomy.listAllUrgencyLevels.invalidate(); setUrgencyLevelDialog({ open: false }); toast({ title: "Nível de urgência atualizado" }); },
+    onError: (e: { message: string }) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
+  });
+  const deleteUrgencyLevel = trpc.taxonomy.deleteUrgencyLevel.useMutation({
+    onSuccess: () => { utils.taxonomy.listAllUrgencyLevels.invalidate(); toast({ title: "Nível de urgência removido" }); },
+  });
+  const toggleUrgencyLevel = trpc.taxonomy.updateUrgencyLevel.useMutation({
+    onSuccess: () => utils.taxonomy.listAllUrgencyLevels.invalidate(),
+  });
+
+  function openNewUrgencyLevel() {
+    setUrgencyLevelForm({ name: "", slug: "", order: urgencyLevels.length });
+    setUrgencyLevelDialog({ open: true });
+  }
+  function openEditUrgencyLevel(level: { id: string; name: string; slug: string; order: number }) {
+    setUrgencyLevelForm({ name: level.name, slug: level.slug, order: level.order });
+    setUrgencyLevelDialog({ open: true, editing: level });
+  }
+  function submitUrgencyLevel() {
+    if (urgencyLevelDialog.editing) {
+      updateUrgencyLevel.mutate({ id: urgencyLevelDialog.editing.id, name: urgencyLevelForm.name, order: urgencyLevelForm.order });
+    } else {
+      createUrgencyLevel.mutate({ name: urgencyLevelForm.name, slug: urgencyLevelForm.slug, order: urgencyLevelForm.order });
+    }
+  }
+
   // — DELETE CONFIRM —
-  const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; type?: "area" | "theme" | "suggestion" | "mainTool" | "projectKind" | "costCategory"; id?: string; label?: string }>({ open: false });
+  const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; type?: "area" | "theme" | "suggestion" | "mainTool" | "projectKind" | "costCategory" | "urgencyLevel"; id?: string; label?: string }>({ open: false });
 
   function confirmDelete() {
     if (!deleteConfirm.id || !deleteConfirm.type) return;
@@ -371,6 +409,7 @@ export default function CategoriasPage() {
     if (deleteConfirm.type === "mainTool") deleteMainTool.mutate({ id: deleteConfirm.id });
     if (deleteConfirm.type === "projectKind") deleteProjectKind.mutate({ id: deleteConfirm.id });
     if (deleteConfirm.type === "costCategory") deleteCostCategory.mutate({ id: deleteConfirm.id });
+    if (deleteConfirm.type === "urgencyLevel") deleteUrgencyLevel.mutate({ id: deleteConfirm.id });
     setDeleteConfirm({ open: false });
   }
 
@@ -719,6 +758,56 @@ export default function CategoriasPage() {
                   </button>
                   <button
                     onClick={() => setDeleteConfirm({ open: true, type: "costCategory", id: cat.id, label: cat.name })}
+                    className="text-destructive/60 hover:text-destructive"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </button>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        )}
+      </div>
+
+      {/* Níveis de urgência */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-semibold">Níveis de Urgência</h2>
+            <p className="text-sm text-muted-foreground">
+              Opções do campo &quot;Nível de urgência&quot; na solicitação de projeto.
+            </p>
+          </div>
+          <Button size="sm" variant="outline" onClick={openNewUrgencyLevel}>
+            <Plus className="mr-2 h-4 w-4" />
+            Novo nível
+          </Button>
+        </div>
+        {urgencyLevels.length === 0 ? (
+          <Card className="flex flex-col items-center justify-center py-10 text-center">
+            <Flame className="mb-3 h-8 w-8 text-muted-foreground/50" />
+            <p className="text-sm font-medium">Nenhum nível de urgência cadastrado</p>
+          </Card>
+        ) : (
+          <Card>
+            <CardContent className="flex flex-wrap gap-2 pt-4">
+              {urgencyLevels.map((level: UrgencyLevelItem) => (
+                <div
+                  key={level.id}
+                  className={`flex items-center gap-1 rounded-md border px-2 py-1 text-xs ${!level.isActive ? "opacity-50" : ""}`}
+                >
+                  <span>{level.name}</span>
+                  <Badge variant="secondary" className="text-[10px]">{level.slug}</Badge>
+                  <Switch
+                    checked={level.isActive}
+                    onCheckedChange={(v) => toggleUrgencyLevel.mutate({ id: level.id, isActive: v })}
+                    className="scale-75"
+                  />
+                  <button onClick={() => openEditUrgencyLevel(level)} className="text-muted-foreground hover:text-foreground">
+                    <Pencil className="h-3 w-3" />
+                  </button>
+                  <button
+                    onClick={() => setDeleteConfirm({ open: true, type: "urgencyLevel", id: level.id, label: level.name })}
                     className="text-destructive/60 hover:text-destructive"
                   >
                     <Trash2 className="h-3 w-3" />
@@ -1140,6 +1229,58 @@ export default function CategoriasPage() {
             <Button variant="outline" onClick={() => setCostCategoryDialog({ open: false })}>Cancelar</Button>
             <Button onClick={submitCostCategory} disabled={!costCategoryForm.name || (!costCategoryDialog.editing && !costCategoryForm.slug)}>
               {costCategoryDialog.editing ? "Salvar" : "Criar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog: Nível de urgência */}
+      <Dialog open={urgencyLevelDialog.open} onOpenChange={(o) => setUrgencyLevelDialog({ open: o })}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{urgencyLevelDialog.editing ? "Editar nível de urgência" : "Novo nível de urgência"}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <Label>Nome</Label>
+              <Input
+                value={urgencyLevelForm.name}
+                onChange={(e) => {
+                  const name = e.target.value;
+                  setUrgencyLevelForm((f) => ({
+                    ...f,
+                    name,
+                    slug: urgencyLevelDialog.editing ? f.slug : slugify(name),
+                  }));
+                }}
+                placeholder="Ex: Crítica — hoje mesmo"
+              />
+            </div>
+            {!urgencyLevelDialog.editing && (
+              <div className="space-y-1.5">
+                <Label>Slug</Label>
+                <Input
+                  value={urgencyLevelForm.slug}
+                  onChange={(e) => setUrgencyLevelForm((f) => ({ ...f, slug: slugify(e.target.value) }))}
+                  placeholder="Ex: critica"
+                />
+                <p className="text-xs text-muted-foreground">Identificador único. Não pode ser alterado após criação.</p>
+              </div>
+            )}
+            <div className="space-y-1.5">
+              <Label>Ordem</Label>
+              <Input
+                type="number"
+                min={0}
+                value={urgencyLevelForm.order}
+                onChange={(e) => setUrgencyLevelForm((f) => ({ ...f, order: Number(e.target.value) }))}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setUrgencyLevelDialog({ open: false })}>Cancelar</Button>
+            <Button onClick={submitUrgencyLevel} disabled={!urgencyLevelForm.name || (!urgencyLevelDialog.editing && !urgencyLevelForm.slug)}>
+              {urgencyLevelDialog.editing ? "Salvar" : "Criar"}
             </Button>
           </DialogFooter>
         </DialogContent>
