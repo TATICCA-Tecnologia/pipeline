@@ -4,7 +4,6 @@ import {
   HAS_EXISTING_SYSTEM_OPTIONS,
   HAS_CURRENT_APPLICATION_OPTIONS,
   PROCESS_FREQUENCIES,
-  URGENCY_LEVELS,
   COMPLEXITY_LEVELS,
   BENEFIT_OPTIONS,
   resolveLabel,
@@ -43,7 +42,10 @@ function formatDeadline(date: Date | undefined): string {
   return `${year}-${month}-${day}`;
 }
 
-export function buildProjetoCompletoXml(project: Project): string {
+export function buildProjetoCompletoXml(
+  project: Project,
+  urgencyLevels: { value: string; label: string }[]
+): string {
   const lines: string[] = [];
   lines.push('<?xml version="1.0" encoding="UTF-8"?>');
   lines.push("<projetoCompleto>");
@@ -82,7 +84,7 @@ export function buildProjetoCompletoXml(project: Project): string {
   lines.push(tag("avaliacaoImpactoInterno", project.ratingInternalImpact));
   lines.push(tag("avaliacaoImpactoExterno", project.ratingExternalImpact));
   lines.push(tag("avaliacaoAtendimentoPoliticas", project.ratingCompliance));
-  lines.push(tag("urgencia", resolveLabel(project.urgency, URGENCY_LEVELS)));
+  lines.push(tag("urgencia", resolveLabel(project.urgency, urgencyLevels)));
   lines.push(tag("prazoLimite", formatDeadline(project.estimatedDeadline)));
   lines.push(tag("informacoesAdicionais", project.additionalInfo));
   lines.push(tag("ferramentaPrincipal", project.mainTool?.name));

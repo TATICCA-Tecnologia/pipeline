@@ -3,7 +3,6 @@ import {
   HAS_EXISTING_SYSTEM_OPTIONS,
   HAS_CURRENT_APPLICATION_OPTIONS,
   PROCESS_FREQUENCIES,
-  URGENCY_LEVELS,
   COMPLEXITY_LEVELS,
   BENEFIT_OPTIONS,
 } from "@/shared/constants/project-taxonomy";
@@ -114,7 +113,10 @@ function parseNumber(raw: string | undefined, fieldLabel: string, warnings: stri
   return n;
 }
 
-export function parseProjetoCompletoXml(xmlText: string): ParseProjetoCompletoResult {
+export function parseProjetoCompletoXml(
+  xmlText: string,
+  urgencyLevels: { value: string; label: string }[]
+): ParseProjetoCompletoResult {
   const parser = new DOMParser();
   const doc = parser.parseFromString(xmlText, "text/xml");
   if (doc.querySelector("parsererror")) {
@@ -201,7 +203,7 @@ export function parseProjetoCompletoXml(xmlText: string): ParseProjetoCompletoRe
     "Avaliação de atendimento a políticas",
     warnings
   );
-  data.urgency = resolveEnum(getDirectChildText(root, "urgencia"), URGENCY_LEVELS, "Urgência", warnings);
+  data.urgency = resolveEnum(getDirectChildText(root, "urgencia"), urgencyLevels, "Urgência", warnings);
   const rawDeadline = getDirectChildText(root, "prazoLimite");
   if (rawDeadline) {
     if (/^\d{4}-\d{2}-\d{2}$/.test(rawDeadline)) {

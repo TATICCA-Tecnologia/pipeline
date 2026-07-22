@@ -9,6 +9,10 @@ import type { Project } from "@/shared/types";
 import { buildProjetoCompletoXml } from "@/shared/xml/build-projeto-completo-xml";
 import { parseProjetoCompletoXml } from "@/shared/xml/parse-projeto-completo-xml";
 
+function toUrgencyOptions(levels: { name: string; slug: string }[]) {
+  return levels.map((l) => ({ value: l.slug, label: l.name }));
+}
+
 // new Date("YYYY-MM-DD") interpreta a string como UTC meia-noite, o que no
 // fuso do Brasil (UTC-3) cai no dia anterior — construímos a partir dos
 // componentes locais em vez de deixar o Date parsear a string diretamente
@@ -20,6 +24,7 @@ function parseLocalDateInputValue(value: string): Date {
 
 export function ProjectXmlImportExport({ project }: { project: Project }) {
   const utils = trpc.useUtils();
+  const { data: dbUrgencyLevels = [] } = trpc.taxonomy.listUrgencyLevels.useQuery();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isImporting, setIsImporting] = useState(false);
 
@@ -41,7 +46,7 @@ export function ProjectXmlImportExport({ project }: { project: Project }) {
   });
 
   function handleExport() {
-    const xml = buildProjetoCompletoXml(project);
+    const xml = buildProjetoCompletoXml(project, toUrgencyOptions(dbUrgencyLevels));
     const blob = new Blob([xml], { type: "application/xml" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -61,7 +66,7 @@ export function ProjectXmlImportExport({ project }: { project: Project }) {
     if (!file) return;
 
     const text = await file.text();
-    const parsed = parseProjetoCompletoXml(text);
+    const parsed = parseProjetoCompletoXml(text, toUrgencyOptions(dbUrgencyLevels));
     if (!parsed.ok) {
       toast.error("Não foi possível importar o XML", { description: parsed.error });
       return;
