@@ -1135,33 +1135,50 @@ export const projectRouter = router({
         .sort((a, b) => b.projectCount - a.projectCount);
     }),
 
-  // Contagem de projetos de uma empresa sem área definida (areaId null),
-  // separados em pipeline/entregues — usado pela aba "Resumo por Área" da
-  // Priorização pra avisar que esses projetos ficam fora dos dois resumos
-  // acima (que filtram areaId: { not: null }). Mesmos filtros exatos de
-  // getPrioritizedRanking/getExistingAutomationsRanking, só invertendo a
-  // condição de areaId.
+  // Contagem de projetos de uma empresa sem área/ferramenta definida,
+  // separados em pipeline/entregues — usado pela aba "Resumo por Área" (só os
+  // dois campos de área) e pela aba "Resumo Executivo" (os quatro campos) da
+  // Priorização, pra avisar que esses projetos ficam fora dos resumos
+  // correspondentes (que filtram areaId/mainToolId: { not: null }). Mesmos
+  // filtros exatos de getPrioritizedRanking/getExistingAutomationsRanking, só
+  // invertendo a condição de areaId/mainToolId.
   getAreaSummaryGaps: adminProcedure
     .input(z.object({ companyId: z.string() }))
     .query(async ({ ctx, input }) => {
-      const [pipelineWithoutArea, deliveredWithoutArea] = await Promise.all([
-        ctx.db.project.count({
-          where: {
-            companyId: input.companyId,
-            areaId: null,
-            hasCurrentApplication: { not: "sim" },
-            status: { notIn: ["DONE", "CANCELLED"] },
-          },
-        }),
-        ctx.db.project.count({
-          where: {
-            companyId: input.companyId,
-            areaId: null,
-            OR: [{ hasCurrentApplication: "sim" }, { status: "DONE" }],
-          },
-        }),
-      ]);
-      return { pipelineWithoutArea, deliveredWithoutArea };
+      const [pipelineWithoutArea, deliveredWithoutArea, pipelineWithoutTool, deliveredWithoutTool] =
+        await Promise.all([
+          ctx.db.project.count({
+            where: {
+              companyId: input.companyId,
+              areaId: null,
+              hasCurrentApplication: { not: "sim" },
+              status: { notIn: ["DONE", "CANCELLED"] },
+            },
+          }),
+          ctx.db.project.count({
+            where: {
+              companyId: input.companyId,
+              areaId: null,
+              OR: [{ hasCurrentApplication: "sim" }, { status: "DONE" }],
+            },
+          }),
+          ctx.db.project.count({
+            where: {
+              companyId: input.companyId,
+              mainToolId: null,
+              hasCurrentApplication: { not: "sim" },
+              status: { notIn: ["DONE", "CANCELLED"] },
+            },
+          }),
+          ctx.db.project.count({
+            where: {
+              companyId: input.companyId,
+              mainToolId: null,
+              OR: [{ hasCurrentApplication: "sim" }, { status: "DONE" }],
+            },
+          }),
+        ]);
+      return { pipelineWithoutArea, deliveredWithoutArea, pipelineWithoutTool, deliveredWithoutTool };
     }),
 
   updatePeopleOfInterest: protectedProcedure
