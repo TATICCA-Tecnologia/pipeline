@@ -846,6 +846,46 @@ export const projectRouter = router({
         .sort((a, b) => b.projectCount - a.projectCount);
     }),
 
+  // Agregação de projetos por ferramenta principal (contagem), mesmo padrão de
+  // getAreaSummary mas agrupado por mainToolId — usado pela aba "Resumo
+  // Executivo" da Priorização. adminProcedure pelo mesmo motivo de segurança
+  // (contagem por ferramenta é dado interno do diagnóstico).
+  getToolSummary: adminProcedure
+    .input(z.object({ companyId: z.string().optional() }))
+    .query(async ({ ctx, input }) => {
+      const grouped = await ctx.db.project.groupBy({
+        by: ["mainToolId"],
+        _count: true,
+        where: {
+          mainToolId: { not: null },
+          hasCurrentApplication: { not: "sim" },
+          status: { notIn: ["DONE", "CANCELLED"] },
+          ...(input.companyId ? { companyId: input.companyId } : {}),
+        },
+      });
+
+      const toolIds = grouped
+        .map((g) => g.mainToolId)
+        .filter((id): id is string => id != null);
+
+      const tools = await ctx.db.mainTool.findMany({
+        where: { id: { in: toolIds } },
+      });
+      const toolById = new Map(tools.map((t) => [t.id, t]));
+
+      return grouped
+        .filter((g) => g.mainToolId != null && toolById.has(g.mainToolId))
+        .map((g) => {
+          const tool = toolById.get(g.mainToolId as string)!;
+          return {
+            toolId: tool.id,
+            toolName: tool.name,
+            projectCount: g._count,
+          };
+        })
+        .sort((a, b) => b.projectCount - a.projectCount);
+    }),
+
   // Ranking priorizado dos projetos de uma empresa, reordenável por economia,
   // qualitativo ou score combinado (Passo 4 do blueprint de diagnóstico de
   // robotização). adminProcedure: expõe rating/complexidade/saving, dados
