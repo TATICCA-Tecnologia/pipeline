@@ -205,9 +205,11 @@ model Project {
   areaId           String?
   theme            ProjectTheme?             @relation(fields: [themeId], references: [id], onDelete: SetNull)
   themeId          String?
-  mainTool         MainTool?                 @relation(fields: [mainToolId], references: [id], onDelete: SetNull)
-  mainToolId       String?
-  solutionTypes    ProjectKind[]             @relation("ProjectSolutionTypes")
+  mainTool           MainTool?               @relation(fields: [mainToolId], references: [id], onDelete: SetNull)
+  mainToolId         String?
+  mainToolCategory   MainToolCategory?       @relation(fields: [mainToolCategoryId], references: [id], onDelete: SetNull)
+  mainToolCategoryId String?
+  solutionTypes      ProjectKind[]           @relation("ProjectSolutionTypes")
   features         ProjectFeature[]
   phases           ProjectPhase[]
   tasks            Task[]
@@ -524,15 +526,31 @@ model ProjectTheme {
 // TAXONOMIA CONFIGURAVEL (FERRAMENTA PRINCIPAL)
 // ==========================================
 
-model MainTool {
-  id        String    @id @default(cuid())
+model MainToolCategory {
+  id        String     @id @default(cuid())
   name      String
-  slug      String    @unique
-  isActive  Boolean   @default(true)
-  order     Int       @default(0)
+  slug      String     @unique
+  isActive  Boolean    @default(true)
+  order     Int        @default(0)
+  tools     MainTool[]
   projects  Project[]
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  @@map("main_tool_categories")
+}
+
+model MainTool {
+  id         String            @id @default(cuid())
+  name       String
+  slug       String            @unique
+  isActive   Boolean           @default(true)
+  order      Int               @default(0)
+  projects   Project[]
+  category   MainToolCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  categoryId String?
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
 
   @@map("main_tools")
 }
