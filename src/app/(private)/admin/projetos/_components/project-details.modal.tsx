@@ -17,6 +17,7 @@ import {
   AlertDialogTitle,
 } from "@/src/shared/components/ui/alert-dialog";
 import { ProjectDetailSections } from "@/shared/components/project-detail-sections";
+import { ProjectMoveStatusBox } from "@/shared/components/project-move-status-box";
 import { useAuth } from "@/shared/context/auth-context";
 import { useDemoMode } from "@/shared/context/demo-mode-context";
 import { useModal } from "@/shared/context/modal-context";
@@ -30,8 +31,8 @@ import {
   SelectValue,
 } from "@/src/shared/components/ui/select";
 import { HAS_CURRENT_APPLICATION_OPTIONS } from "@/shared/constants/project-taxonomy";
-import { ROBOT_OPERATIONAL_STATUS_CONFIG, STATUS_CONFIG } from "@/shared/types";
-import type { RobotOperationalStatus, ProjectStatus } from "@/shared/types";
+import { ROBOT_OPERATIONAL_STATUS_CONFIG } from "@/shared/types";
+import type { RobotOperationalStatus } from "@/shared/types";
 import { Input } from "@/src/shared/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/src/shared/components/ui/card";
 import { ScrollArea } from "@/src/shared/components/ui/scroll-area";
@@ -78,23 +79,7 @@ export function ProjectDetailsModal({
     { enabled: !!data?.project.id }
   );
 
-  // Mover projeto entre colunas sem arrastar — workaround enquanto o drag-and-drop
-  // do Kanban não funciona de forma confiável em todos os papéis/navegadores.
   const utils = trpc.useUtils();
-  const [pendingMoveStatus, setPendingMoveStatus] = useState<ProjectStatus | undefined>(
-    undefined
-  );
-  const moveProjectMutation = trpc.project.move.useMutation({
-    onSuccess: () => {
-      utils.project.list.invalidate();
-      if (data?.project.id) utils.project.byId.invalidate({ id: data.project.id });
-      toast.success("Projeto movido");
-      setPendingMoveStatus(undefined);
-    },
-    onError: (error) => {
-      toast.error(error.message || "Não foi possível mover o projeto.");
-    },
-  });
 
   // Correção pontual de "Aplicação existente hoje" — esse campo só era preenchido na
   // criação (XML/formulário) e não tinha nenhuma forma de corrigir depois, mesmo quando a
@@ -210,42 +195,8 @@ export function ProjectDetailsModal({
           user?.role === "developer" ||
           user?.role === "super_admin") &&
           !isLoading && (
-            <div className="mb-5 flex items-center gap-3 rounded-md border border-dashed border-border p-3">
-              <Label htmlFor="move-status" className="text-xs text-muted-foreground">
-                Mover para:
-              </Label>
-              <Select
-                value={pendingMoveStatus ?? project.status}
-                onValueChange={(v) => setPendingMoveStatus(v as ProjectStatus)}
-              >
-                <SelectTrigger id="move-status" className="h-8 w-44 text-xs">
-                  <SelectValue placeholder="Selecione" />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.entries(STATUS_CONFIG).map(([value, cfg]) => (
-                    <SelectItem key={value} value={value}>
-                      {cfg.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Button
-                size="sm"
-                className="h-8"
-                disabled={
-                  !pendingMoveStatus ||
-                  pendingMoveStatus === project.status ||
-                  moveProjectMutation.isPending
-                }
-                onClick={() =>
-                  moveProjectMutation.mutate({
-                    id: project.id,
-                    status: pendingMoveStatus as ProjectStatus,
-                  })
-                }
-              >
-                {moveProjectMutation.isPending ? "Movendo..." : "Mover"}
-              </Button>
+            <div className="mb-5">
+              <ProjectMoveStatusBox projectId={project.id} currentStatus={project.status} />
             </div>
           )}
 

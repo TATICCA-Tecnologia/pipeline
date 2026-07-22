@@ -33,6 +33,8 @@ import {
   SelectValue,
 } from "@/src/shared/components/ui/select";
 import { ArchitectureTab } from "./_components/architecture-tab";
+import { ProjectMoveStatusBox } from "@/shared/components/project-move-status-box";
+import { useAuth } from "@/shared/context/auth-context";
 import {
   ArrowLeft,
   Plus,
@@ -61,6 +63,7 @@ interface Props {
 
 export default function EspecificacaoPage({ params }: Props) {
   const { id: projectId } = use(params);
+  const { user } = useAuth();
 
   const { data: phases, refetch } = trpc.specification.getByProject.useQuery({ projectId });
   const { data: project } = trpc.project.byId.useQuery({ id: projectId });
@@ -261,6 +264,15 @@ export default function EspecificacaoPage({ params }: Props) {
                     )}
                   </div>
                 )}
+
+                {project &&
+                  (user?.role === "admin" ||
+                    user?.role === "developer" ||
+                    user?.role === "super_admin") && (
+                    <div className="pt-2">
+                      <ProjectMoveStatusBox projectId={projectId} currentStatus={project.status} />
+                    </div>
+                  )}
               </div>
             </div>
 
