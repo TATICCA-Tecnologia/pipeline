@@ -12,6 +12,7 @@ type MainToolItem = RouterOutputs["taxonomy"]["listAllMainTools"][number];
 type ProjectKindItem = RouterOutputs["taxonomy"]["listAllProjectKinds"][number];
 type CostCategoryItem = RouterOutputs["taxonomy"]["listAllCostCategories"][number];
 type UrgencyLevelItem = RouterOutputs["taxonomy"]["listAllUrgencyLevels"][number];
+type MainToolCategoryItem = RouterOutputs["taxonomy"]["listAllMainToolCategories"][number];
 
 import { Button } from "@/src/shared/components/ui/button";
 import { Input } from "@/src/shared/components/ui/input";
@@ -58,6 +59,7 @@ import {
   Merge,
   Wallet,
   Flame,
+  Boxes,
 } from "lucide-react";
 
 function slugify(text: string) {
@@ -69,6 +71,8 @@ function slugify(text: string) {
     .trim()
     .replace(/\s+/g, "-");
 }
+
+const NO_CATEGORY_VALUE = "__none__";
 
 export default function CategoriasPage() {
   const { toast } = useToast();
@@ -253,10 +257,46 @@ export default function CategoriasPage() {
     }
   }
 
+  // — CATEGORIAS DE FERRAMENTA —
+  const { data: mainToolCategories = [] } = trpc.taxonomy.listAllMainToolCategories.useQuery();
+  const [mainToolCategoryDialog, setMainToolCategoryDialog] = useState<{ open: boolean; editing?: { id: string; name: string; slug: string; order: number } }>({ open: false });
+  const [mainToolCategoryForm, setMainToolCategoryForm] = useState({ name: "", slug: "", order: 0 });
+
+  const createMainToolCategory = trpc.taxonomy.createMainToolCategory.useMutation({
+    onSuccess: () => { utils.taxonomy.listAllMainToolCategories.invalidate(); setMainToolCategoryDialog({ open: false }); toast({ title: "Categoria de ferramenta criada" }); },
+    onError: (e: { message: string }) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
+  });
+  const updateMainToolCategory = trpc.taxonomy.updateMainToolCategory.useMutation({
+    onSuccess: () => { utils.taxonomy.listAllMainToolCategories.invalidate(); setMainToolCategoryDialog({ open: false }); toast({ title: "Categoria de ferramenta atualizada" }); },
+    onError: (e: { message: string }) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
+  });
+  const deleteMainToolCategory = trpc.taxonomy.deleteMainToolCategory.useMutation({
+    onSuccess: () => { utils.taxonomy.listAllMainToolCategories.invalidate(); toast({ title: "Categoria de ferramenta removida" }); },
+  });
+  const toggleMainToolCategory = trpc.taxonomy.updateMainToolCategory.useMutation({
+    onSuccess: () => utils.taxonomy.listAllMainToolCategories.invalidate(),
+  });
+
+  function openNewMainToolCategory() {
+    setMainToolCategoryForm({ name: "", slug: "", order: mainToolCategories.length });
+    setMainToolCategoryDialog({ open: true });
+  }
+  function openEditMainToolCategory(cat: { id: string; name: string; slug: string; order: number }) {
+    setMainToolCategoryForm({ name: cat.name, slug: cat.slug, order: cat.order });
+    setMainToolCategoryDialog({ open: true, editing: cat });
+  }
+  function submitMainToolCategory() {
+    if (mainToolCategoryDialog.editing) {
+      updateMainToolCategory.mutate({ id: mainToolCategoryDialog.editing.id, name: mainToolCategoryForm.name, order: mainToolCategoryForm.order });
+    } else {
+      createMainToolCategory.mutate({ name: mainToolCategoryForm.name, slug: mainToolCategoryForm.slug, order: mainToolCategoryForm.order });
+    }
+  }
+
   // — FERRAMENTAS PRINCIPAIS —
   const { data: mainTools = [] } = trpc.taxonomy.listAllMainTools.useQuery();
-  const [mainToolDialog, setMainToolDialog] = useState<{ open: boolean; editing?: { id: string; name: string; slug: string; order: number } }>({ open: false });
-  const [mainToolForm, setMainToolForm] = useState({ name: "", slug: "", order: 0 });
+  const [mainToolDialog, setMainToolDialog] = useState<{ open: boolean; editing?: { id: string; name: string; slug: string; order: number; categoryId: string | null } }>({ open: false });
+  const [mainToolForm, setMainToolForm] = useState({ name: "", slug: "", order: 0, categoryId: "" });
 
   const createMainTool = trpc.taxonomy.createMainTool.useMutation({
     onSuccess: () => { utils.taxonomy.listAllMainTools.invalidate(); setMainToolDialog({ open: false }); toast({ title: "Ferramenta criada" }); },
@@ -274,18 +314,28 @@ export default function CategoriasPage() {
   });
 
   function openNewMainTool() {
-    setMainToolForm({ name: "", slug: "", order: mainTools.length });
+    setMainToolForm({ name: "", slug: "", order: mainTools.length, categoryId: "" });
     setMainToolDialog({ open: true });
   }
-  function openEditMainTool(tool: { id: string; name: string; slug: string; order: number }) {
-    setMainToolForm({ name: tool.name, slug: tool.slug, order: tool.order });
+  function openEditMainTool(tool: { id: string; name: string; slug: string; order: number; categoryId: string | null }) {
+    setMainToolForm({ name: tool.name, slug: tool.slug, order: tool.order, categoryId: tool.categoryId ?? "" });
     setMainToolDialog({ open: true, editing: tool });
   }
   function submitMainTool() {
     if (mainToolDialog.editing) {
-      updateMainTool.mutate({ id: mainToolDialog.editing.id, name: mainToolForm.name, order: mainToolForm.order });
+      updateMainTool.mutate({
+        id: mainToolDialog.editing.id,
+        name: mainToolForm.name,
+        order: mainToolForm.order,
+        categoryId: mainToolForm.categoryId || null,
+      });
     } else {
-      createMainTool.mutate({ name: mainToolForm.name, slug: mainToolForm.slug, order: mainToolForm.order });
+      createMainTool.mutate({
+        name: mainToolForm.name,
+        slug: mainToolForm.slug,
+        order: mainToolForm.order,
+        categoryId: mainToolForm.categoryId || null,
+      });
     }
   }
 
@@ -399,7 +449,7 @@ export default function CategoriasPage() {
   }
 
   // — DELETE CONFIRM —
-  const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; type?: "area" | "theme" | "suggestion" | "mainTool" | "projectKind" | "costCategory" | "urgencyLevel"; id?: string; label?: string }>({ open: false });
+  const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; type?: "area" | "theme" | "suggestion" | "mainTool" | "mainToolCategory" | "projectKind" | "costCategory" | "urgencyLevel"; id?: string; label?: string }>({ open: false });
 
   function confirmDelete() {
     if (!deleteConfirm.id || !deleteConfirm.type) return;
@@ -407,6 +457,7 @@ export default function CategoriasPage() {
     if (deleteConfirm.type === "theme") deleteTheme.mutate({ id: deleteConfirm.id });
     if (deleteConfirm.type === "suggestion") deleteSugg.mutate({ id: deleteConfirm.id });
     if (deleteConfirm.type === "mainTool") deleteMainTool.mutate({ id: deleteConfirm.id });
+    if (deleteConfirm.type === "mainToolCategory") deleteMainToolCategory.mutate({ id: deleteConfirm.id });
     if (deleteConfirm.type === "projectKind") deleteProjectKind.mutate({ id: deleteConfirm.id });
     if (deleteConfirm.type === "costCategory") deleteCostCategory.mutate({ id: deleteConfirm.id });
     if (deleteConfirm.type === "urgencyLevel") deleteUrgencyLevel.mutate({ id: deleteConfirm.id });
@@ -619,6 +670,57 @@ export default function CategoriasPage() {
         </div>
       )}
 
+      {/* Categorias de ferramenta */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-semibold">Categorias de Ferramenta</h2>
+            <p className="text-sm text-muted-foreground">
+              Agrupam as ferramentas principais (ex.: &quot;Motor de IA&quot; agrupa Claude, GPT...).
+              Escolher só a categoria já é suficiente na tela de Arquitetura.
+            </p>
+          </div>
+          <Button size="sm" variant="outline" onClick={openNewMainToolCategory}>
+            <Plus className="mr-2 h-4 w-4" />
+            Nova categoria
+          </Button>
+        </div>
+        {mainToolCategories.length === 0 ? (
+          <Card className="flex flex-col items-center justify-center py-10 text-center">
+            <Boxes className="mb-3 h-8 w-8 text-muted-foreground/50" />
+            <p className="text-sm font-medium">Nenhuma categoria de ferramenta cadastrada</p>
+          </Card>
+        ) : (
+          <Card>
+            <CardContent className="flex flex-wrap gap-2 pt-4">
+              {mainToolCategories.map((cat: MainToolCategoryItem) => (
+                <div
+                  key={cat.id}
+                  className={`flex items-center gap-1 rounded-md border px-2 py-1 text-xs ${!cat.isActive ? "opacity-50" : ""}`}
+                >
+                  <span>{cat.name}</span>
+                  <Badge variant="secondary" className="text-[10px]">{cat.slug}</Badge>
+                  <Switch
+                    checked={cat.isActive}
+                    onCheckedChange={(v) => toggleMainToolCategory.mutate({ id: cat.id, isActive: v })}
+                    className="scale-75"
+                  />
+                  <button onClick={() => openEditMainToolCategory(cat)} className="text-muted-foreground hover:text-foreground">
+                    <Pencil className="h-3 w-3" />
+                  </button>
+                  <button
+                    onClick={() => setDeleteConfirm({ open: true, type: "mainToolCategory", id: cat.id, label: cat.name })}
+                    className="text-destructive/60 hover:text-destructive"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </button>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        )}
+      </div>
+
       {/* Ferramentas principais */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
@@ -647,6 +749,9 @@ export default function CategoriasPage() {
                   className={`flex items-center gap-1 rounded-md border px-2 py-1 text-xs ${!tool.isActive ? "opacity-50" : ""}`}
                 >
                   <span>{tool.name}</span>
+                  {tool.category && (
+                    <Badge variant="outline" className="text-[10px]">{tool.category.name}</Badge>
+                  )}
                   <Badge variant="secondary" className="text-[10px]">{tool.slug}</Badge>
                   <Switch
                     checked={tool.isActive}
@@ -1112,6 +1217,27 @@ export default function CategoriasPage() {
               </div>
             )}
             <div className="space-y-1.5">
+              <Label>Categoria</Label>
+              <Select
+                value={mainToolForm.categoryId || NO_CATEGORY_VALUE}
+                onValueChange={(v) =>
+                  setMainToolForm((f) => ({ ...f, categoryId: v === NO_CATEGORY_VALUE ? "" : v }))
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Sem categoria" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NO_CATEGORY_VALUE}>Sem categoria</SelectItem>
+                  {mainToolCategories.map((cat: MainToolCategoryItem) => (
+                    <SelectItem key={cat.id} value={cat.id}>
+                      {cat.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
               <Label>Ordem</Label>
               <Input
                 type="number"
@@ -1125,6 +1251,58 @@ export default function CategoriasPage() {
             <Button variant="outline" onClick={() => setMainToolDialog({ open: false })}>Cancelar</Button>
             <Button onClick={submitMainTool} disabled={!mainToolForm.name || (!mainToolDialog.editing && !mainToolForm.slug)}>
               {mainToolDialog.editing ? "Salvar" : "Criar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog: Categoria de Ferramenta */}
+      <Dialog open={mainToolCategoryDialog.open} onOpenChange={(o) => setMainToolCategoryDialog({ open: o })}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{mainToolCategoryDialog.editing ? "Editar categoria de ferramenta" : "Nova categoria de ferramenta"}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <Label>Nome</Label>
+              <Input
+                value={mainToolCategoryForm.name}
+                onChange={(e) => {
+                  const name = e.target.value;
+                  setMainToolCategoryForm((f) => ({
+                    ...f,
+                    name,
+                    slug: mainToolCategoryDialog.editing ? f.slug : slugify(name),
+                  }));
+                }}
+                placeholder="Ex: Motor de IA"
+              />
+            </div>
+            {!mainToolCategoryDialog.editing && (
+              <div className="space-y-1.5">
+                <Label>Slug</Label>
+                <Input
+                  value={mainToolCategoryForm.slug}
+                  onChange={(e) => setMainToolCategoryForm((f) => ({ ...f, slug: slugify(e.target.value) }))}
+                  placeholder="Ex: motor-de-ia"
+                />
+                <p className="text-xs text-muted-foreground">Identificador único. Não pode ser alterado após criação.</p>
+              </div>
+            )}
+            <div className="space-y-1.5">
+              <Label>Ordem</Label>
+              <Input
+                type="number"
+                min={0}
+                value={mainToolCategoryForm.order}
+                onChange={(e) => setMainToolCategoryForm((f) => ({ ...f, order: Number(e.target.value) }))}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setMainToolCategoryDialog({ open: false })}>Cancelar</Button>
+            <Button onClick={submitMainToolCategory} disabled={!mainToolCategoryForm.name || (!mainToolCategoryDialog.editing && !mainToolCategoryForm.slug)}>
+              {mainToolCategoryDialog.editing ? "Salvar" : "Criar"}
             </Button>
           </DialogFooter>
         </DialogContent>
