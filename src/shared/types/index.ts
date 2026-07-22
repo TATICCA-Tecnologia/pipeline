@@ -84,11 +84,9 @@ export interface Project {
   robotSchedule?: string;
   hourlyRateBRL?: number;
   estimatedAnnualSavingBRL?: number;
-  solutionTypes?: string[];
+  solutionTypes?: { id: string; name: string; slug: string }[];
   mainTool?: { id: string; name: string; slug: string };
   mainToolId?: string;
-  projectKind?: { id: string; name: string; slug: string };
-  projectKindId?: string;
   executionStrategy?: string;
   architectNotes?: string;
   implementationEffortDays?: number;
