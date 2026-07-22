@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { trpc } from "@/shared/trpc/client";
 import type { Project, UserRole } from "@/shared/types";
@@ -18,19 +18,29 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/src/shared/components/ui/select";
+import { CreatableCombobox } from "@/src/shared/components/ui/creatable-combobox";
 import { RatingRow } from "@/shared/components/rating-row";
 import { DetailSection, FieldRow } from "@/shared/components/detail-section";
 import {
   HAS_EXISTING_SYSTEM_OPTIONS,
   HAS_CURRENT_APPLICATION_OPTIONS,
   PROCESS_FREQUENCIES,
-  URGENCY_LEVELS,
   BENEFIT_OPTIONS,
   COMPLEXITY_LEVELS,
   resolveLabel,
 } from "@/shared/constants/project-taxonomy";
 import { EXECUTION_STRATEGIES } from "@/src/app/(private)/admin/projetos/[id]/especificacao/_constants/architecture";
 import { useTaxonomy } from "@/src/app/(private)/cliente/solicitar/utils/use-taxonomy";
+
+function slugify(text: string) {
+  return text
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .replace(/[^a-z0-9\s-]/g, "")
+    .trim()
+    .replace(/\s+/g, "-");
+}
 
 function toDateInputValue(date: Date | string | undefined): string {
   if (!date) return "";
@@ -83,6 +93,7 @@ export function ProjectRequestEditForm({
 }: ProjectRequestEditFormProps) {
   const utils = trpc.useUtils();
   const { areas, themesByArea, isLoading: isTaxonomyLoading } = useTaxonomy();
+  const { data: dbUrgencyLevels = [] } = trpc.taxonomy.listUrgencyLevels.useQuery();
   const canSeeTechnical =
     viewerRole === "admin" || viewerRole === "developer" || viewerRole === "super_admin";
 
@@ -140,6 +151,22 @@ export function ProjectRequestEditForm({
   function set<K extends keyof EditFormState>(key: K, value: EditFormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
+
+  const urgencyLevelOptions = useMemo(() => {
+    const opts = dbUrgencyLevels.map((u) => ({ value: u.slug, label: u.name }));
+    if (form.urgency && !opts.some((o) => o.value === form.urgency)) {
+      opts.push({ value: form.urgency, label: form.urgency });
+    }
+    return opts;
+  }, [dbUrgencyLevels, form.urgency]);
+  const createUrgencyLevel = trpc.taxonomy.createUrgencyLevel.useMutation({
+    onSuccess: (created) => {
+      utils.taxonomy.listUrgencyLevels.invalidate();
+      set("urgency", created.slug);
+      toast.success(`Nível de urgência "${created.name}" criado`);
+    },
+    onError: (err) => toast.error("Falha ao criar nível de urgência", { description: err.message }),
+  });
 
   function toggleBenefit(key: string) {
     setForm((prev) => ({
@@ -484,18 +511,20 @@ export function ProjectRequestEditForm({
         </div>
         <div className="space-y-1.5">
           <Label>Urgência</Label>
-          <Select value={form.urgency} onValueChange={(v) => set("urgency", v)}>
-            <SelectTrigger>
-              <SelectValue placeholder="Selecione" />
-            </SelectTrigger>
-            <SelectContent>
-              {URGENCY_LEVELS.map((opt) => (
-                <SelectItem key={opt.value} value={opt.value}>
-                  {opt.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <CreatableCombobox
+            options={urgencyLevelOptions}
+            value={form.urgency}
+            onChange={(v) => set("urgency", v)}
+            onCreate={(label) =>
+              createUrgencyLevel.mutate({
+                name: label,
+                slug: slugify(label),
+                order: dbUrgencyLevels.length,
+              })
+            }
+            placeholder="Selecione ou crie"
+            disabled={createUrgencyLevel.isPending}
+          />
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="edit-estimatedDeadline">Prazo limite</Label>
