@@ -1261,14 +1261,13 @@ export const projectRouter = router({
         estimatedDeadline: z.coerce.date().optional(),
         additionalInfo: z.string().optional(),
         mainToolName: z.string().optional(),
-        projectKindName: z.string().optional(),
         peopleOfInterestNames: z.array(z.string()).optional(),
         complexity: z.string().optional(),
         robotSchedule: z.string().optional(),
         hourlyRateBRL: z.number().optional(),
         estimatedAnnualSavingBRL: z.number().optional(),
         executionStrategy: z.string().optional(),
-        solutionTypes: z.array(z.string()).optional(),
+        solutionTypeNames: z.array(z.string()).optional(),
         architectNotes: z.string().optional(),
         implementationEffortDays: z.number().int().optional(),
         implementationWave: z.number().int().optional(),
@@ -1339,7 +1338,6 @@ export const projectRouter = router({
       if (input.estimatedAnnualSavingBRL !== undefined)
         data.estimatedAnnualSavingBRL = input.estimatedAnnualSavingBRL;
       if (input.executionStrategy !== undefined) data.executionStrategy = input.executionStrategy;
-      if (input.solutionTypes !== undefined) data.solutionTypes = input.solutionTypes;
       if (input.architectNotes !== undefined) data.architectNotes = input.architectNotes;
       if (input.implementationEffortDays !== undefined)
         data.implementationEffortDays = input.implementationEffortDays;
@@ -1367,9 +1365,13 @@ export const projectRouter = router({
         const tool = await findOrCreateMainTool(ctx.db, input.mainToolName, warnings);
         if (tool) data.mainToolId = tool.id;
       }
-      if (input.projectKindName !== undefined) {
-        const kind = await findOrCreateProjectKind(ctx.db, input.projectKindName, warnings);
-        if (kind) data.projectKindId = kind.id;
+      if (input.solutionTypeNames !== undefined) {
+        const resolvedKinds = [];
+        for (const name of input.solutionTypeNames) {
+          const kind = await findOrCreateProjectKind(ctx.db, name, warnings);
+          if (kind) resolvedKinds.push(kind);
+        }
+        data.solutionTypes = { set: resolvedKinds.map((k) => ({ id: k.id })) };
       }
 
       await ctx.db.project.update({ where: { id: input.projectId }, data });
