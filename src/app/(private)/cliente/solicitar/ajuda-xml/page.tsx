@@ -6,7 +6,6 @@ import { Button } from "@/src/shared/components/ui/button";
 import {
   PLATFORMS,
   TARGET_AUDIENCES,
-  URGENCY_LEVELS,
   PROCESS_FREQUENCIES,
   HAS_EXISTING_SYSTEM_OPTIONS,
   HAS_CURRENT_APPLICATION_OPTIONS,
@@ -22,7 +21,7 @@ type TagHelp = {
 };
 
 export default function AjudaXmlPage() {
-  const { areas, themesByArea } = useTaxonomy();
+  const { areas, themesByArea, urgencyLevels } = useTaxonomy();
 
   const allThemeLabels = Object.values(themesByArea).flatMap((themes) =>
     themes.map((t) => t.label)
@@ -183,7 +182,7 @@ export default function AjudaXmlPage() {
       required: false,
       description:
         'Nível de urgência. Use exatamente um dos valores aceitos (incluindo o texto depois do travessão), sem texto adicional — o motivo da urgência vai em "Informações adicionais". Se não corresponder a nenhuma opção conhecida, é tratado como "Outro".',
-      acceptedValues: URGENCY_LEVELS.map((u) => u.label),
+      acceptedValues: urgencyLevels.map((u) => u.label),
     },
     {
       tag: "prazoLimite",
