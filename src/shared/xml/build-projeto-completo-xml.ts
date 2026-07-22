@@ -87,6 +87,7 @@ export function buildProjetoCompletoXml(
   lines.push(tag("urgencia", resolveLabel(project.urgency, urgencyLevels)));
   lines.push(tag("prazoLimite", formatDeadline(project.estimatedDeadline)));
   lines.push(tag("informacoesAdicionais", project.additionalInfo));
+  lines.push(tag("categoriaDaFerramenta", project.mainToolCategory?.name));
   lines.push(tag("ferramentaPrincipal", project.mainTool?.name));
   lines.push(
     listTag(

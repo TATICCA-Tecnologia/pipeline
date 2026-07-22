@@ -38,6 +38,7 @@ export interface ParsedProjetoCompleto {
   estimatedDeadline?: string;
   additionalInfo?: string;
   mainToolName?: string;
+  mainToolCategoryName?: string;
   peopleOfInterestNames?: string[];
   complexity?: string;
   robotSchedule?: string;
@@ -214,6 +215,7 @@ export function parseProjetoCompletoXml(
   }
   data.additionalInfo = getDirectChildText(root, "informacoesAdicionais");
   data.mainToolName = getDirectChildText(root, "ferramentaPrincipal");
+  data.mainToolCategoryName = getDirectChildText(root, "categoriaDaFerramenta");
   data.peopleOfInterestNames = getListItems(root, "pessoasDeInteresse", "pessoa");
   data.complexity = resolveEnum(
     getDirectChildText(root, "complexidade"),
