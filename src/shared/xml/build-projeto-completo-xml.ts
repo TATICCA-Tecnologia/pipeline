@@ -9,10 +9,7 @@ import {
   BENEFIT_OPTIONS,
   resolveLabel,
 } from "@/shared/constants/project-taxonomy";
-import {
-  SOLUTION_TYPES,
-  EXECUTION_STRATEGIES,
-} from "@/src/app/(private)/admin/projetos/[id]/especificacao/_constants/architecture";
+import { EXECUTION_STRATEGIES } from "@/src/app/(private)/admin/projetos/[id]/especificacao/_constants/architecture";
 
 function escapeXml(value: string): string {
   return value
@@ -89,7 +86,6 @@ export function buildProjetoCompletoXml(project: Project): string {
   lines.push(tag("prazoLimite", formatDeadline(project.estimatedDeadline)));
   lines.push(tag("informacoesAdicionais", project.additionalInfo));
   lines.push(tag("ferramentaPrincipal", project.mainTool?.name));
-  lines.push(tag("tipoDeProjeto", project.projectKind?.name));
   lines.push(
     listTag(
       "pessoasDeInteresse",
@@ -108,7 +104,7 @@ export function buildProjetoCompletoXml(project: Project): string {
     listTag(
       "tiposDeSolucao",
       "tipo",
-      (project.solutionTypes ?? []).map((v) => resolveLabel(v, SOLUTION_TYPES) ?? v)
+      (project.solutionTypes ?? []).map((k) => k.name)
     )
   );
   lines.push(tag("notasDoArquiteto", project.architectNotes));

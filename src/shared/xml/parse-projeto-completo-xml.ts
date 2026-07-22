@@ -7,10 +7,7 @@ import {
   COMPLEXITY_LEVELS,
   BENEFIT_OPTIONS,
 } from "@/shared/constants/project-taxonomy";
-import {
-  SOLUTION_TYPES,
-  EXECUTION_STRATEGIES,
-} from "@/src/app/(private)/admin/projetos/[id]/especificacao/_constants/architecture";
+import { EXECUTION_STRATEGIES } from "@/src/app/(private)/admin/projetos/[id]/especificacao/_constants/architecture";
 
 export interface ParsedProjetoCompleto {
   projetoId?: string;
@@ -42,14 +39,13 @@ export interface ParsedProjetoCompleto {
   estimatedDeadline?: string;
   additionalInfo?: string;
   mainToolName?: string;
-  projectKindName?: string;
   peopleOfInterestNames?: string[];
   complexity?: string;
   robotSchedule?: string;
   hourlyRateBRL?: number;
   estimatedAnnualSavingBRL?: number;
   executionStrategy?: string;
-  solutionTypes?: string[];
+  solutionTypeNames?: string[];
   architectNotes?: string;
   implementationEffortDays?: number;
   implementationWave?: number;
@@ -216,7 +212,6 @@ export function parseProjetoCompletoXml(xmlText: string): ParseProjetoCompletoRe
   }
   data.additionalInfo = getDirectChildText(root, "informacoesAdicionais");
   data.mainToolName = getDirectChildText(root, "ferramentaPrincipal");
-  data.projectKindName = getDirectChildText(root, "tipoDeProjeto");
   data.peopleOfInterestNames = getListItems(root, "pessoasDeInteresse", "pessoa");
   data.complexity = resolveEnum(
     getDirectChildText(root, "complexidade"),
@@ -237,8 +232,14 @@ export function parseProjetoCompletoXml(xmlText: string): ParseProjetoCompletoRe
     "Estratégia de execução",
     warnings
   );
-  const rawSolutionTypes = getListItems(root, "tiposDeSolucao", "tipo");
-  data.solutionTypes = rawSolutionTypes?.map((label) => matchValueByLabel(label, SOLUTION_TYPES) ?? label);
+  const rawSolutionTypes = getListItems(root, "tiposDeSolucao", "tipo") ?? [];
+  // Compatibilidade com XMLs exportados antes desta mudança, que ainda podem
+  // ter a tag antiga <tipoDeProjeto> (um valor único) em vez da lista.
+  const legacyProjectKindName = getDirectChildText(root, "tipoDeProjeto");
+  data.solutionTypeNames =
+    rawSolutionTypes.length > 0 || legacyProjectKindName
+      ? [...rawSolutionTypes, ...(legacyProjectKindName ? [legacyProjectKindName] : [])]
+      : undefined;
   data.architectNotes = getDirectChildText(root, "notasDoArquiteto");
   data.implementationEffortDays = parseNumber(
     getDirectChildText(root, "esforcoDeImplementacaoDias"),
