@@ -58,7 +58,6 @@ import {
 import {
   PLATFORMS,
   TARGET_AUDIENCES,
-  URGENCY_LEVELS,
   DEFAULT_PLATFORM_VALUE,
   PROCESS_FREQUENCIES,
   PROCESS_FREQUENCY_MULTIPLIERS,
@@ -174,7 +173,7 @@ const STEPS: StepDef[] = [
     key: "prazo",
     label: "Prazo",
     description: "Quando você precisa pronto",
-    fieldsToValidate: ["urgency", "customUrgency", "deadline", "additionalInfo"],
+    fieldsToValidate: ["urgency", "deadline", "additionalInfo"],
   },
 ];
 
@@ -204,6 +203,7 @@ export default function SolicitarProjetoPage() {
     areas: PROJECT_AREAS,
     themesByArea: PROJECT_THEMES_BY_AREA,
     suggestionGroups: FEATURE_SUGGESTION_GROUPS,
+    urgencyLevels: URGENCY_LEVELS,
     buildTypeLabel: buildClienteProjectTypeLabel,
   } = useTaxonomy();
 
@@ -240,7 +240,6 @@ export default function SolicitarProjetoPage() {
       ratingCompliance: null,
       projectNarrative: "",
       urgency: "",
-      customUrgency: "",
       deadline: "",
       additionalInfo: "",
     },
@@ -264,7 +263,6 @@ export default function SolicitarProjetoPage() {
   const hasCurrentApplication = watch("hasCurrentApplication");
   const taskDurationHours = watch("taskDurationHours");
   const processFrequency = watch("processFrequency");
-  const urgency = watch("urgency");
 
   const previewAnnualHours = useMemo(() => {
     const duration = Number(taskDurationHours);
@@ -294,6 +292,7 @@ export default function SolicitarProjetoPage() {
     userId: user?.id,
     areas: PROJECT_AREAS,
     themesByArea: PROJECT_THEMES_BY_AREA,
+    urgencyLevels: URGENCY_LEVELS,
     companies: companyOptions,
     buildTypeLabel: buildClienteProjectTypeLabel,
   });
@@ -1406,45 +1405,24 @@ export default function SolicitarProjetoPage() {
                 <div className="grid gap-5 sm:grid-cols-2">
                   <div className="space-y-2">
                     <Label htmlFor="urgency">Nível de urgência</Label>
-                    <div className="flex gap-2">
-                      <Controller
-                        control={control}
-                        name="urgency"
-                        render={({ field }) => (
-                          <Select
-                            value={field.value}
-                            onValueChange={(value) => {
-                              field.onChange(value);
-                              if (value !== "outro") setValue("customUrgency", "");
-                            }}
-                          >
-                            <SelectTrigger
-                              className={urgency === "outro" ? "w-32 shrink-0" : "w-full"}
-                            >
-                              <SelectValue placeholder="Selecione" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {URGENCY_LEVELS.map((level) => (
-                                <SelectItem key={level.value} value={level.value}>
-                                  {level.label}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        )}
-                      />
-                      {urgency === "outro" && (
-                        <Input
-                          id="customUrgency"
-                          {...register("customUrgency")}
-                          placeholder="Qual urgência?"
-                          className="flex-1"
-                        />
+                    <Controller
+                      control={control}
+                      name="urgency"
+                      render={({ field }) => (
+                        <Select value={field.value} onValueChange={field.onChange}>
+                          <SelectTrigger className="w-full">
+                            <SelectValue placeholder="Selecione" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {URGENCY_LEVELS.map((level) => (
+                              <SelectItem key={level.value} value={level.value}>
+                                {level.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       )}
-                    </div>
-                    {errors.customUrgency && (
-                      <p className="text-xs text-destructive">{errors.customUrgency.message}</p>
-                    )}
+                    />
                   </div>
 
                   <div className="space-y-2">
