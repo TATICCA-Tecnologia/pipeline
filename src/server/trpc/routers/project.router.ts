@@ -1097,6 +1097,44 @@ export const projectRouter = router({
         .sort((a, b) => b.projectCount - a.projectCount);
     }),
 
+  // Resumo por ferramenta das automações já existentes/entregues — mesmo
+  // padrão de getToolSummary, com o filtro invertido (igual
+  // getExistingAutomationsAreaSummary faz para área).
+  getExistingAutomationsToolSummary: adminProcedure
+    .input(z.object({ companyId: z.string().optional() }))
+    .query(async ({ ctx, input }) => {
+      const grouped = await ctx.db.project.groupBy({
+        by: ["mainToolId"],
+        _count: true,
+        where: {
+          mainToolId: { not: null },
+          OR: [{ hasCurrentApplication: "sim" }, { status: "DONE" }],
+          ...(input.companyId ? { companyId: input.companyId } : {}),
+        },
+      });
+
+      const toolIds = grouped
+        .map((g) => g.mainToolId)
+        .filter((id): id is string => id != null);
+
+      const tools = await ctx.db.mainTool.findMany({
+        where: { id: { in: toolIds } },
+      });
+      const toolById = new Map(tools.map((t) => [t.id, t]));
+
+      return grouped
+        .filter((g) => g.mainToolId != null && toolById.has(g.mainToolId))
+        .map((g) => {
+          const tool = toolById.get(g.mainToolId as string)!;
+          return {
+            toolId: tool.id,
+            toolName: tool.name,
+            projectCount: g._count,
+          };
+        })
+        .sort((a, b) => b.projectCount - a.projectCount);
+    }),
+
   // Contagem de projetos de uma empresa sem área definida (areaId null),
   // separados em pipeline/entregues — usado pela aba "Resumo por Área" da
   // Priorização pra avisar que esses projetos ficam fora dos dois resumos
