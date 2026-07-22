@@ -7,6 +7,7 @@ import {
   findOrCreateProjectArea,
   findOrCreateProjectTheme,
   findOrCreateMainTool,
+  findOrCreateMainToolCategory,
   findOrCreateProjectKind,
 } from "./project-import-xml-helpers";
 import type { FrontendProjectStatus } from "../mappers";
@@ -1267,6 +1268,7 @@ export const projectRouter = router({
         estimatedDeadline: z.coerce.date().optional(),
         additionalInfo: z.string().optional(),
         mainToolName: z.string().optional(),
+        mainToolCategoryName: z.string().optional(),
         peopleOfInterestNames: z.array(z.string()).optional(),
         complexity: z.string().optional(),
         robotSchedule: z.string().optional(),
@@ -1370,6 +1372,10 @@ export const projectRouter = router({
       if (input.mainToolName !== undefined) {
         const tool = await findOrCreateMainTool(ctx.db, input.mainToolName, warnings);
         if (tool) data.mainToolId = tool.id;
+      }
+      if (input.mainToolCategoryName !== undefined) {
+        const category = await findOrCreateMainToolCategory(ctx.db, input.mainToolCategoryName, warnings);
+        if (category) data.mainToolCategoryId = category.id;
       }
       if (input.solutionTypeNames !== undefined) {
         const resolvedKinds = [];
