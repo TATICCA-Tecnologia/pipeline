@@ -87,6 +87,8 @@ export interface Project {
   solutionTypes?: { id: string; name: string; slug: string }[];
   mainTool?: { id: string; name: string; slug: string };
   mainToolId?: string;
+  mainToolCategory?: { id: string; name: string; slug: string };
+  mainToolCategoryId?: string;
   executionStrategy?: string;
   architectNotes?: string;
   implementationEffortDays?: number;
