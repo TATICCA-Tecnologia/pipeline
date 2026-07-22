@@ -55,14 +55,39 @@ export function ArchitectureTab({ projectId }: ArchitectureTabProps) {
     onError: (err) => toast.error("Falha ao salvar", { description: err.message }),
   });
 
+  const [mainToolCategoryId, setMainToolCategoryId] = useState<string>("");
+
+  const { data: mainToolCategories = [] } = trpc.taxonomy.listMainToolCategories.useQuery();
+  const mainToolCategoryOptions = useMemo(() => {
+    const opts = mainToolCategories.map((c) => ({ value: c.id, label: c.name }));
+    if (
+      project?.mainToolCategory &&
+      !opts.some((o) => o.value === project.mainToolCategory!.id)
+    ) {
+      opts.push({ value: project.mainToolCategory.id, label: project.mainToolCategory.name });
+    }
+    return opts;
+  }, [mainToolCategories, project?.mainToolCategory]);
+  const createMainToolCategory = trpc.taxonomy.createMainToolCategory.useMutation({
+    onSuccess: (created) => {
+      utils.taxonomy.listMainToolCategories.invalidate();
+      setMainToolCategoryId(created.id);
+      toast.success(`Categoria de ferramenta "${created.name}" criada`);
+    },
+    onError: (err) => toast.error("Falha ao criar categoria de ferramenta", { description: err.message }),
+  });
+
   const { data: mainTools = [] } = trpc.taxonomy.listMainTools.useQuery();
   const mainToolOptions = useMemo(() => {
-    const opts = mainTools.map((t) => ({ value: t.id, label: t.name }));
+    const filtered = mainTools.filter(
+      (t) => !mainToolCategoryId || t.categoryId === mainToolCategoryId
+    );
+    const opts = filtered.map((t) => ({ value: t.id, label: t.name }));
     if (project?.mainTool && !opts.some((o) => o.value === project.mainTool!.id)) {
       opts.push({ value: project.mainTool.id, label: project.mainTool.name });
     }
     return opts;
-  }, [mainTools, project?.mainTool]);
+  }, [mainTools, mainToolCategoryId, project?.mainTool]);
   const createMainTool = trpc.taxonomy.createMainTool.useMutation({
     onSuccess: (created) => {
       utils.taxonomy.listMainTools.invalidate();
@@ -126,6 +151,7 @@ export function ArchitectureTab({ projectId }: ArchitectureTabProps) {
   useEffect(() => {
     if (project) {
       setSolutionTypeIds((project.solutionTypes ?? []).map((k) => k.id));
+      setMainToolCategoryId(project.mainToolCategory?.id ?? "");
       setMainToolId(project.mainTool?.id ?? "");
       setExecutionStrategy(project.executionStrategy ?? "");
       setArchitectNotes(project.architectNotes ?? "");
@@ -200,6 +226,7 @@ export function ArchitectureTab({ projectId }: ArchitectureTabProps) {
     updateProject.mutate({
       id: projectId,
       solutionTypeIds,
+      mainToolCategoryId: mainToolCategoryId || null,
       mainToolId: mainToolId || null,
       executionStrategy: executionStrategy || null,
       architectNotes: architectNotes || null,
@@ -277,9 +304,39 @@ export function ArchitectureTab({ projectId }: ArchitectureTabProps) {
             </div>
           </div>
 
-          <div className="grid gap-5 sm:grid-cols-2">
+          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
             <div className="space-y-2">
-              <Label>Ferramenta principal</Label>
+              <Label>Categoria de ferramenta</Label>
+              <p className="text-xs text-muted-foreground">
+                Ex.: &quot;Motor de IA&quot; — já basta escolher a categoria.
+              </p>
+              <CreatableCombobox
+                options={mainToolCategoryOptions}
+                value={mainToolCategoryId}
+                onChange={(v) => {
+                  setMainToolCategoryId(v);
+                  const stillValid = mainTools.some(
+                    (t) => t.id === mainToolId && t.categoryId === v
+                  );
+                  if (mainToolId && !stillValid) setMainToolId("");
+                }}
+                onCreate={(label) =>
+                  createMainToolCategory.mutate({
+                    name: label,
+                    slug: slugify(label),
+                    order: mainToolCategories.length,
+                  })
+                }
+                placeholder="Selecione ou crie"
+                disabled={createMainToolCategory.isPending}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Produto (opcional)</Label>
+              <p className="text-xs text-muted-foreground">
+                Ex.: &quot;Claude&quot; dentro de Motor de IA — só se souber o produto exato.
+              </p>
               <CreatableCombobox
                 options={mainToolOptions}
                 value={mainToolId}
@@ -289,9 +346,10 @@ export function ArchitectureTab({ projectId }: ArchitectureTabProps) {
                     name: label,
                     slug: slugify(label),
                     order: mainTools.length,
+                    categoryId: mainToolCategoryId || null,
                   })
                 }
-                placeholder="Selecione ou crie"
+                placeholder="Selecione ou crie (opcional)"
                 disabled={createMainTool.isPending}
               />
             </div>
@@ -436,7 +494,9 @@ export function ArchitectureTab({ projectId }: ArchitectureTabProps) {
           <div className="flex justify-end pt-2">
             <Button
               onClick={handleSaveArchitecture}
-              disabled={updateProject.isPending || createMainTool.isPending}
+              disabled={
+                updateProject.isPending || createMainTool.isPending || createMainToolCategory.isPending
+              }
             >
               {updateProject.isPending ? (
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
