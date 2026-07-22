@@ -23,45 +23,40 @@ import {
 } from "@/src/shared/components/ui/table";
 import { formatCurrency, formatCompactBRL } from "@/shared/utils";
 
-type ExistingAutomationsAreaSummaryTooltipPayload = {
-  payload: {
-    areaName: string;
-    totalAccumulatedSavingBRL: number;
-  };
+type TotalAreaRow = {
+  areaId: string;
+  areaName: string;
+  projectCount: number;
+  totalSavingBRL: number;
 };
 
-function ExistingAutomationsAreaSummaryTooltip({
+type TotalAreaSummaryTooltipPayload = {
+  payload: TotalAreaRow;
+};
+
+function TotalAreaSummaryTooltip({
   active,
   payload,
 }: {
   active?: boolean;
-  payload?: ExistingAutomationsAreaSummaryTooltipPayload[];
+  payload?: TotalAreaSummaryTooltipPayload[];
 }) {
   if (!active || !payload?.length) return null;
   const item = payload[0].payload;
   return (
     <div className="rounded-lg border border-border/50 bg-background px-3 py-2 text-xs shadow-xl">
       <p className="font-medium text-foreground">{item.areaName}</p>
-      <p className="text-muted-foreground">
-        {formatCurrency(item.totalAccumulatedSavingBRL)}
-      </p>
+      <p className="text-muted-foreground">{formatCurrency(item.totalSavingBRL)}</p>
     </div>
   );
 }
 
-type ExistingAutomationsCountTooltipPayload = {
-  payload: {
-    areaName: string;
-    projectCount: number;
-  };
-};
-
-function ExistingAutomationsCountTooltip({
+function TotalAreaCountTooltip({
   active,
   payload,
 }: {
   active?: boolean;
-  payload?: ExistingAutomationsCountTooltipPayload[];
+  payload?: TotalAreaSummaryTooltipPayload[];
 }) {
   if (!active || !payload?.length) return null;
   const item = payload[0].payload;
@@ -75,35 +70,68 @@ function ExistingAutomationsCountTooltip({
   );
 }
 
-export function ExistingAutomationsAreaSummaryChart({ companyId }: { companyId?: string }) {
-  const { data, isLoading } = trpc.project.getExistingAutomationsAreaSummary.useQuery({
-    companyId,
-  });
+// Junta getAreaSummary (oportunidades em pipeline) com getExistingAutomationsAreaSummary
+// (automações já entregues) por área — os dois conjuntos são mutuamente exclusivos
+// (mesmo particionamento usado nos dois cards acima), então somar os dois dá o total real
+// de cada área, sem contar nada em dobro.
+export function TotalAreaSummaryChart({ companyId }: { companyId?: string }) {
+  const { data: opportunities, isLoading: isLoadingOpportunities } =
+    trpc.project.getAreaSummary.useQuery({ companyId });
+  const { data: existing, isLoading: isLoadingExisting } =
+    trpc.project.getExistingAutomationsAreaSummary.useQuery({ companyId });
 
-  const dataBySaving = data
-    ? [...data].sort((a, b) => b.totalAccumulatedSavingBRL - a.totalAccumulatedSavingBRL)
-    : undefined;
-  const dataByCount = data
-    ? [...data].sort((a, b) => b.projectCount - a.projectCount)
-    : undefined;
+  const isLoading = isLoadingOpportunities || isLoadingExisting;
+
+  const data: TotalAreaRow[] | undefined =
+    opportunities && existing
+      ? (() => {
+          const byArea = new Map<string, TotalAreaRow>();
+          for (const row of opportunities) {
+            byArea.set(row.areaId, {
+              areaId: row.areaId,
+              areaName: row.areaName,
+              projectCount: row.projectCount,
+              totalSavingBRL: row.totalEstimatedSavingBRL,
+            });
+          }
+          for (const row of existing) {
+            const current = byArea.get(row.areaId);
+            if (current) {
+              current.projectCount += row.projectCount;
+              current.totalSavingBRL += row.totalAccumulatedSavingBRL;
+            } else {
+              byArea.set(row.areaId, {
+                areaId: row.areaId,
+                areaName: row.areaName,
+                projectCount: row.projectCount,
+                totalSavingBRL: row.totalAccumulatedSavingBRL,
+              });
+            }
+          }
+          return Array.from(byArea.values());
+        })()
+      : undefined;
+
+  const dataBySaving = data ? [...data].sort((a, b) => b.totalSavingBRL - a.totalSavingBRL) : undefined;
+  const dataByCount = data ? [...data].sort((a, b) => b.projectCount - a.projectCount) : undefined;
 
   const totals = data?.reduce(
     (acc, row) => ({
       projectCount: acc.projectCount + row.projectCount,
-      totalAccumulatedSavingBRL: acc.totalAccumulatedSavingBRL + row.totalAccumulatedSavingBRL,
+      totalSavingBRL: acc.totalSavingBRL + row.totalSavingBRL,
     }),
-    { projectCount: 0, totalAccumulatedSavingBRL: 0 }
+    { projectCount: 0, totalSavingBRL: 0 }
   );
 
   return (
     <Card
       className="bg-card animate-fade-up"
-      style={{ animationDelay: "420ms", animationFillMode: "both" }}
+      style={{ animationDelay: "480ms", animationFillMode: "both" }}
     >
       <CardHeader className="pb-2">
         <CardTitle className="text-base flex items-center gap-2">
           <Layers className="h-4 w-4 text-primary" />
-          Resumo por área — automações existentes
+          Resumo por área — total (oportunidades + existentes)
         </CardTitle>
       </CardHeader>
       <CardContent className="pt-0">
@@ -113,7 +141,7 @@ export function ExistingAutomationsAreaSummaryChart({ companyId }: { companyId?:
 
         {!isLoading && (!data || data.length === 0) && (
           <p className="text-sm text-muted-foreground py-6 text-center">
-            Nenhuma automação existente com área definida ainda.
+            Nenhum projeto com área definida ainda.
           </p>
         )}
 
@@ -122,7 +150,7 @@ export function ExistingAutomationsAreaSummaryChart({ companyId }: { companyId?:
             <div className="grid gap-6 lg:grid-cols-2">
               <div>
                 <p className="mb-2 text-xs font-medium text-muted-foreground">
-                  Economia acumulada
+                  Saving total
                 </p>
                 <div
                   className="w-full"
@@ -155,11 +183,11 @@ export function ExistingAutomationsAreaSummaryChart({ companyId }: { companyId?:
                         tickLine={false}
                       />
                       <Tooltip
-                        content={<ExistingAutomationsAreaSummaryTooltip />}
+                        content={<TotalAreaSummaryTooltip />}
                         cursor={{ fill: "var(--color-muted)", opacity: 0.4 }}
                       />
                       <Bar
-                        dataKey="totalAccumulatedSavingBRL"
+                        dataKey="totalSavingBRL"
                         fill="var(--color-chart-1)"
                         radius={[0, 4, 4, 0]}
                         barSize={18}
@@ -204,7 +232,7 @@ export function ExistingAutomationsAreaSummaryChart({ companyId }: { companyId?:
                         tickLine={false}
                       />
                       <Tooltip
-                        content={<ExistingAutomationsCountTooltip />}
+                        content={<TotalAreaCountTooltip />}
                         cursor={{ fill: "var(--color-muted)", opacity: 0.4 }}
                       />
                       <Bar
@@ -224,8 +252,8 @@ export function ExistingAutomationsAreaSummaryChart({ companyId }: { companyId?:
                 <TableHeader>
                   <TableRow>
                     <TableHead>Área</TableHead>
-                    <TableHead className="text-right">Automações</TableHead>
-                    <TableHead className="text-right">Economia acumulada</TableHead>
+                    <TableHead className="text-right">Projetos</TableHead>
+                    <TableHead className="text-right">Saving total</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -236,7 +264,7 @@ export function ExistingAutomationsAreaSummaryChart({ companyId }: { companyId?:
                         {row.projectCount}
                       </TableCell>
                       <TableCell className="text-right tabular-nums">
-                        {formatCurrency(row.totalAccumulatedSavingBRL)}
+                        {formatCurrency(row.totalSavingBRL)}
                       </TableCell>
                     </TableRow>
                   ))}
@@ -249,7 +277,7 @@ export function ExistingAutomationsAreaSummaryChart({ companyId }: { companyId?:
                         {totals.projectCount}
                       </TableCell>
                       <TableCell className="text-right font-semibold tabular-nums">
-                        {formatCurrency(totals.totalAccumulatedSavingBRL)}
+                        {formatCurrency(totals.totalSavingBRL)}
                       </TableCell>
                     </TableRow>
                   </TableFooter>

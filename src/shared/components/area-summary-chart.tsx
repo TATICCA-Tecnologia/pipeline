@@ -53,8 +53,41 @@ function AreaSummaryTooltip({
   );
 }
 
+type AreaCountTooltipPayload = {
+  payload: {
+    areaName: string;
+    projectCount: number;
+  };
+};
+
+function AreaCountTooltip({
+  active,
+  payload,
+}: {
+  active?: boolean;
+  payload?: AreaCountTooltipPayload[];
+}) {
+  if (!active || !payload?.length) return null;
+  const item = payload[0].payload;
+  return (
+    <div className="rounded-lg border border-border/50 bg-background px-3 py-2 text-xs shadow-xl">
+      <p className="font-medium text-foreground">{item.areaName}</p>
+      <p className="text-muted-foreground">
+        {item.projectCount} automaç{item.projectCount !== 1 ? "ões" : "ão"}
+      </p>
+    </div>
+  );
+}
+
 export function AreaSummaryChart({ companyId }: { companyId?: string }) {
   const { data, isLoading } = trpc.project.getAreaSummary.useQuery({ companyId });
+
+  const dataBySaving = data
+    ? [...data].sort((a, b) => b.totalEstimatedSavingBRL - a.totalEstimatedSavingBRL)
+    : undefined;
+  const dataByCount = data
+    ? [...data].sort((a, b) => b.projectCount - a.projectCount)
+    : undefined;
 
   const totals = data?.reduce(
     (acc, row) => ({
@@ -73,7 +106,7 @@ export function AreaSummaryChart({ companyId }: { companyId?: string }) {
       <CardHeader className="pb-2">
         <CardTitle className="text-base flex items-center gap-2">
           <Layers className="h-4 w-4 text-primary" />
-          Resumo por área
+          Resumo por área — oportunidades
         </CardTitle>
       </CardHeader>
       <CardContent className="pt-0">
@@ -87,47 +120,106 @@ export function AreaSummaryChart({ companyId }: { companyId?: string }) {
           </p>
         )}
 
-        {!isLoading && data && data.length > 0 && (
-          <div className="grid gap-6 lg:grid-cols-2">
-            <div className="w-full" style={{ height: Math.max(256, data.length * 36 + 40) }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart
-                  data={data}
-                  layout="vertical"
-                  margin={{ top: 4, right: 16, bottom: 4, left: 4 }}
+        {!isLoading && dataBySaving && dataByCount && dataBySaving.length > 0 && (
+          <div className="space-y-6">
+            <div className="grid gap-6 lg:grid-cols-2">
+              <div>
+                <p className="mb-2 text-xs font-medium text-muted-foreground">
+                  Saving anual
+                </p>
+                <div
+                  className="w-full"
+                  style={{ height: Math.max(256, dataBySaving.length * 36 + 40) }}
                 >
-                  <CartesianGrid
-                    horizontal={false}
-                    stroke="var(--color-border)"
-                    strokeOpacity={0.5}
-                  />
-                  <XAxis
-                    type="number"
-                    tickFormatter={(value: number) => formatCompactBRL(value)}
-                    tick={{ fontSize: 11, fill: "var(--color-muted-foreground)" }}
-                    axisLine={false}
-                    tickLine={false}
-                  />
-                  <YAxis
-                    type="category"
-                    dataKey="areaName"
-                    width={110}
-                    tick={{ fontSize: 11, fill: "var(--color-muted-foreground)" }}
-                    axisLine={false}
-                    tickLine={false}
-                  />
-                  <Tooltip
-                    content={<AreaSummaryTooltip />}
-                    cursor={{ fill: "var(--color-muted)", opacity: 0.4 }}
-                  />
-                  <Bar
-                    dataKey="totalEstimatedSavingBRL"
-                    fill="var(--color-chart-1)"
-                    radius={[0, 4, 4, 0]}
-                    barSize={18}
-                  />
-                </BarChart>
-              </ResponsiveContainer>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={dataBySaving}
+                      layout="vertical"
+                      margin={{ top: 4, right: 16, bottom: 4, left: 4 }}
+                    >
+                      <CartesianGrid
+                        horizontal={false}
+                        stroke="var(--color-border)"
+                        strokeOpacity={0.5}
+                      />
+                      <XAxis
+                        type="number"
+                        tickFormatter={(value: number) => formatCompactBRL(value)}
+                        tick={{ fontSize: 11, fill: "var(--color-muted-foreground)" }}
+                        axisLine={false}
+                        tickLine={false}
+                      />
+                      <YAxis
+                        type="category"
+                        dataKey="areaName"
+                        width={110}
+                        tick={{ fontSize: 11, fill: "var(--color-muted-foreground)" }}
+                        axisLine={false}
+                        tickLine={false}
+                      />
+                      <Tooltip
+                        content={<AreaSummaryTooltip />}
+                        cursor={{ fill: "var(--color-muted)", opacity: 0.4 }}
+                      />
+                      <Bar
+                        dataKey="totalEstimatedSavingBRL"
+                        fill="var(--color-chart-1)"
+                        radius={[0, 4, 4, 0]}
+                        barSize={18}
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              <div>
+                <p className="mb-2 text-xs font-medium text-muted-foreground">
+                  Quantidade de automações
+                </p>
+                <div
+                  className="w-full"
+                  style={{ height: Math.max(256, dataByCount.length * 36 + 40) }}
+                >
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={dataByCount}
+                      layout="vertical"
+                      margin={{ top: 4, right: 16, bottom: 4, left: 4 }}
+                    >
+                      <CartesianGrid
+                        horizontal={false}
+                        stroke="var(--color-border)"
+                        strokeOpacity={0.5}
+                      />
+                      <XAxis
+                        type="number"
+                        allowDecimals={false}
+                        tick={{ fontSize: 11, fill: "var(--color-muted-foreground)" }}
+                        axisLine={false}
+                        tickLine={false}
+                      />
+                      <YAxis
+                        type="category"
+                        dataKey="areaName"
+                        width={110}
+                        tick={{ fontSize: 11, fill: "var(--color-muted-foreground)" }}
+                        axisLine={false}
+                        tickLine={false}
+                      />
+                      <Tooltip
+                        content={<AreaCountTooltip />}
+                        cursor={{ fill: "var(--color-muted)", opacity: 0.4 }}
+                      />
+                      <Bar
+                        dataKey="projectCount"
+                        fill="var(--color-chart-2)"
+                        radius={[0, 4, 4, 0]}
+                        barSize={18}
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
             </div>
 
             <div className="overflow-x-auto">
@@ -141,7 +233,7 @@ export function AreaSummaryChart({ companyId }: { companyId?: string }) {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {data.map((row) => (
+                  {dataBySaving.map((row) => (
                     <TableRow key={row.areaId}>
                       <TableCell className="font-medium">{row.areaName}</TableCell>
                       <TableCell className="text-right tabular-nums">

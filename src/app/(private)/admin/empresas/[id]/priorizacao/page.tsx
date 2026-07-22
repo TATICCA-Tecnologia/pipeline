@@ -58,6 +58,7 @@ import { WaveTimeline } from "@/src/shared/components/wave-timeline";
 import { PaybackChart } from "@/src/shared/components/payback-chart";
 import { AreaSummaryChart } from "@/src/shared/components/area-summary-chart";
 import { ExistingAutomationsAreaSummaryChart } from "@/src/shared/components/existing-automations-area-summary-chart";
+import { TotalAreaSummaryChart } from "@/src/shared/components/total-area-summary-chart";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -801,6 +802,7 @@ export default function PriorizacaoPage({ params }: Props) {
         <TabsContent value="resumo-area" className="space-y-6 mt-4">
           <AreaSummaryChart companyId={companyId} />
           <ExistingAutomationsAreaSummaryChart companyId={companyId} />
+          <TotalAreaSummaryChart companyId={companyId} />
           {areaSummaryGaps &&
             (areaSummaryGaps.pipelineWithoutArea > 0 || areaSummaryGaps.deliveredWithoutArea > 0) && (
               <p className="text-xs text-muted-foreground">
