@@ -249,7 +249,7 @@ export function ProjectExecutiveSlide({ project }: { project: Project }) {
   // campos desta seção, uma lacuna aqui não deve sumir da tabela (pareceria que ninguém
   // perguntou); mostra um rótulo neutro em vez do valor, para ser explicado educadamente
   // ao cliente como algo a confirmar, sem virar um alerta/destaque de atenção no slide.
-  const NOT_QUANTIFIED_LABEL = "Não quantificado nesta reunião";
+  const NOT_QUANTIFIED_LABEL = "N/A";
 
   const quantitativeLines: { label: string; value: string; isGap?: boolean }[] = [
     ...buildLabeledLines([

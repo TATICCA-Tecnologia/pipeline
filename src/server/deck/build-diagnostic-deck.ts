@@ -625,7 +625,7 @@ export function addInterviewsSlide(pres: PptxGenJS, interviews: Interviews): voi
 
 // Igual ao `NOT_QUANTIFIED_LABEL` do componente React: Colaboradores/Duração vêm
 // da entrevista e uma lacuna aqui NÃO some da tabela — mostra rótulo neutro.
-const NOT_QUANTIFIED_LABEL = "Não quantificado nesta reunião";
+const NOT_QUANTIFIED_LABEL = "N/A";
 
 // Réplica de `roundHours` do componente React (evita floats longos ao converter
 // horas anuais em mensais; usa vírgula decimal, pt-BR).
@@ -686,9 +686,9 @@ function buildQuantitativeLines(project: ProjectDeckRow): QuantitativeLine[] {
 // A tabela usa linhas de altura automática (sem `autoPage`, sem tamanho fixo),
 // então o header/radar abaixo dela precisam ser posicionados dinamicamente —
 // caso contrário, um projeto com as 7 linhas preenchidas (ou um valor longo,
-// como `robotSchedule` livre ou o fallback "Não quantificado nesta reunião",
-// que pode quebrar em 2 linhas dentro da coluna de 3.2") faz a tabela crescer
-// além da posição fixa onde o header/radar estavam, colidindo visualmente.
+// como `robotSchedule` livre, que pode quebrar em 2 linhas dentro da coluna
+// de 3.2") faz a tabela crescer além da posição fixa onde o header/radar
+// estavam, colidindo visualmente.
 // `estimateQuantTableHeight` é uma estimativa conservadora (superestima) da
 // altura renderizada, usada só para posicionar os elementos abaixo — não
 // precisa ser exata, só nunca subestimar.
