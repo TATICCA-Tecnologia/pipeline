@@ -27,8 +27,6 @@ import { useToast } from "@/src/shared/hooks/use-toast";
 import { useDemoMode } from "@/shared/context/demo-mode-context";
 import { Bot, Building2, Plus, Search, Pencil, ListOrdered, Users, Download, Wallet } from "lucide-react";
 import Link from "next/link";
-import { getTrpcUserId } from "@/shared/trpc/auth-header";
-import { slugifyFilename } from "@/shared/utils";
 
 const EMPTY_FORM = { name: "", document: "", email: "", phone: "" };
 
@@ -39,10 +37,6 @@ export default function EmpresasPage() {
   const { data: companies = [], isLoading } = trpc.company.listAll.useQuery();
 
   const [search, setSearch] = useState("");
-  const [exportingId, setExportingId] = useState<string | null>(null);
-  const [exportingExistingAutomationsId, setExportingExistingAutomationsId] = useState<
-    string | null
-  >(null);
   const [dialog, setDialog] = useState<{ open: boolean; editingId?: string }>({
     open: false,
   });
@@ -99,83 +93,6 @@ export default function EmpresasPage() {
       updateMutation.mutate({ id: dialog.editingId, ...form });
     } else {
       createMutation.mutate(form);
-    }
-  }
-
-  // Download do deck consolidado (.pptx). A rota /api/empresas/[id]/deck exige
-  // o header x-user-id (mesma auth do resto do app), que uma navegação simples
-  // de <a href> não incluiria — por isso fazemos um fetch manual com o header,
-  // convertemos em blob e disparamos o download por um link temporário.
-  async function handleExportDeck(company: (typeof companies)[number]) {
-    setExportingId(company.id);
-    try {
-      const response = await fetch(`/api/empresas/${company.id}/deck`, {
-        headers: { "x-user-id": getTrpcUserId() },
-      });
-      if (!response.ok) {
-        const message = await response.text();
-        throw new Error(message || `Erro ${response.status}`);
-      }
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      // Blob URLs ignoram o header Content-Disposition do servidor — o browser
-      // usa `link.download` diretamente. Por isso sanitizamos o nome aqui
-      // também (mesma função `slugifyFilename` usada no Content-Disposition
-      // da rota), senão o nome real do arquivo baixado usaria o `company.name`
-      // cru, que pode ter acentos, espaços ou "/" (caractere hostil a path).
-      const safeName = slugifyFilename(company.name) || company.id;
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `diagnostico-${safeName}.pptx`;
-      try {
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-      } finally {
-        URL.revokeObjectURL(url);
-      }
-    } catch (error) {
-      toast({
-        title: "Erro ao exportar diagnóstico",
-        description: error instanceof Error ? error.message : "Erro desconhecido",
-        variant: "destructive",
-      });
-    } finally {
-      setExportingId(null);
-    }
-  }
-
-  async function handleExportExistingAutomationsDeck(company: (typeof companies)[number]) {
-    setExportingExistingAutomationsId(company.id);
-    try {
-      const response = await fetch(`/api/empresas/${company.id}/deck-automacoes-existentes`, {
-        headers: { "x-user-id": getTrpcUserId() },
-      });
-      if (!response.ok) {
-        const message = await response.text();
-        throw new Error(message || `Erro ${response.status}`);
-      }
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      const safeName = slugifyFilename(company.name) || company.id;
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `automacoes-existentes-${safeName}.pptx`;
-      try {
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-      } finally {
-        URL.revokeObjectURL(url);
-      }
-    } catch (error) {
-      toast({
-        title: "Erro ao exportar automações existentes",
-        description: error instanceof Error ? error.message : "Erro desconhecido",
-        variant: "destructive",
-      });
-    } finally {
-      setExportingExistingAutomationsId(null);
     }
   }
 
@@ -293,24 +210,11 @@ export default function EmpresasPage() {
                             <Wallet className="h-4 w-4" />
                           </Button>
                         </Link>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          title="Exportar diagnóstico completo (.pptx)"
-                          disabled={exportingId === company.id}
-                          onClick={() => handleExportDeck(company)}
-                        >
-                          <Download className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          title="Exportar automações existentes (.pptx)"
-                          disabled={exportingExistingAutomationsId === company.id}
-                          onClick={() => handleExportExistingAutomationsDeck(company)}
-                        >
-                          <Download className="h-4 w-4" />
-                        </Button>
+                        <Link href={`/admin/empresas/${company.id}/downloads`}>
+                          <Button size="icon" variant="ghost" title="Central de Downloads">
+                            <Download className="h-4 w-4" />
+                          </Button>
+                        </Link>
                         <Button
                           size="icon"
                           variant="ghost"
