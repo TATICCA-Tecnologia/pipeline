@@ -8,6 +8,7 @@ import { trpc } from "@/shared/trpc/client";
 import { useTaxonomy } from "@/src/app/(private)/cliente/solicitar/utils/use-taxonomy";
 import { useXmlOpportunityImporter } from "@/shared/hooks/use-xml-opportunity-importer";
 import { XmlOpportunityResolutionDialogs } from "@/shared/components/xml-opportunity-resolution-dialogs";
+import { YoutubeTranscriptFetcher } from "@/shared/components/youtube-transcript-fetcher";
 import { parseSolicitacaoXml } from "@/src/app/(private)/cliente/solicitar/utils/xml-import";
 import { Button } from "@/src/shared/components/ui/button";
 import { Textarea } from "@/src/shared/components/ui/textarea";
@@ -203,6 +204,11 @@ export default function GerarOportunidadesPorIaPage() {
                 ))}
               </SelectContent>
             </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Ou busque a partir de um vídeo do YouTube</Label>
+            <YoutubeTranscriptFetcher onTranscriptFetched={setTranscript} />
           </div>
 
           <div className="space-y-2">
