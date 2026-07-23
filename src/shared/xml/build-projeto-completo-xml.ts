@@ -10,7 +10,7 @@ import {
 } from "@/shared/constants/project-taxonomy";
 import { EXECUTION_STRATEGIES } from "@/src/app/(private)/admin/projetos/[id]/especificacao/_constants/architecture";
 
-function escapeXml(value: string): string {
+export function escapeXml(value: string): string {
   return value
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
@@ -42,13 +42,68 @@ function formatDeadline(date: Date | undefined): string {
   return `${year}-${month}-${day}`;
 }
 
-export function buildProjetoCompletoXml(
-  project: Project,
+// Subconjunto de `Project` realmente lido por buildProjetoCompletoXmlFields —
+// permite que o export agregado por empresa (build-empresa-agregado-xml.ts)
+// monte esse shape a partir de uma query Prisma sem precisar fabricar campos
+// não usados aqui (status, priority, clientId, createdAt, updatedAt...).
+// Como `Project` é estruturalmente um superconjunto, o caller existente
+// (project-xml-import-export.tsx, que passa um `Project` inteiro) continua
+// funcionando sem nenhuma mudança.
+export type ProjetoCompletoXmlData = Pick<
+  Project,
+  | "id"
+  | "companyName"
+  | "title"
+  | "area"
+  | "theme"
+  | "platform"
+  | "description"
+  | "targetAudience"
+  | "expectedUsers"
+  | "hasExistingSystem"
+  | "existingSystemDetails"
+  | "hasCurrentApplication"
+  | "currentApplicationDetails"
+  | "peopleInvolved"
+  | "taskDurationHours"
+  | "processFrequency"
+  | "projectNarrative"
+  | "features"
+  | "benefits"
+  | "benefitsDetails"
+  | "monthlyHoursSaved"
+  | "ratingErrorReduction"
+  | "ratingProcessCriticality"
+  | "ratingInternalImpact"
+  | "ratingExternalImpact"
+  | "ratingCompliance"
+  | "urgency"
+  | "estimatedDeadline"
+  | "additionalInfo"
+  | "mainToolCategory"
+  | "mainTool"
+  | "peopleOfInterest"
+  | "complexity"
+  | "robotSchedule"
+  | "hourlyRateBRL"
+  | "estimatedAnnualSavingBRL"
+  | "executionStrategy"
+  | "solutionTypes"
+  | "architectNotes"
+  | "implementationEffortDays"
+  | "implementationWave"
+  | "waveOrder"
+>;
+
+// Só as linhas de tag por projeto, sem declaração XML nem wrapper de root —
+// reaproveitado tanto pelo export individual (abaixo) quanto pelo agregado
+// por empresa (build-empresa-agregado-xml.ts), que aninha essas mesmas
+// linhas dentro de <area>/<projeto>.
+export function buildProjetoCompletoXmlFields(
+  project: ProjetoCompletoXmlData,
   urgencyLevels: { value: string; label: string }[]
-): string {
+): string[] {
   const lines: string[] = [];
-  lines.push('<?xml version="1.0" encoding="UTF-8"?>');
-  lines.push("<projetoCompleto>");
   lines.push(tag("projetoId", project.id));
   lines.push(tag("empresa", project.companyName));
   lines.push(tag("titulo", project.title));
@@ -114,6 +169,17 @@ export function buildProjetoCompletoXml(
   lines.push(tag("esforcoDeImplementacaoDias", project.implementationEffortDays));
   lines.push(tag("ondaDeImplementacao", project.implementationWave));
   lines.push(tag("ordemNaOnda", project.waveOrder));
+  return lines;
+}
+
+export function buildProjetoCompletoXml(
+  project: ProjetoCompletoXmlData,
+  urgencyLevels: { value: string; label: string }[]
+): string {
+  const lines: string[] = [];
+  lines.push('<?xml version="1.0" encoding="UTF-8"?>');
+  lines.push("<projetoCompleto>");
+  lines.push(...buildProjetoCompletoXmlFields(project, urgencyLevels));
   lines.push("</projetoCompleto>");
   return lines.join("\n");
 }
