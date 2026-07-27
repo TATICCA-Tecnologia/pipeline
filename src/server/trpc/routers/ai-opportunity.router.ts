@@ -13,7 +13,68 @@ import {
   YoutubeTranscriptInvalidVideoIdError,
   YoutubeTranscriptTooManyRequestError,
   type TranscriptResult,
+  type FetchParams,
 } from "youtube-transcript-plus";
+
+// DIAGNOSTICO TEMPORARIO — remover quando a causa em producao estiver fechada.
+// A busca de transcricao funciona em dev (IP residencial) e falha em producao
+// (IP de datacenter, que o YouTube trata de forma bem mais agressiva). A lib faz
+// tres requisicoes em sequencia e colapsa qualquer falha numa mensagem generica,
+// entao aqui envolvemos cada uma para produção dizer em QUAL etapa ela morre.
+const DIAG_USER_AGENT =
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36";
+
+function describeStage(stage: string, res: Response, text: string): string {
+  const head = `[${stage}] http=${res.status} bytes=${text.length}`;
+  if (stage === "watch") {
+    return (
+      `${head} apiKey=${/"INNERTUBE_API_KEY":"|INNERTUBE_API_KEY\\":\\"/.test(text) ? "sim" : "NAO"}` +
+      ` recaptcha=${text.includes('class="g-recaptcha"') ? "SIM" : "nao"}` +
+      ` consent=${/consent\.youtube\.com|CONSENT_FLOW/.test(text) ? "SIM" : "nao"}`
+    );
+  }
+  if (stage === "player") {
+    try {
+      const json = JSON.parse(text);
+      const tracks = json?.captions?.playerCaptionsTracklistRenderer?.captionTracks;
+      return (
+        `${head} playability=${json?.playabilityStatus?.status ?? "?"}` +
+        ` captions=${json?.captions ? "sim" : "NAO"}` +
+        ` tracks=${
+          Array.isArray(tracks)
+            ? tracks.map((t: { languageCode?: string; kind?: string }) =>
+                `${t.languageCode}${t.kind === "asr" ? "(auto)" : ""}`).join(",") || "vazio"
+            : "-"
+        }`
+      );
+    } catch {
+      return `${head} json=ILEGIVEL`;
+    }
+  }
+  // transcript: o caso silencioso é o YouTube devolver 200 com corpo vazio
+  return `${head} inicio=${JSON.stringify(text.slice(0, 120))}`;
+}
+
+// Reproduz o defaultFetch da lib, mas registra o resultado antes de devolver.
+// O corpo é lido aqui, então repassamos uma Response nova com o mesmo texto.
+function traceFetch(stage: string, trace: string[]) {
+  return async (params: FetchParams): Promise<Response> => {
+    const { url, lang, userAgent, method = "GET", body, headers = {}, signal } = params;
+    const res = await fetch(url, {
+      method,
+      headers: {
+        "User-Agent": userAgent ?? DIAG_USER_AGENT,
+        ...(lang ? { "Accept-Language": lang } : {}),
+        ...headers,
+      },
+      ...(body && method === "POST" ? { body } : {}),
+      signal,
+    });
+    const text = await res.text();
+    trace.push(describeStage(stage, res, text));
+    return new Response(text, { status: res.status, statusText: res.statusText });
+  };
+}
 
 export const aiOpportunityRouter = router({
   // Não recebe companyId: a empresa é sempre escolhida no client ANTES de
@@ -76,15 +137,30 @@ export const aiOpportunityRouter = router({
   fetchYoutubeTranscript: adminProcedure
     .input(z.object({ url: z.string().min(1, "Cole o link do vídeo do YouTube.") }))
     .mutation(async ({ input }) => {
+      const trace: string[] = [];
+      const diag = {
+        videoFetch: traceFetch("watch", trace),
+        playerFetch: traceFetch("player", trace),
+        transcriptFetch: traceFetch("transcript", trace),
+      };
       try {
         let result: TranscriptResult;
         try {
-          result = await fetchTranscript(input.url, { lang: "pt-BR", videoDetails: true });
+          result = await fetchTranscript(input.url, {
+            lang: "pt-BR",
+            videoDetails: true,
+            ...diag,
+          });
         } catch (error) {
           if (error instanceof YoutubeTranscriptNotAvailableLanguageError) {
             const fallbackLang =
               error.availableLangs.find((l) => l.startsWith("pt")) ?? error.availableLangs[0];
-            result = await fetchTranscript(input.url, { lang: fallbackLang, videoDetails: true });
+            trace.push(`[fallback] pt-BR indisponivel, tentando "${fallbackLang}"`);
+            result = await fetchTranscript(input.url, {
+              lang: fallbackLang,
+              videoDetails: true,
+              ...diag,
+            });
           } else {
             throw error;
           }
@@ -93,41 +169,39 @@ export const aiOpportunityRouter = router({
         const transcript = result.segments.map((s) => s.text).join(" ");
         return { transcript, videoTitle: result.videoDetails.title };
       } catch (error) {
+        let code: TRPCError["code"] = "INTERNAL_SERVER_ERROR";
+        let message: string;
+
         if (error instanceof YoutubeTranscriptDisabledError) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: "Este vídeo tem as transcrições/legendas desativadas pelo autor.",
-          });
-        }
-        if (
+          code = "BAD_REQUEST";
+          message = "Este vídeo tem as transcrições/legendas desativadas pelo autor.";
+        } else if (
           error instanceof YoutubeTranscriptNotAvailableError ||
           error instanceof YoutubeTranscriptNotAvailableLanguageError
         ) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: "Nenhuma transcrição disponível para este vídeo.",
-          });
+          code = "BAD_REQUEST";
+          message = "Nenhuma transcrição disponível para este vídeo.";
+        } else if (error instanceof YoutubeTranscriptVideoUnavailableError) {
+          code = "BAD_REQUEST";
+          message = "Vídeo não encontrado ou indisponível.";
+        } else if (error instanceof YoutubeTranscriptInvalidVideoIdError) {
+          code = "BAD_REQUEST";
+          message = "Link do YouTube inválido.";
+        } else if (error instanceof YoutubeTranscriptTooManyRequestError) {
+          code = "TOO_MANY_REQUESTS";
+          message = "YouTube limitou as requisições. Tente novamente em alguns minutos.";
+        } else {
+          message = `Falha ao buscar transcrição: ${
+            error instanceof Error ? error.message : "Erro desconhecido"
+          }`;
         }
-        if (error instanceof YoutubeTranscriptVideoUnavailableError) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: "Vídeo não encontrado ou indisponível.",
-          });
-        }
-        if (error instanceof YoutubeTranscriptInvalidVideoIdError) {
-          throw new TRPCError({ code: "BAD_REQUEST", message: "Link do YouTube inválido." });
-        }
-        if (error instanceof YoutubeTranscriptTooManyRequestError) {
-          throw new TRPCError({
-            code: "TOO_MANY_REQUESTS",
-            message: "YouTube limitou as requisições. Tente novamente em alguns minutos.",
-          });
-        }
-        const message = error instanceof Error ? error.message : "Erro desconhecido";
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: `Falha ao buscar transcrição: ${message}`,
-        });
+
+        // DIAGNOSTICO TEMPORARIO — o trace revela em qual das tres requisicoes o
+        // YouTube corta em producao. Sai no log do container e tambem na tela
+        // (rota é adminProcedure, so admin ve).
+        const detail = trace.length > 0 ? trace.join(" | ") : "nenhuma requisicao completou";
+        console.error("[fetchYoutubeTranscript]", input.url, "->", error, "| trace:", detail);
+        throw new TRPCError({ code, message: `${message}\n\n[diag] ${detail}` });
       }
     }),
 });
