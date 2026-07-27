@@ -33,7 +33,7 @@ function describeStage(stage: string, res: Response, text: string): string {
       ` consent=${/consent\.youtube\.com|CONSENT_FLOW/.test(text) ? "SIM" : "nao"}`
     );
   }
-  if (stage === "player") {
+  if (stage.startsWith("player")) {
     try {
       const json = JSON.parse(text);
       const tracks = json?.captions?.playerCaptionsTracklistRenderer?.captionTracks;
@@ -73,6 +73,102 @@ function traceFetch(stage: string, trace: string[]) {
     const text = await res.text();
     trace.push(describeStage(stage, res, text));
     return new Response(text, { status: res.status, statusText: res.statusText });
+  };
+}
+
+// A lib chama o Innertube fixo como client ANDROID, e o YouTube recusa esse
+// client vindo de IP de datacenter com playabilityStatus=LOGIN_REQUIRED e sem
+// nenhum captionTrack — o que em producao virava "nenhuma transcricao
+// disponivel" mesmo em video publico com legenda. Estes clients nao exigem a
+// attestation que o ANDROID passou a exigir; tentamos em ordem e ficamos com o
+// primeiro que realmente devolver faixas de legenda.
+const PLAYER_CLIENTS = [
+  {
+    label: "ANDROID_VR",
+    userAgent:
+      "com.google.android.apps.youtube.vr.oculus/1.62.27 (Linux; U; Android 12; en_US; Quest 3) gzip",
+    client: {
+      clientName: "ANDROID_VR",
+      clientVersion: "1.62.27",
+      deviceMake: "Oculus",
+      deviceModel: "Quest 3",
+      osName: "Android",
+      osVersion: "12",
+      androidSdkVersion: 32,
+    },
+  },
+  {
+    label: "IOS",
+    userAgent: "com.google.ios.youtube/20.10.4 (iPhone16,2; U; CPU iOS 18_3_2 like Mac OS X)",
+    client: {
+      clientName: "IOS",
+      clientVersion: "20.10.4",
+      deviceMake: "Apple",
+      deviceModel: "iPhone16,2",
+      osName: "iPhone",
+      osVersion: "18.3.2.22D82",
+    },
+  },
+  {
+    label: "TVHTML5_EMBED",
+    userAgent:
+      "Mozilla/5.0 (ChromiumStylePlatform) Cobalt/Version (unlike Gecko) v8/8.8.278.8-jit gles Starboard/13",
+    client: {
+      clientName: "TVHTML5_SIMPLY_EMBEDDED_PLAYER",
+      clientVersion: "2.0",
+      clientScreen: "EMBED",
+    },
+    thirdParty: { embedUrl: "https://www.youtube.com" },
+  },
+  {
+    label: "MWEB",
+    userAgent:
+      "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
+    client: { clientName: "MWEB", clientVersion: "2.20250101.00.00" },
+  },
+] as const;
+
+function captionTracksOf(text: string): unknown[] | null {
+  try {
+    const json = JSON.parse(text);
+    const tracks =
+      json?.captions?.playerCaptionsTracklistRenderer?.captionTracks ??
+      json?.playerCaptionsTracklistRenderer?.captionTracks;
+    return Array.isArray(tracks) && tracks.length > 0 ? tracks : null;
+  } catch {
+    return null;
+  }
+}
+
+// Substitui o playerFetch da lib: reaproveita a URL/videoId que ela montou, mas
+// troca o client do corpo. Devolve a primeira resposta com legenda; se nenhuma
+// tiver, repassa a ultima para a lib produzir o erro normal dela.
+function playerFetchWithClientFallback(trace: string[]) {
+  return async (params: FetchParams): Promise<Response> => {
+    const original = JSON.parse(params.body ?? "{}") as { videoId?: string };
+    let lastText = "{}";
+    let lastStatus = 200;
+
+    for (const candidate of PLAYER_CLIENTS) {
+      const res = await fetch(params.url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "User-Agent": candidate.userAgent },
+        body: JSON.stringify({
+          context: { client: { ...candidate.client, hl: "pt-BR", gl: "BR" } },
+          ...(("thirdParty" in candidate && candidate.thirdParty) ? { thirdParty: candidate.thirdParty } : {}),
+          videoId: original.videoId,
+        }),
+        signal: params.signal,
+      });
+      const text = await res.text();
+      trace.push(describeStage(`player:${candidate.label}`, res, text));
+      lastText = text;
+      lastStatus = res.status;
+      if (res.ok && captionTracksOf(text)) {
+        return new Response(text, { status: res.status });
+      }
+    }
+    return new Response(lastText, { status: lastStatus });
   };
 }
 
@@ -140,7 +236,7 @@ export const aiOpportunityRouter = router({
       const trace: string[] = [];
       const diag = {
         videoFetch: traceFetch("watch", trace),
-        playerFetch: traceFetch("player", trace),
+        playerFetch: playerFetchWithClientFallback(trace),
         transcriptFetch: traceFetch("transcript", trace),
       };
       try {
