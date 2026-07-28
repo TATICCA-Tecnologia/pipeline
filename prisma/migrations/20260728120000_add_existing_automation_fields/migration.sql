@@ -1,5 +1,6 @@
 -- Ficha de sustentação das automações existentes.
--- Seis colunas opcionais em projects; nenhum backfill — o texto livre já
+-- Sete colunas opcionais em projects (seis campos da ficha, mais o texto livre
+-- de "outro" da hospedagem); nenhum backfill — o texto livre já
 -- existente em "currentApplicationDetails" permanece intocado como observações.
 ALTER TABLE "projects" ADD COLUMN "currentApplicationHosting" TEXT;
 ALTER TABLE "projects" ADD COLUMN "currentApplicationHostingCustom" TEXT;
