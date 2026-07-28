@@ -6,10 +6,13 @@ import type { Project } from "@/shared/types";
 import {
   HAS_EXISTING_SYSTEM_OPTIONS,
   HAS_CURRENT_APPLICATION_OPTIONS,
+  CURRENT_APPLICATION_ACCESS_LOCATION_OPTIONS,
   PROCESS_FREQUENCIES,
   BENEFIT_OPTIONS,
   resolveLabel,
+  resolveCurrentApplicationHostingLabel,
 } from "@/shared/constants/project-taxonomy";
+import { formatDate } from "@/shared/utils";
 import { EXECUTION_STRATEGIES } from "@/src/app/(private)/admin/projetos/[id]/especificacao/_constants/architecture";
 import { useDemoMode } from "@/shared/context/demo-mode-context";
 
@@ -229,6 +232,34 @@ export function ProjectExecutiveSlide({ project }: { project: Project }) {
       label: "Aplicação existente hoje",
       value: resolveLabel(project.hasCurrentApplication, HAS_CURRENT_APPLICATION_OPTIONS),
       detail: maskFreeText(project.currentApplicationDetails) ?? undefined,
+    },
+    // Ficha de sustentação: linhas sem valor são descartadas por
+    // buildLabeledLinesWithDetail, então um projeto que não é automação
+    // existente não ganha nenhuma linha extra aqui.
+    // "Onde encontrar" (currentApplicationAccessReference) fica de fora de
+    // propósito — é texto livre apontando onde as credenciais moram, e o mesmo
+    // critério já exclui esse campo do deck .pptx.
+    {
+      label: "Onde roda",
+      value: resolveCurrentApplicationHostingLabel(
+        project.currentApplicationHosting,
+        maskFreeText(project.currentApplicationHostingCustom)
+      ),
+    },
+    { label: "Quem desenvolveu", value: maskFreeText(project.currentApplicationAuthor) ?? undefined },
+    { label: "Responsável hoje", value: maskFreeText(project.currentApplicationOwner) ?? undefined },
+    {
+      label: "Onde ficam os acessos",
+      value: resolveLabel(
+        project.currentApplicationAccessLocation,
+        CURRENT_APPLICATION_ACCESS_LOCATION_OPTIONS
+      ),
+    },
+    {
+      label: "Em produção desde",
+      value: project.currentApplicationLiveSince
+        ? formatDate(new Date(project.currentApplicationLiveSince))
+        : undefined,
     },
     { label: "Público-alvo", value: maskFreeText(project.targetAudience) ?? undefined },
   ]);
