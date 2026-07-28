@@ -68,9 +68,11 @@ type RankingRow = {
 
 // "Outro" guarda o texto real no campo custom; qualquer outro slug vira o
 // rótulo da taxonomia (resolveLabel devolve o próprio slug se não reconhecer).
+// Recebe a linha já mascarada por displayRanking — o texto de "outro" é livre e
+// precisa passar por maskFreeText no modo demo, igual ao título e ao responsável.
 function hostingLabelOf(row: RankingRow): string {
   if (row.currentApplicationHosting === "outro") {
-    return row.currentApplicationHostingCustom || "Outro";
+    return row.currentApplicationHostingCustom?.trim() || "Outro";
   }
   return resolveLabel(row.currentApplicationHosting, CURRENT_APPLICATION_HOSTING_OPTIONS) ?? "-";
 }
@@ -122,7 +124,12 @@ export default function AutomacoesExistentesPage({ params }: Props) {
     sortBy,
   });
   const displayRanking = useMemo(
-    () => ranking.map((row) => ({ ...row, title: maskFreeText(row.title) ?? row.title })),
+    () =>
+      ranking.map((row) => ({
+        ...row,
+        title: maskFreeText(row.title) ?? row.title,
+        currentApplicationHostingCustom: maskFreeText(row.currentApplicationHostingCustom) ?? null,
+      })),
     [ranking, maskFreeText]
   );
 
