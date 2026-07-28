@@ -27,13 +27,20 @@ export function ProjectXmlImportExport({ project }: { project: Project }) {
   const { data: dbUrgencyLevels = [] } = trpc.taxonomy.listUrgencyLevels.useQuery();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isImporting, setIsImporting] = useState(false);
+  // Avisos gerados na LEITURA do arquivo (valor de enum não reconhecido, número
+  // inválido, data fora de AAAA-MM-DD, referência de acessos truncada). Vivem
+  // num ref porque só podem ser exibidos junto dos avisos do servidor, que
+  // chegam depois — sem isso, tudo o que o parser detecta é descartado em
+  // silêncio e o usuário não fica sabendo que um campo foi ignorado.
+  const parseWarningsRef = useRef<string[]>([]);
 
   const importMutation = trpc.project.importXml.useMutation({
     onSuccess: (result) => {
       utils.project.byId.invalidate({ id: project.id });
-      if (result.warnings.length > 0) {
+      const allWarnings = [...parseWarningsRef.current, ...result.warnings];
+      if (allWarnings.length > 0) {
         toast.warning("XML importado com avisos", {
-          description: result.warnings.join(" • "),
+          description: allWarnings.join(" • "),
         });
       } else {
         toast.success("XML importado com sucesso.");
@@ -42,7 +49,10 @@ export function ProjectXmlImportExport({ project }: { project: Project }) {
     onError: (error) => {
       toast.error("Erro ao importar XML", { description: error.message });
     },
-    onSettled: () => setIsImporting(false),
+    onSettled: () => {
+      setIsImporting(false);
+      parseWarningsRef.current = [];
+    },
   });
 
   function handleExport() {
@@ -80,6 +90,7 @@ export function ProjectXmlImportExport({ project }: { project: Project }) {
     }
 
     setIsImporting(true);
+    parseWarningsRef.current = parsed.warnings;
     const {
       projetoId: _projetoId,
       estimatedDeadline,
