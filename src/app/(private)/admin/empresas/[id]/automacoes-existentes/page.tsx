@@ -33,6 +33,10 @@ import type { Project, RobotOperationalStatus } from "@/shared/types";
 import { ExistingAutomationsAreaSummaryChart } from "@/shared/components/existing-automations-area-summary-chart";
 import { useModal } from "@/shared/context/modal-context";
 import { ProjectExecutiveSlideModal } from "@/src/app/(private)/admin/projetos/_components/project-executive-slide.modal";
+import {
+  CURRENT_APPLICATION_HOSTING_OPTIONS,
+  resolveLabel,
+} from "@/shared/constants/project-taxonomy";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -57,7 +61,19 @@ type RankingRow = {
   accumulatedSavingBRL: number | null;
   economiaScore: number;
   operationalStatus: RobotOperationalStatus | null;
+  currentApplicationHosting: string | null;
+  currentApplicationHostingCustom: string | null;
+  currentApplicationOwner: string | null;
 };
+
+// "Outro" guarda o texto real no campo custom; qualquer outro slug vira o
+// rótulo da taxonomia (resolveLabel devolve o próprio slug se não reconhecer).
+function hostingLabelOf(row: RankingRow): string {
+  if (row.currentApplicationHosting === "outro") {
+    return row.currentApplicationHostingCustom || "Outro";
+  }
+  return resolveLabel(row.currentApplicationHosting, CURRENT_APPLICATION_HOSTING_OPTIONS) ?? "-";
+}
 
 function activeScoreOf(row: RankingRow, sortBy: SortBy): number {
   if (sortBy === "economia") return Math.round(row.economiaScore * 100);
@@ -254,6 +270,8 @@ export default function AutomacoesExistentesPage({ params }: Props) {
                 <TableHead className="w-12">#</TableHead>
                 <TableHead>Título</TableHead>
                 <TableHead>Área</TableHead>
+                <TableHead>Onde roda</TableHead>
+                <TableHead>Responsável</TableHead>
                 <TableHead className="text-right">Qualitativo %</TableHead>
                 <TableHead>Status operacional</TableHead>
                 <TableHead className="text-right">Economia acumulada</TableHead>
@@ -263,13 +281,13 @@ export default function AutomacoesExistentesPage({ params }: Props) {
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
+                  <TableCell colSpan={9} className="h-24 text-center text-muted-foreground">
                     Carregando...
                   </TableCell>
                 </TableRow>
               ) : displayRanking.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
+                  <TableCell colSpan={9} className="h-24 text-center text-muted-foreground">
                     Nenhuma automação existente encontrada para esta empresa.
                   </TableCell>
                 </TableRow>
@@ -288,6 +306,12 @@ export default function AutomacoesExistentesPage({ params }: Props) {
                       </TableCell>
                       <TableCell className="text-muted-foreground">
                         {row.areaName ?? "-"}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground max-w-[180px] truncate">
+                        {hostingLabelOf(row)}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground max-w-[160px] truncate">
+                        {maskFreeText(row.currentApplicationOwner) ?? "-"}
                       </TableCell>
                       <TableCell className="text-right tabular-nums">
                         {Math.round(row.qualitativeScorePercent)}%

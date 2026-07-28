@@ -1089,6 +1089,9 @@ export const projectRouter = router({
             ratingCompliance: true,
             accumulatedSavingBRL: true,
             operationalStatus: true,
+            currentApplicationHosting: true,
+            currentApplicationHostingCustom: true,
+            currentApplicationOwner: true,
           },
         }),
         ctx.db.systemSettings.findUnique({ where: { id: "default" } }),
@@ -1121,6 +1124,9 @@ export const projectRouter = router({
           accumulatedSavingBRL: p.accumulatedSavingBRL,
           economiaScore,
           operationalStatus: p.operationalStatus,
+          currentApplicationHosting: p.currentApplicationHosting,
+          currentApplicationHostingCustom: p.currentApplicationHostingCustom,
+          currentApplicationOwner: p.currentApplicationOwner,
         };
       });
 
