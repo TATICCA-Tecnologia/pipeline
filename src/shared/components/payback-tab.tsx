@@ -268,8 +268,12 @@ export function PaybackTab({
   const totals = useMemo(() => {
     const developmentCost = composition.reduce((sum, i) => sum + i.developmentCostBRL, 0);
     const annualSaving = composition.reduce((sum, i) => sum + i.annualSavingBRL, 0);
+    // Sem robôs agendados a curva é vazia e não existe "fim da janela"; nesse
+    // caso o custo de estrutura é medido até hoje, senão o KPI mostraria R$ 0
+    // logo acima da linha da tabela que exibe esse mesmo custo acumulado — a
+    // empresa pode ter estrutura rodando sem nenhum robô nas ondas ainda.
     const lastPoint = curve[curve.length - 1];
-    const structureCost = lastPoint ? computeStructureCostAt(structureCosts, lastPoint.date) : 0;
+    const structureCost = computeStructureCostAt(structureCosts, lastPoint?.date ?? new Date());
     return { developmentCost, annualSaving, structureCost };
   }, [composition, curve, structureCosts]);
 
