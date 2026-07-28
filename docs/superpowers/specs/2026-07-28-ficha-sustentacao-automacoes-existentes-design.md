@@ -158,7 +158,12 @@ Arquivos:
 - `src/shared/xml/parse-projeto-completo-xml.ts` — leitura no round-trip.
 - `src/app/api/empresas/[id]/xml-agregado/route.ts` — XML agregado da empresa.
 - `src/app/(private)/cliente/solicitar/utils/xml-import.ts` — XML de solicitação.
+- `public/modelo-solicitacao-projeto.xml` — modelo público de referência.
 - `docs/prompt-geracao-xml.md` — prompt do LLM externo, para gerar a ficha.
+- `src/server/ai/xml-generation-prompt.ts` — cópia do mesmo prompt usada pela
+  geração de oportunidades por IA dentro do app. O cabeçalho desse arquivo
+  obriga a mantê-lo em sincronia com o `.md` sempre que o schema do XML muda;
+  esquecê-lo faz o caminho in-app gerar XMLs sem a ficha, em silêncio.
 
 Todas as tags são opcionais na leitura: XMLs antigos continuam importando sem erro, e
 `producaoDesdeAplicacaoExistente` inválido é tratado como ausente, não como erro de

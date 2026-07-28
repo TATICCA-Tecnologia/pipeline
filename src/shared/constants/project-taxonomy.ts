@@ -127,6 +127,13 @@ export const HAS_CURRENT_APPLICATION_OPTIONS = [
 // Ficha de sustentação da automação existente — listas curtas e estáveis, por
 // isso constantes aqui em vez de tabela configurável (ao contrário de
 // ProjectArea/MainTool/UrgencyLevel, que variam por cliente).
+//
+// ATENÇÃO: os LABELS destas duas listas estão duplicados como texto literal em
+// docs/prompt-geracao-xml.md e em src/server/ai/xml-generation-prompt.ts, e a
+// importação de XML casa justamente por label (matchByLabel/resolveEnum). Mudar
+// um label aqui sem atualizar os dois arquivos faz todo XML gerado cair
+// silenciosamente no fallback "Outro" — sem erro, sem aviso. Mexeu no label,
+// mexa nos três lugares.
 export const CURRENT_APPLICATION_HOSTING_OPTIONS = [
   { value: "servidor-proprio", label: "Servidor próprio (on-premise)" },
   { value: "vm-cliente", label: "Máquina virtual da empresa" },

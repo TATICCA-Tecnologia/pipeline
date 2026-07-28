@@ -19,7 +19,9 @@ Este repositório **não tem framework de testes** (sem vitest, sem jest, sem ar
 A verificação de cada tarefa é, portanto:
 
 1. `npx tsc --noEmit` — o gate principal. Como cada campo atravessa ~8 arquivos tipados, um campo esquecido em qualquer camada quebra a compilação.
-2. `pnpm lint`
+
+   **Baseline:** o repositório já tem **10 erros pré-existentes** de `tsc`, todos em `src/shared/components/ui/` (boilerplate shadcn não usado: `chart.tsx`, `input-otp.tsx`, `sidebar.tsx`, `toaster.tsx`). Onde o plano diz "Expected: nenhum erro", leia **"nenhum erro novo fora de `src/shared/components/ui/`"**. Consertar esses 10 está fora do escopo desta feature.
+2. ~~`pnpm lint`~~ — **indisponível.** O script existe em `package.json` (`"lint": "eslint ."`), mas o eslint não está instalado (não é devDependency e não há binário em `node_modules/.bin`). Onde o plano manda rodar `pnpm lint`, pule — é um buraco pré-existente do repo, fora do escopo desta feature.
 3. Verificação manual no browser, com caminho de clique exato, nas tarefas de UI.
 
 `parseProjetoCompletoXml` usa `DOMParser` (API de browser), então não dá para exercitá-lo por script Node — a verificação do round-trip XML é manual, pela própria UI de importação/exportação.
@@ -1872,8 +1874,13 @@ git commit -m "feat: ficha de sustentacao no XML de projeto completo"
 - Modify: `src/app/(private)/cliente/solicitar/utils/xml-import.ts:202` (leitura), `:369` (formData)
 - Modify: `public/modelo-solicitacao-projeto.xml`
 - Modify: `docs/prompt-geracao-xml.md`
+- Modify: `src/server/ai/xml-generation-prompt.ts`
+
+> **Arquivo que este plano tinha esquecido:** `src/server/ai/xml-generation-prompt.ts` é uma cópia em template literal da seção `## Prompt` do `.md`, usada pela geração de oportunidades por IA dentro do app. O cabeçalho dele exige sincronia sempre que o schema do XML muda. As mesmas sete tags e os mesmos sete bullets precisam entrar lá — sem o `## Histórico`, que é só do `.md`. Cuidado com backticks e `${` dentro do template literal.
 
 > Esta tarefa mexe no XML de **entrada**, o que normalmente é fora de escopo neste projeto. Foi autorizado explicitamente para esta feature.
+
+> **Estado deixado pela Task 4:** `xml-import.ts` já contém os sete campos no objeto `formData` devolvido, todos com o literal `""` e um comentário dizendo que ainda não há tags de XML. Isso foi obrigatório para compilar — `SolicitarProjetoFormData` é o tipo de *saída* do Zod, e `.optional().default("")` torna a chave obrigatória. Esta tarefa **substitui** esses sete literais pelas variáveis derivadas do parsing, e remove aquele comentário.
 
 - [ ] **Step 1: Ler as sete tags no import de solicitação**
 
