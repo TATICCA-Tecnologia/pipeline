@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { CURRENT_APPLICATION_ACCESS_REFERENCE_MAX_LENGTH } from "@/shared/constants/project-taxonomy";
 
 const ratingScale = z
   .number()
@@ -27,6 +28,22 @@ export const solicitarProjetoSchema = z
     hasCurrentApplication: z.string().optional().default(""),
     customHasCurrentApplication: z.string().optional().default(""),
     currentApplicationDetails: z.string().optional().default(""),
+    // Ficha de sustentação — só faz sentido quando hasCurrentApplication = "sim",
+    // mas nenhum campo é obrigatório: a ficha é preenchida incrementalmente.
+    currentApplicationHosting: z.string().optional().default(""),
+    currentApplicationHostingCustom: z.string().optional().default(""),
+    currentApplicationAuthor: z.string().optional().default(""),
+    currentApplicationOwner: z.string().optional().default(""),
+    currentApplicationAccessLocation: z.string().optional().default(""),
+    currentApplicationAccessReference: z
+      .string()
+      .max(
+        CURRENT_APPLICATION_ACCESS_REFERENCE_MAX_LENGTH,
+        "Use no máximo 200 caracteres — este campo é só a referência de onde encontrar o acesso"
+      )
+      .optional()
+      .default(""),
+    currentApplicationLiveSince: z.string().optional().default(""),
     peopleInvolved: z.string().optional().default(""),
     peopleInvolvedDetails: z.string().optional().default(""),
     taskDurationHours: z.string().optional().default(""),

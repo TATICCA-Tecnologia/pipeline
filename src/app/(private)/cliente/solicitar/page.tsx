@@ -63,6 +63,9 @@ import {
   PROCESS_FREQUENCY_MULTIPLIERS,
   HAS_EXISTING_SYSTEM_OPTIONS,
   HAS_CURRENT_APPLICATION_OPTIONS,
+  CURRENT_APPLICATION_HOSTING_OPTIONS,
+  CURRENT_APPLICATION_ACCESS_LOCATION_OPTIONS,
+  CURRENT_APPLICATION_ACCESS_REFERENCE_MAX_LENGTH,
   BENEFIT_OPTIONS,
 } from "./utils/solicitar.utils";
 import { useTaxonomy } from "./utils/use-taxonomy";
@@ -146,6 +149,13 @@ const STEPS: StepDef[] = [
       "hasCurrentApplication",
       "customHasCurrentApplication",
       "currentApplicationDetails",
+      "currentApplicationHosting",
+      "currentApplicationHostingCustom",
+      "currentApplicationAuthor",
+      "currentApplicationOwner",
+      "currentApplicationAccessLocation",
+      "currentApplicationAccessReference",
+      "currentApplicationLiveSince",
       "peopleInvolvedDetails",
     ],
   },
@@ -226,6 +236,13 @@ export default function SolicitarProjetoPage() {
       hasCurrentApplication: "",
       customHasCurrentApplication: "",
       currentApplicationDetails: "",
+      currentApplicationHosting: "",
+      currentApplicationHostingCustom: "",
+      currentApplicationAuthor: "",
+      currentApplicationOwner: "",
+      currentApplicationAccessLocation: "",
+      currentApplicationAccessReference: "",
+      currentApplicationLiveSince: "",
       peopleInvolved: "",
       peopleInvolvedDetails: "",
       taskDurationHours: "",
@@ -261,6 +278,7 @@ export default function SolicitarProjetoPage() {
   const targetAudience = watch("targetAudience");
   const hasExistingSystem = watch("hasExistingSystem");
   const hasCurrentApplication = watch("hasCurrentApplication");
+  const currentApplicationHosting = watch("currentApplicationHosting");
   const taskDurationHours = watch("taskDurationHours");
   const processFrequency = watch("processFrequency");
 
@@ -1099,16 +1117,145 @@ export default function SolicitarProjetoPage() {
                 </div>
 
                 {hasCurrentApplication === "sim" && (
-                  <div className="space-y-2">
-                    <Label htmlFor="currentApplicationDetails">
-                      Detalhes da aplicação existente
-                    </Label>
-                    <Textarea
-                      id="currentApplicationDetails"
-                      {...register("currentApplicationDetails")}
-                      placeholder="Qual plataforma, quem desenvolveu, desde quando está em uso..."
-                      rows={4}
-                    />
+                  <div className="space-y-5 rounded-lg border border-border p-4">
+                    <div className="space-y-1">
+                      <Label className="text-xs uppercase tracking-wider text-muted-foreground">
+                        Ficha da automação existente
+                      </Label>
+                      <p className="text-xs text-muted-foreground">
+                        Tudo opcional — ajuda o TI a saber onde a automação vive e quem
+                        cuida dela. O que você não souber, deixe em branco.
+                      </p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Onde essa automação roda hoje?</Label>
+                      <div className="flex gap-2">
+                        <Controller
+                          control={control}
+                          name="currentApplicationHosting"
+                          render={({ field }) => (
+                            <Select
+                              value={field.value}
+                              onValueChange={(value) => {
+                                field.onChange(value);
+                                if (value !== "outro")
+                                  setValue("currentApplicationHostingCustom", "");
+                              }}
+                            >
+                              <SelectTrigger
+                                className={
+                                  currentApplicationHosting === "outro"
+                                    ? "w-40 shrink-0"
+                                    : "w-full"
+                                }
+                              >
+                                <SelectValue placeholder="Selecione" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {CURRENT_APPLICATION_HOSTING_OPTIONS.map((option) => (
+                                  <SelectItem key={option.value} value={option.value}>
+                                    {option.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          )}
+                        />
+                        {currentApplicationHosting === "outro" && (
+                          <Input
+                            id="currentApplicationHostingCustom"
+                            {...register("currentApplicationHostingCustom")}
+                            placeholder="Descreva onde roda"
+                            className="flex-1"
+                          />
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="grid gap-5 sm:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label htmlFor="currentApplicationAuthor">Quem desenvolveu?</Label>
+                        <Input
+                          id="currentApplicationAuthor"
+                          {...register("currentApplicationAuthor")}
+                          placeholder="Pessoa, equipe interna ou fornecedor"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="currentApplicationOwner">Quem cuida dela hoje?</Label>
+                        <Input
+                          id="currentApplicationOwner"
+                          {...register("currentApplicationOwner")}
+                          placeholder="Quem chamar quando para de funcionar"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Onde ficam guardados os acessos que ela usa?</Label>
+                      <Controller
+                        control={control}
+                        name="currentApplicationAccessLocation"
+                        render={({ field }) => (
+                          <Select value={field.value} onValueChange={field.onChange}>
+                            <SelectTrigger className="w-full">
+                              <SelectValue placeholder="Selecione" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {CURRENT_APPLICATION_ACCESS_LOCATION_OPTIONS.map((option) => (
+                                <SelectItem key={option.value} value={option.value}>
+                                  {option.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        )}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="currentApplicationAccessReference">
+                        Onde encontrar
+                      </Label>
+                      <Input
+                        id="currentApplicationAccessReference"
+                        {...register("currentApplicationAccessReference")}
+                        maxLength={CURRENT_APPLICATION_ACCESS_REFERENCE_MAX_LENGTH}
+                        placeholder="Ex.: cofre TI — pasta Automações; ou: com o João do Financeiro"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Só a referência de onde procurar. Nunca escreva senhas, tokens ou
+                        chaves aqui.
+                      </p>
+                      {errors.currentApplicationAccessReference && (
+                        <p className="text-xs text-destructive">
+                          {errors.currentApplicationAccessReference.message}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="currentApplicationLiveSince">Em produção desde</Label>
+                      <Input
+                        id="currentApplicationLiveSince"
+                        type="date"
+                        {...register("currentApplicationLiveSince")}
+                        className="sm:w-48"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="currentApplicationDetails">
+                        Outras observações sobre a aplicação existente
+                      </Label>
+                      <Textarea
+                        id="currentApplicationDetails"
+                        {...register("currentApplicationDetails")}
+                        placeholder="Limitações conhecidas, o que costuma quebrar, integrações..."
+                        rows={4}
+                      />
+                    </div>
                   </div>
                 )}
 

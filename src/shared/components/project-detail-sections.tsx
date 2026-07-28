@@ -18,6 +18,8 @@ import {
   PROCESS_FREQUENCIES,
   BENEFIT_OPTIONS,
   COMPLEXITY_LEVELS,
+  resolveCurrentApplicationHostingLabel,
+  CURRENT_APPLICATION_ACCESS_LOCATION_OPTIONS,
   resolveLabel,
 } from "@/shared/constants/project-taxonomy";
 import { EXECUTION_STRATEGIES } from "@/src/app/(private)/admin/projetos/[id]/especificacao/_constants/architecture";
@@ -73,6 +75,17 @@ export function ProjectDetailSections({
     (key) => BENEFIT_OPTIONS.find((b) => b.key === key)?.label ?? key
   );
   const solutionTypeLabels = (project.solutionTypes ?? []).map((k) => k.name);
+  // A seção só aparece quando há algo preenchido — projetos que não são
+  // automações existentes não ganham um card vazio de "Não informado".
+  const hasSustentacaoData = Boolean(
+    project.currentApplicationHosting ||
+      project.currentApplicationHostingCustom ||
+      project.currentApplicationAuthor ||
+      project.currentApplicationOwner ||
+      project.currentApplicationAccessLocation ||
+      project.currentApplicationAccessReference ||
+      project.currentApplicationLiveSince
+  );
 
   return (
     <div className="space-y-6">
@@ -119,6 +132,45 @@ export function ProjectDetailSections({
           value={maskFreeText(project.currentApplicationDetails)}
         />
       </DetailSection>
+
+      {hasSustentacaoData && (
+        <DetailSection title="Sustentação & acessos">
+          <FieldRow
+            label="Onde a automação roda"
+            value={resolveCurrentApplicationHostingLabel(
+              project.currentApplicationHosting,
+              maskFreeText(project.currentApplicationHostingCustom)
+            )}
+          />
+          <FieldRow
+            label="Quem desenvolveu"
+            value={maskFreeText(project.currentApplicationAuthor)}
+          />
+          <FieldRow
+            label="Responsável hoje"
+            value={maskFreeText(project.currentApplicationOwner)}
+          />
+          <FieldRow
+            label="Onde ficam os acessos"
+            value={resolveLabel(
+              project.currentApplicationAccessLocation,
+              CURRENT_APPLICATION_ACCESS_LOCATION_OPTIONS
+            )}
+          />
+          <FieldRow
+            label="Onde encontrar"
+            value={maskFreeText(project.currentApplicationAccessReference)}
+          />
+          <FieldRow
+            label="Em produção desde"
+            value={
+              project.currentApplicationLiveSince
+                ? formatDate(new Date(project.currentApplicationLiveSince))
+                : undefined
+            }
+          />
+        </DetailSection>
+      )}
 
       <DetailSection title="Diagnóstico operacional">
         <FieldRow label="Colaboradores envolvidos" value={project.peopleInvolved} />

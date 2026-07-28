@@ -124,6 +124,38 @@ export const HAS_CURRENT_APPLICATION_OPTIONS = [
   { value: "outro", label: "Outro" },
 ];
 
+// Ficha de sustentação da automação existente — listas curtas e estáveis, por
+// isso constantes aqui em vez de tabela configurável (ao contrário de
+// ProjectArea/MainTool/UrgencyLevel, que variam por cliente).
+//
+// ATENÇÃO: os LABELS destas duas listas estão duplicados como texto literal em
+// docs/prompt-geracao-xml.md e em src/server/ai/xml-generation-prompt.ts, e a
+// importação de XML casa justamente por label (matchByLabel/resolveEnum). Mudar
+// um label aqui sem atualizar os dois arquivos faz todo XML gerado cair
+// silenciosamente no fallback "Outro" — sem erro, sem aviso. Mexeu no label,
+// mexa nos três lugares.
+export const CURRENT_APPLICATION_HOSTING_OPTIONS = [
+  { value: "servidor-proprio", label: "Servidor próprio (on-premise)" },
+  { value: "vm-cliente", label: "Máquina virtual da empresa" },
+  { value: "nuvem", label: "Nuvem (Azure, AWS, GCP)" },
+  { value: "maquina-usuario", label: "Máquina de um usuário" },
+  { value: "saas", label: "Plataforma SaaS do fornecedor" },
+  { value: "nao-sei", label: "Não sei" },
+  { value: "outro", label: "Outro" },
+];
+
+export const CURRENT_APPLICATION_ACCESS_LOCATION_OPTIONS = [
+  { value: "cofre-senhas", label: "Cofre de senhas corporativo" },
+  { value: "planilha", label: "Planilha ou documento compartilhado" },
+  { value: "com-pessoa", label: "Com uma pessoa específica" },
+  { value: "nao-se-sabe", label: "Não se sabe" },
+  { value: "outro", label: "Outro" },
+];
+
+// Limite do ponteiro de acessos. Curto de propósito: desencoraja colar um bloco
+// de credenciais num campo que é para dizer ONDE procurar, não O QUE usar.
+export const CURRENT_APPLICATION_ACCESS_REFERENCE_MAX_LENGTH = 200;
+
 export const BENEFIT_OPTIONS = [
   {
     key: "reducao-trabalho-operacional",
@@ -241,4 +273,18 @@ export function resolveLabel(
 ): string | undefined {
   if (!value) return undefined;
   return options.find((o) => o.value === value)?.label ?? value;
+}
+
+// Rótulo de "onde a automação roda": "outro" guarda o texto real no campo
+// custom, os demais slugs viram rótulo da taxonomia. Compartilhado pela ficha do
+// projeto, pela tabela de automações existentes e pelo deck .pptx — as três
+// precisam mostrar exatamente a mesma coisa.
+// Devolve undefined quando não há nada preenchido; cada tela escolhe o próprio
+// texto de vazio ("-" nas tabelas, "Não informado" no FieldRow).
+export function resolveCurrentApplicationHostingLabel(
+  hosting: string | null | undefined,
+  hostingCustom: string | null | undefined
+): string | undefined {
+  if (hosting === "outro") return hostingCustom?.trim() || "Outro";
+  return resolveLabel(hosting, CURRENT_APPLICATION_HOSTING_OPTIONS);
 }

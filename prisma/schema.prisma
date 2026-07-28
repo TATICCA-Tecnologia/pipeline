@@ -154,6 +154,20 @@ model Project {
   currentApplicationDetails String?
   projectNarrative          String?
 
+  // Ficha de sustentação da automação que já existe (só faz sentido quando
+  // hasCurrentApplication = "sim"). Preenchida pelo solicitante no levantamento,
+  // editável depois por dev/arquiteto. Tudo opcional — a ficha é preenchida
+  // incrementalmente. Ver docs/superpowers/specs/2026-07-28-ficha-sustentacao-automacoes-existentes-design.md
+  currentApplicationHosting         String? // slug de CURRENT_APPLICATION_HOSTING_OPTIONS
+  currentApplicationHostingCustom   String? // texto livre quando hosting = "outro"
+  currentApplicationAuthor          String? // quem desenvolveu
+  currentApplicationOwner           String? // quem cuida hoje
+  currentApplicationAccessLocation  String? // slug de CURRENT_APPLICATION_ACCESS_LOCATION_OPTIONS
+  // Ponteiro para ONDE o acesso mora (nome do cofre, caminho, com quem está).
+  // NUNCA a credencial em si — ver seção "Regra de segurança" da spec.
+  currentApplicationAccessReference String?
+  currentApplicationLiveSince       DateTime? // em produção desde
+
   // Beneficios e impacto esperado
   benefits          Json? // array de chaves selecionadas
   benefitsDetails   String?

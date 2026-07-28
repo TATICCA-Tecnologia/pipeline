@@ -64,6 +64,14 @@ export interface Project {
   existingSystemDetails?: string;
   hasCurrentApplication?: string;
   currentApplicationDetails?: string;
+  // Ficha de sustentação da automação existente
+  currentApplicationHosting?: string;
+  currentApplicationHostingCustom?: string;
+  currentApplicationAuthor?: string;
+  currentApplicationOwner?: string;
+  currentApplicationAccessLocation?: string;
+  currentApplicationAccessReference?: string;
+  currentApplicationLiveSince?: Date;
   projectNarrative?: string;
   benefits?: string[];
   benefitsDetails?: string;
