@@ -1327,6 +1327,16 @@ export const projectRouter = router({
         existingSystemDetails: z.string().optional(),
         hasCurrentApplication: z.string().optional(),
         currentApplicationDetails: z.string().optional(),
+        currentApplicationHosting: z.string().optional(),
+        currentApplicationHostingCustom: z.string().optional(),
+        currentApplicationAuthor: z.string().optional(),
+        currentApplicationOwner: z.string().optional(),
+        currentApplicationAccessLocation: z.string().optional(),
+        currentApplicationAccessReference: z
+          .string()
+          .max(CURRENT_APPLICATION_ACCESS_REFERENCE_MAX_LENGTH)
+          .optional(),
+        currentApplicationLiveSince: z.coerce.date().optional(),
         peopleInvolved: z.number().int().optional(),
         taskDurationHours: z.number().optional(),
         processFrequency: z.string().optional(),
@@ -1392,6 +1402,20 @@ export const projectRouter = router({
         data.hasCurrentApplication = input.hasCurrentApplication;
       if (input.currentApplicationDetails !== undefined)
         data.currentApplicationDetails = input.currentApplicationDetails;
+      if (input.currentApplicationHosting !== undefined)
+        data.currentApplicationHosting = input.currentApplicationHosting;
+      if (input.currentApplicationHostingCustom !== undefined)
+        data.currentApplicationHostingCustom = input.currentApplicationHostingCustom;
+      if (input.currentApplicationAuthor !== undefined)
+        data.currentApplicationAuthor = input.currentApplicationAuthor;
+      if (input.currentApplicationOwner !== undefined)
+        data.currentApplicationOwner = input.currentApplicationOwner;
+      if (input.currentApplicationAccessLocation !== undefined)
+        data.currentApplicationAccessLocation = input.currentApplicationAccessLocation;
+      if (input.currentApplicationAccessReference !== undefined)
+        data.currentApplicationAccessReference = input.currentApplicationAccessReference;
+      if (input.currentApplicationLiveSince !== undefined)
+        data.currentApplicationLiveSince = input.currentApplicationLiveSince;
       if (input.peopleInvolved !== undefined) data.peopleInvolved = input.peopleInvolved;
       if (input.taskDurationHours !== undefined || input.processFrequency !== undefined) {
         const nextDuration = input.taskDurationHours ?? current.taskDurationHours;

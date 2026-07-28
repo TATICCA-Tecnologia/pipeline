@@ -5,6 +5,9 @@ import {
   PROCESS_FREQUENCIES,
   COMPLEXITY_LEVELS,
   BENEFIT_OPTIONS,
+  CURRENT_APPLICATION_HOSTING_OPTIONS,
+  CURRENT_APPLICATION_ACCESS_LOCATION_OPTIONS,
+  CURRENT_APPLICATION_ACCESS_REFERENCE_MAX_LENGTH,
 } from "@/shared/constants/project-taxonomy";
 import { EXECUTION_STRATEGIES } from "@/src/app/(private)/admin/projetos/[id]/especificacao/_constants/architecture";
 
@@ -21,6 +24,15 @@ export interface ParsedProjetoCompleto {
   existingSystemDetails?: string;
   hasCurrentApplication?: string;
   currentApplicationDetails?: string;
+  currentApplicationHosting?: string;
+  currentApplicationHostingCustom?: string;
+  currentApplicationAuthor?: string;
+  currentApplicationOwner?: string;
+  currentApplicationAccessLocation?: string;
+  currentApplicationAccessReference?: string;
+  // String "AAAA-MM-DD", igual a estimatedDeadline — convertida para Date pelo
+  // caller (project-xml-import-export.tsx).
+  currentApplicationLiveSince?: string;
   peopleInvolved?: number;
   taskDurationHours?: number;
   processFrequency?: string;
@@ -153,6 +165,50 @@ export function parseProjetoCompletoXml(
     warnings
   );
   data.currentApplicationDetails = getDirectChildText(root, "detalhesAplicacaoExistente");
+  data.currentApplicationHosting = resolveEnum(
+    getDirectChildText(root, "hospedagemAplicacaoExistente"),
+    CURRENT_APPLICATION_HOSTING_OPTIONS,
+    "Onde a automação roda",
+    warnings
+  );
+  data.currentApplicationHostingCustom = getDirectChildText(
+    root,
+    "hospedagemCustomAplicacaoExistente"
+  );
+  data.currentApplicationAuthor = getDirectChildText(root, "autorAplicacaoExistente");
+  data.currentApplicationOwner = getDirectChildText(root, "responsavelAplicacaoExistente");
+  data.currentApplicationAccessLocation = resolveEnum(
+    getDirectChildText(root, "localAcessosAplicacaoExistente"),
+    CURRENT_APPLICATION_ACCESS_LOCATION_OPTIONS,
+    "Onde ficam os acessos",
+    warnings
+  );
+  const rawAccessReference = getDirectChildText(root, "referenciaAcessosAplicacaoExistente");
+  if (rawAccessReference) {
+    if (rawAccessReference.length > CURRENT_APPLICATION_ACCESS_REFERENCE_MAX_LENGTH) {
+      // Trunca em vez de falhar a importação inteira por causa de um campo
+      // auxiliar — ver "Tratamento de erros" na spec.
+      data.currentApplicationAccessReference = rawAccessReference.slice(
+        0,
+        CURRENT_APPLICATION_ACCESS_REFERENCE_MAX_LENGTH
+      );
+      warnings.push(
+        `"Referência dos acessos" tinha mais de ${CURRENT_APPLICATION_ACCESS_REFERENCE_MAX_LENGTH} caracteres — foi truncada.`
+      );
+    } else {
+      data.currentApplicationAccessReference = rawAccessReference;
+    }
+  }
+  const rawLiveSince = getDirectChildText(root, "producaoDesdeAplicacaoExistente");
+  if (rawLiveSince) {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(rawLiveSince)) {
+      data.currentApplicationLiveSince = rawLiveSince;
+    } else {
+      warnings.push(
+        `"Em produção desde" com valor "${rawLiveSince}" não está no formato AAAA-MM-DD — ignorado.`
+      );
+    }
+  }
   data.peopleInvolved = parseNumber(
     getDirectChildText(root, "colaboradoresEnvolvidos"),
     "Colaboradores envolvidos",

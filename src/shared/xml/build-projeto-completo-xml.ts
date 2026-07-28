@@ -6,6 +6,8 @@ import {
   PROCESS_FREQUENCIES,
   COMPLEXITY_LEVELS,
   BENEFIT_OPTIONS,
+  CURRENT_APPLICATION_HOSTING_OPTIONS,
+  CURRENT_APPLICATION_ACCESS_LOCATION_OPTIONS,
   resolveLabel,
 } from "@/shared/constants/project-taxonomy";
 import { EXECUTION_STRATEGIES } from "@/src/app/(private)/admin/projetos/[id]/especificacao/_constants/architecture";
@@ -64,6 +66,13 @@ export type ProjetoCompletoXmlData = Pick<
   | "existingSystemDetails"
   | "hasCurrentApplication"
   | "currentApplicationDetails"
+  | "currentApplicationHosting"
+  | "currentApplicationHostingCustom"
+  | "currentApplicationAuthor"
+  | "currentApplicationOwner"
+  | "currentApplicationAccessLocation"
+  | "currentApplicationAccessReference"
+  | "currentApplicationLiveSince"
   | "peopleInvolved"
   | "taskDurationHours"
   | "processFrequency"
@@ -124,6 +133,32 @@ export function buildProjetoCompletoXmlFields(
     )
   );
   lines.push(tag("detalhesAplicacaoExistente", project.currentApplicationDetails));
+  lines.push(
+    tag(
+      "hospedagemAplicacaoExistente",
+      resolveLabel(project.currentApplicationHosting, CURRENT_APPLICATION_HOSTING_OPTIONS)
+    )
+  );
+  lines.push(
+    tag("hospedagemCustomAplicacaoExistente", project.currentApplicationHostingCustom)
+  );
+  lines.push(tag("autorAplicacaoExistente", project.currentApplicationAuthor));
+  lines.push(tag("responsavelAplicacaoExistente", project.currentApplicationOwner));
+  lines.push(
+    tag(
+      "localAcessosAplicacaoExistente",
+      resolveLabel(
+        project.currentApplicationAccessLocation,
+        CURRENT_APPLICATION_ACCESS_LOCATION_OPTIONS
+      )
+    )
+  );
+  lines.push(
+    tag("referenciaAcessosAplicacaoExistente", project.currentApplicationAccessReference)
+  );
+  lines.push(
+    tag("producaoDesdeAplicacaoExistente", formatDeadline(project.currentApplicationLiveSince))
+  );
   lines.push(tag("colaboradoresEnvolvidos", project.peopleInvolved));
   lines.push(tag("duracaoPorExecucao", project.taskDurationHours));
   lines.push(tag("periodicidade", resolveLabel(project.processFrequency, PROCESS_FREQUENCIES)));

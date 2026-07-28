@@ -80,11 +80,19 @@ export function ProjectXmlImportExport({ project }: { project: Project }) {
     }
 
     setIsImporting(true);
-    const { projetoId: _projetoId, estimatedDeadline, ...rest } = parsed.data;
+    const {
+      projetoId: _projetoId,
+      estimatedDeadline,
+      currentApplicationLiveSince,
+      ...rest
+    } = parsed.data;
     importMutation.mutate({
       projectId: project.id,
       ...rest,
       ...(estimatedDeadline ? { estimatedDeadline: parseLocalDateInputValue(estimatedDeadline) } : {}),
+      ...(currentApplicationLiveSince
+        ? { currentApplicationLiveSince: parseLocalDateInputValue(currentApplicationLiveSince) }
+        : {}),
     });
   }
 
