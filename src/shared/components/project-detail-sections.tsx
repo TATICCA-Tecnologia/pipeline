@@ -18,7 +18,7 @@ import {
   PROCESS_FREQUENCIES,
   BENEFIT_OPTIONS,
   COMPLEXITY_LEVELS,
-  CURRENT_APPLICATION_HOSTING_OPTIONS,
+  resolveCurrentApplicationHostingLabel,
   CURRENT_APPLICATION_ACCESS_LOCATION_OPTIONS,
   resolveLabel,
 } from "@/shared/constants/project-taxonomy";
@@ -137,14 +137,10 @@ export function ProjectDetailSections({
         <DetailSection title="Sustentação & acessos">
           <FieldRow
             label="Onde a automação roda"
-            value={
-              project.currentApplicationHosting === "outro"
-                ? maskFreeText(project.currentApplicationHostingCustom)
-                : resolveLabel(
-                    project.currentApplicationHosting,
-                    CURRENT_APPLICATION_HOSTING_OPTIONS
-                  )
-            }
+            value={resolveCurrentApplicationHostingLabel(
+              project.currentApplicationHosting,
+              maskFreeText(project.currentApplicationHostingCustom)
+            )}
           />
           <FieldRow
             label="Quem desenvolveu"

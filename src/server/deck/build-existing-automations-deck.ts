@@ -5,9 +5,9 @@ import { createCaller } from "@/server/trpc/root";
 import type { Context } from "@/server/trpc/context";
 import { formatCurrency, formatDate } from "@/shared/utils";
 import {
-  CURRENT_APPLICATION_HOSTING_OPTIONS,
   CURRENT_APPLICATION_ACCESS_LOCATION_OPTIONS,
   resolveLabel,
+  resolveCurrentApplicationHostingLabel,
 } from "@/shared/constants/project-taxonomy";
 import {
   addCoverSlide,
@@ -53,13 +53,14 @@ type ExistingAutomationProject = {
   currentApplicationLiveSince: Date | null;
 };
 
-// "Outro" guarda o texto real no campo custom; os demais slugs viram rótulo
-// da taxonomia. Sem valor nenhum, o deck mostra "-" em vez de célula vazia.
+// Sem valor nenhum, o deck mostra "-" em vez de célula vazia.
 function hostingLabel(p: ExistingAutomationProject): string {
-  if (p.currentApplicationHosting === "outro") {
-    return p.currentApplicationHostingCustom?.trim() || "Outro";
-  }
-  return resolveLabel(p.currentApplicationHosting, CURRENT_APPLICATION_HOSTING_OPTIONS) ?? "-";
+  return (
+    resolveCurrentApplicationHostingLabel(
+      p.currentApplicationHosting,
+      p.currentApplicationHostingCustom
+    ) ?? "-"
+  );
 }
 
 function accessLabel(p: ExistingAutomationProject): string {
@@ -75,6 +76,11 @@ function liveSinceLabel(p: ExistingAutomationProject): string {
 
 // Um projeto sem nenhum campo de ficha preenchido não entra no slide de
 // inventário — uma tabela só de traços não informa nada.
+// Checa seis campos, não sete: `currentApplicationAccessReference` é de
+// propósito o único que nunca sai no deck (é texto livre apontando onde as
+// credenciais moram), então não faz sentido usá-lo como critério de entrada
+// numa tabela que não vai exibi-lo. É por isso que este predicado difere do
+// homônimo em project-detail-sections.tsx, que inclui o sétimo campo.
 function hasSustentacaoData(p: ExistingAutomationProject): boolean {
   return Boolean(
     p.currentApplicationHosting ||

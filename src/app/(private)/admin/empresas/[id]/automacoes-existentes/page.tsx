@@ -34,8 +34,7 @@ import { ExistingAutomationsAreaSummaryChart } from "@/shared/components/existin
 import { useModal } from "@/shared/context/modal-context";
 import { ProjectExecutiveSlideModal } from "@/src/app/(private)/admin/projetos/_components/project-executive-slide.modal";
 import {
-  CURRENT_APPLICATION_HOSTING_OPTIONS,
-  resolveLabel,
+  resolveCurrentApplicationHostingLabel,
 } from "@/shared/constants/project-taxonomy";
 
 interface Props {
@@ -66,15 +65,15 @@ type RankingRow = {
   currentApplicationOwner: string | null;
 };
 
-// "Outro" guarda o texto real no campo custom; qualquer outro slug vira o
-// rótulo da taxonomia (resolveLabel devolve o próprio slug se não reconhecer).
 // Recebe a linha já mascarada por displayRanking — o texto de "outro" é livre e
 // precisa passar por maskFreeText no modo demo, igual ao título e ao responsável.
 function hostingLabelOf(row: RankingRow): string {
-  if (row.currentApplicationHosting === "outro") {
-    return row.currentApplicationHostingCustom?.trim() || "Outro";
-  }
-  return resolveLabel(row.currentApplicationHosting, CURRENT_APPLICATION_HOSTING_OPTIONS) ?? "-";
+  return (
+    resolveCurrentApplicationHostingLabel(
+      row.currentApplicationHosting,
+      row.currentApplicationHostingCustom
+    ) ?? "-"
+  );
 }
 
 function activeScoreOf(row: RankingRow, sortBy: SortBy): number {

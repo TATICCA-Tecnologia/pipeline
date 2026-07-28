@@ -267,3 +267,17 @@ export function resolveLabel(
   if (!value) return undefined;
   return options.find((o) => o.value === value)?.label ?? value;
 }
+
+// Rótulo de "onde a automação roda": "outro" guarda o texto real no campo
+// custom, os demais slugs viram rótulo da taxonomia. Compartilhado pela ficha do
+// projeto, pela tabela de automações existentes e pelo deck .pptx — as três
+// precisam mostrar exatamente a mesma coisa.
+// Devolve undefined quando não há nada preenchido; cada tela escolhe o próprio
+// texto de vazio ("-" nas tabelas, "Não informado" no FieldRow).
+export function resolveCurrentApplicationHostingLabel(
+  hosting: string | null | undefined,
+  hostingCustom: string | null | undefined
+): string | undefined {
+  if (hosting === "outro") return hostingCustom?.trim() || "Outro";
+  return resolveLabel(hosting, CURRENT_APPLICATION_HOSTING_OPTIONS);
+}
