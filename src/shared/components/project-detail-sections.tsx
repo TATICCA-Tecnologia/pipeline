@@ -147,14 +147,6 @@ export function ProjectDetailSections({
             }
           />
           <FieldRow
-            label="Em produção desde"
-            value={
-              project.currentApplicationLiveSince
-                ? formatDate(new Date(project.currentApplicationLiveSince))
-                : undefined
-            }
-          />
-          <FieldRow
             label="Quem desenvolveu"
             value={maskFreeText(project.currentApplicationAuthor)}
           />
@@ -172,6 +164,14 @@ export function ProjectDetailSections({
           <FieldRow
             label="Onde encontrar"
             value={maskFreeText(project.currentApplicationAccessReference)}
+          />
+          <FieldRow
+            label="Em produção desde"
+            value={
+              project.currentApplicationLiveSince
+                ? formatDate(new Date(project.currentApplicationLiveSince))
+                : undefined
+            }
           />
         </DetailSection>
       )}
