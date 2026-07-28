@@ -71,6 +71,9 @@ function EditableNumber({
   integer = false,
   className,
   step,
+  placeholder,
+  ariaLabel,
+  id,
 }: {
   value: number | null;
   onCommit: (next: number | null) => void;
@@ -79,6 +82,14 @@ function EditableNumber({
   integer?: boolean;
   className?: string;
   step?: string;
+  /**
+   * Mostrado em cinza quando o campo está vazio — usado para revelar o valor
+   * que o cálculo está de fato usando enquanto o dado não foi preenchido.
+   */
+  placeholder?: string;
+  /** Contexto para leitor de tela quando o cabeçalho da coluna não basta. */
+  ariaLabel?: string;
+  id?: string;
 }) {
   const [draft, setDraft] = useState<string | null>(null);
   const text = draft ?? (value != null ? String(value) : "");
@@ -114,6 +125,9 @@ function EditableNumber({
       min={0}
       step={step}
       className={className}
+      id={id}
+      placeholder={placeholder}
+      aria-label={ariaLabel}
       value={text}
       onChange={(e) => setDraft(e.target.value)}
       onBlur={commit}
@@ -275,8 +289,9 @@ export function PaybackTab({
         </CardHeader>
         <CardContent>
           <div className="max-w-xs space-y-1.5">
-            <Label>Taxa diária do desenvolvedor (R$)</Label>
+            <Label htmlFor="developer-daily-rate">Taxa diária do desenvolvedor (R$)</Label>
             <EditableNumber
+              id="developer-daily-rate"
               value={companyDailyRateBRL}
               allowEmpty
               step="0.01"
@@ -307,7 +322,7 @@ export function PaybackTab({
             <KpiTile
               label="Custo total projetado"
               value={formatCurrency(totals.developmentCost + totals.structureCost)}
-              hint={`dev ${formatCurrency(totals.developmentCost)} + estrutura ${formatCurrency(totals.structureCost)}`}
+              hint={`dev ${formatCurrency(totals.developmentCost)} + estrutura ${formatCurrency(totals.structureCost)} até o fim da janela`}
             />
             <KpiTile
               label="Economia anual"
@@ -342,7 +357,8 @@ export function PaybackTab({
           <p className="text-xs text-muted-foreground">
             Um robô por linha, com os números que alimentam a curva acima — custo de
             desenvolvimento = dias úteis × taxa diária do desenvolvedor. Dias úteis e economia são
-            editáveis: a alteração é gravada no projeto e recalcula cronograma e curva.
+            editáveis: a alteração é gravada no projeto e recalcula cronograma e curva. Dias úteis
+            em branco = ainda não estimado; o cronograma usa o padrão mostrado em cinza no campo.
           </p>
         </CardHeader>
         <CardContent className="p-0">
@@ -392,6 +408,11 @@ export function PaybackTab({
                         value={item.effortDays}
                         integer
                         step="1"
+                        // Campo vazio (esforço não estimado) mostra em cinza o
+                        // número de dias que o cronograma está de fato usando
+                        // — o mesmo que alimenta o custo de dev. desta linha.
+                        placeholder={String(item.businessDays)}
+                        ariaLabel={`Dias úteis de ${item.title}`}
                         // Vazio grava null = "ainda não estimado"; o Passo 5
                         // volta a aplicar o fallback de 20 dias úteis.
                         allowEmpty
@@ -414,6 +435,7 @@ export function PaybackTab({
                         className="h-8 w-32 text-right"
                         step="0.01"
                         value={item.annualSavingBRL}
+                        ariaLabel={`Economia anual de ${item.title}`}
                         onCommit={(next) =>
                           projectMutation.mutate({
                             id: item.projectId,
