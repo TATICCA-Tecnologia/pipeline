@@ -367,6 +367,15 @@ export function parseSolicitacaoXml(
     hasCurrentApplication,
     customHasCurrentApplication,
     currentApplicationDetails,
+    // Ficha de sustentação (Task 4) ainda não tem tags de XML dedicadas — fica
+    // em branco na importação e é preenchida manualmente no formulário.
+    currentApplicationHosting: "",
+    currentApplicationHostingCustom: "",
+    currentApplicationAuthor: "",
+    currentApplicationOwner: "",
+    currentApplicationAccessLocation: "",
+    currentApplicationAccessReference: "",
+    currentApplicationLiveSince: "",
     peopleInvolved,
     peopleInvolvedDetails,
     taskDurationHours,

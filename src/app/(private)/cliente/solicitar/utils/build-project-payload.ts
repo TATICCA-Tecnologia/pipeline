@@ -88,6 +88,15 @@ export function buildProjectPayload(params: {
     existingSystemDetails: data.existingSystemDetails || undefined,
     hasCurrentApplication: hasCurrentApplicationValue || undefined,
     currentApplicationDetails: data.currentApplicationDetails || undefined,
+    currentApplicationHosting: data.currentApplicationHosting || undefined,
+    currentApplicationHostingCustom: data.currentApplicationHostingCustom || undefined,
+    currentApplicationAuthor: data.currentApplicationAuthor || undefined,
+    currentApplicationOwner: data.currentApplicationOwner || undefined,
+    currentApplicationAccessLocation: data.currentApplicationAccessLocation || undefined,
+    currentApplicationAccessReference: data.currentApplicationAccessReference || undefined,
+    currentApplicationLiveSince: data.currentApplicationLiveSince
+      ? new Date(data.currentApplicationLiveSince)
+      : undefined,
     projectNarrative: data.projectNarrative || undefined,
     benefits: benefits.length ? benefits : undefined,
     benefitsDetails: data.benefitsDetails || undefined,
