@@ -27,6 +27,9 @@ import {
   PROCESS_FREQUENCIES,
   BENEFIT_OPTIONS,
   COMPLEXITY_LEVELS,
+  CURRENT_APPLICATION_HOSTING_OPTIONS,
+  CURRENT_APPLICATION_ACCESS_LOCATION_OPTIONS,
+  CURRENT_APPLICATION_ACCESS_REFERENCE_MAX_LENGTH,
   resolveLabel,
 } from "@/shared/constants/project-taxonomy";
 import { EXECUTION_STRATEGIES } from "@/src/app/(private)/admin/projetos/[id]/especificacao/_constants/architecture";
@@ -67,6 +70,13 @@ interface EditFormState {
   existingSystemDetails: string;
   hasCurrentApplication: string;
   currentApplicationDetails: string;
+  currentApplicationHosting: string;
+  currentApplicationHostingCustom: string;
+  currentApplicationAuthor: string;
+  currentApplicationOwner: string;
+  currentApplicationAccessLocation: string;
+  currentApplicationAccessReference: string;
+  currentApplicationLiveSince: string;
   peopleInvolved: string;
   peopleInvolvedDetails: string;
   taskDurationHours: string;
@@ -112,6 +122,13 @@ export function ProjectRequestEditForm({
     existingSystemDetails: project.existingSystemDetails ?? "",
     hasCurrentApplication: project.hasCurrentApplication ?? "",
     currentApplicationDetails: project.currentApplicationDetails ?? "",
+    currentApplicationHosting: project.currentApplicationHosting ?? "",
+    currentApplicationHostingCustom: project.currentApplicationHostingCustom ?? "",
+    currentApplicationAuthor: project.currentApplicationAuthor ?? "",
+    currentApplicationOwner: project.currentApplicationOwner ?? "",
+    currentApplicationAccessLocation: project.currentApplicationAccessLocation ?? "",
+    currentApplicationAccessReference: project.currentApplicationAccessReference ?? "",
+    currentApplicationLiveSince: toDateInputValue(project.currentApplicationLiveSince),
     peopleInvolved: project.peopleInvolved?.toString() ?? "",
     peopleInvolvedDetails: project.peopleInvolvedDetails ?? "",
     taskDurationHours: project.taskDurationHours?.toString() ?? "",
@@ -208,6 +225,15 @@ export function ProjectRequestEditForm({
       existingSystemDetails: form.existingSystemDetails || null,
       hasCurrentApplication: form.hasCurrentApplication || null,
       currentApplicationDetails: form.currentApplicationDetails || null,
+      currentApplicationHosting: form.currentApplicationHosting || null,
+      currentApplicationHostingCustom: form.currentApplicationHostingCustom || null,
+      currentApplicationAuthor: form.currentApplicationAuthor || null,
+      currentApplicationOwner: form.currentApplicationOwner || null,
+      currentApplicationAccessLocation: form.currentApplicationAccessLocation || null,
+      currentApplicationAccessReference: form.currentApplicationAccessReference || null,
+      currentApplicationLiveSince: form.currentApplicationLiveSince
+        ? new Date(form.currentApplicationLiveSince)
+        : null,
       peopleInvolved: form.peopleInvolved ? parseInt(form.peopleInvolved, 10) : null,
       peopleInvolvedDetails: form.peopleInvolvedDetails || null,
       taskDurationHours: form.taskDurationHours ? parseFloat(form.taskDurationHours) : null,
@@ -376,6 +402,95 @@ export function ProjectRequestEditForm({
             rows={2}
             value={form.currentApplicationDetails}
             onChange={(e) => set("currentApplicationDetails", e.target.value)}
+          />
+        </div>
+      </DetailSection>
+
+      <DetailSection title="Sustentação & acessos">
+        <div className="space-y-1.5">
+          <Label>Onde a automação roda</Label>
+          <Select
+            value={form.currentApplicationHosting}
+            onValueChange={(v) => {
+              set("currentApplicationHosting", v);
+              if (v !== "outro") set("currentApplicationHostingCustom", "");
+            }}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Selecione" />
+            </SelectTrigger>
+            <SelectContent>
+              {CURRENT_APPLICATION_HOSTING_OPTIONS.map((opt) => (
+                <SelectItem key={opt.value} value={opt.value}>
+                  {opt.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        {form.currentApplicationHosting === "outro" && (
+          <div className="space-y-1.5">
+            <Label htmlFor="edit-currentApplicationHostingCustom">Onde roda (outro)</Label>
+            <Input
+              id="edit-currentApplicationHostingCustom"
+              value={form.currentApplicationHostingCustom}
+              onChange={(e) => set("currentApplicationHostingCustom", e.target.value)}
+            />
+          </div>
+        )}
+        <div className="space-y-1.5">
+          <Label htmlFor="edit-currentApplicationAuthor">Quem desenvolveu</Label>
+          <Input
+            id="edit-currentApplicationAuthor"
+            value={form.currentApplicationAuthor}
+            onChange={(e) => set("currentApplicationAuthor", e.target.value)}
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="edit-currentApplicationOwner">Responsável hoje</Label>
+          <Input
+            id="edit-currentApplicationOwner"
+            value={form.currentApplicationOwner}
+            onChange={(e) => set("currentApplicationOwner", e.target.value)}
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label>Onde ficam os acessos</Label>
+          <Select
+            value={form.currentApplicationAccessLocation}
+            onValueChange={(v) => set("currentApplicationAccessLocation", v)}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Selecione" />
+            </SelectTrigger>
+            <SelectContent>
+              {CURRENT_APPLICATION_ACCESS_LOCATION_OPTIONS.map((opt) => (
+                <SelectItem key={opt.value} value={opt.value}>
+                  {opt.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="edit-currentApplicationAccessReference">Onde encontrar</Label>
+          <Input
+            id="edit-currentApplicationAccessReference"
+            value={form.currentApplicationAccessReference}
+            maxLength={CURRENT_APPLICATION_ACCESS_REFERENCE_MAX_LENGTH}
+            onChange={(e) => set("currentApplicationAccessReference", e.target.value)}
+          />
+          <p className="text-xs text-muted-foreground">
+            Só a referência de onde procurar. Nunca senhas, tokens ou chaves.
+          </p>
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="edit-currentApplicationLiveSince">Em produção desde</Label>
+          <Input
+            id="edit-currentApplicationLiveSince"
+            type="date"
+            value={form.currentApplicationLiveSince}
+            onChange={(e) => set("currentApplicationLiveSince", e.target.value)}
           />
         </div>
       </DetailSection>
