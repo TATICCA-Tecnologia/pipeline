@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { differenceInBusinessDays, differenceInCalendarDays, format } from "date-fns";
 import { toast } from "sonner";
 import { trpc } from "@/shared/trpc/client";
@@ -367,8 +368,19 @@ export function PaybackTab({
               ) : (
                 composition.map((item) => (
                   <TableRow key={item.projectId}>
+                    {/*
+                      Só o título é clicável (não a linha inteira, como na aba
+                      antiga): as células de dias úteis e economia têm inputs
+                      inline, e um onClick na TableRow dispararia a navegação a
+                      cada clique/blur dentro deles.
+                    */}
                     <TableCell className="font-medium max-w-[260px] truncate">
-                      {item.title}
+                      <Link
+                        href={`/admin/projetos/${item.projectId}/especificacao`}
+                        className="hover:text-primary hover:underline"
+                      >
+                        {item.title}
+                      </Link>
                     </TableCell>
                     <TableCell className="text-muted-foreground">Onda {item.wave}</TableCell>
                     <TableCell className="text-muted-foreground">

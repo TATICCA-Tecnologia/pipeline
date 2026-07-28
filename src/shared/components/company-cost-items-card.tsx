@@ -40,7 +40,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/src/shared/components/ui/table";
-import { useToast } from "@/src/shared/hooks/use-toast";
+import { toast } from "sonner";
 import { Plus, Pencil, Trash2 } from "lucide-react";
 import { formatCurrency, formatDate } from "@/shared/utils";
 
@@ -51,6 +51,10 @@ import { formatCurrency, formatDate } from "@/shared/utils";
  * a página /admin/empresas/[id]/custos e a aba Payback da priorização, onde
  * esses custos entram na curva. Duplicar a tabela + dialog nos dois lugares era
  * a alternativa; um componente só evita que as duas telas divirjam.
+ *
+ * Notificações via `sonner`: o `<Toaster />` do sonner é o único montado no
+ * layout raiz (src/app/layout.tsx), então toasts do `useToast` (shadcn) não
+ * seriam renderizados em lugar nenhum.
  */
 
 type RouterOutputs = inferRouterOutputs<AppRouter>;
@@ -70,7 +74,6 @@ interface CompanyCostItemsCardProps {
 }
 
 export function CompanyCostItemsCard({ companyId, description }: CompanyCostItemsCardProps) {
-  const { toast } = useToast();
   const utils = trpc.useUtils();
 
   const { data: items = [], isLoading } = trpc.company.listCostItems.useQuery({ companyId });
@@ -113,24 +116,24 @@ export function CompanyCostItemsCard({ companyId, description }: CompanyCostItem
     onSuccess: () => {
       invalidateAll();
       setDialog({ open: false });
-      toast({ title: "Item de custo criado" });
+      toast.success("Item de custo criado");
     },
-    onError: (e) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
+    onError: (e) => toast.error("Erro ao salvar item de custo", { description: e.message }),
   });
   const updateMutation = trpc.company.updateCostItem.useMutation({
     onSuccess: () => {
       invalidateAll();
       setDialog({ open: false });
-      toast({ title: "Item de custo atualizado" });
+      toast.success("Item de custo atualizado");
     },
-    onError: (e) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
+    onError: (e) => toast.error("Erro ao salvar item de custo", { description: e.message }),
   });
   const deleteMutation = trpc.company.deleteCostItem.useMutation({
     onSuccess: () => {
       invalidateAll();
-      toast({ title: "Item de custo removido" });
+      toast.success("Item de custo removido");
     },
-    onError: (e) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
+    onError: (e) => toast.error("Erro ao remover item de custo", { description: e.message }),
   });
 
   function openNew() {
