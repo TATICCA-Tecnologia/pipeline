@@ -3,7 +3,12 @@ import type { RobotOperationalStatus } from "@prisma/client";
 import { db } from "@/server/db";
 import { createCaller } from "@/server/trpc/root";
 import type { Context } from "@/server/trpc/context";
-import { formatCurrency } from "@/shared/utils";
+import { formatCurrency, formatDate } from "@/shared/utils";
+import {
+  CURRENT_APPLICATION_HOSTING_OPTIONS,
+  CURRENT_APPLICATION_ACCESS_LOCATION_OPTIONS,
+  resolveLabel,
+} from "@/shared/constants/project-taxonomy";
 import {
   addCoverSlide,
   addTitledSlide,
@@ -37,6 +42,49 @@ const ROBOT_OPERATIONAL_STATUS_LABEL: Record<RobotOperationalStatus, string> = {
   PAUSED: "Pausado",
   ISSUE: "Com problema",
 };
+
+type ExistingAutomationProject = {
+  title: string;
+  currentApplicationHosting: string | null;
+  currentApplicationHostingCustom: string | null;
+  currentApplicationAuthor: string | null;
+  currentApplicationOwner: string | null;
+  currentApplicationAccessLocation: string | null;
+  currentApplicationLiveSince: Date | null;
+};
+
+// "Outro" guarda o texto real no campo custom; os demais slugs viram rótulo
+// da taxonomia. Sem valor nenhum, o deck mostra "-" em vez de célula vazia.
+function hostingLabel(p: ExistingAutomationProject): string {
+  if (p.currentApplicationHosting === "outro") {
+    return p.currentApplicationHostingCustom?.trim() || "Outro";
+  }
+  return resolveLabel(p.currentApplicationHosting, CURRENT_APPLICATION_HOSTING_OPTIONS) ?? "-";
+}
+
+function accessLabel(p: ExistingAutomationProject): string {
+  return (
+    resolveLabel(p.currentApplicationAccessLocation, CURRENT_APPLICATION_ACCESS_LOCATION_OPTIONS) ??
+    "-"
+  );
+}
+
+function liveSinceLabel(p: ExistingAutomationProject): string {
+  return p.currentApplicationLiveSince ? formatDate(p.currentApplicationLiveSince) : "-";
+}
+
+// Um projeto sem nenhum campo de ficha preenchido não entra no slide de
+// inventário — uma tabela só de traços não informa nada.
+function hasSustentacaoData(p: ExistingAutomationProject): boolean {
+  return Boolean(
+    p.currentApplicationHosting ||
+      p.currentApplicationHostingCustom ||
+      p.currentApplicationAuthor ||
+      p.currentApplicationOwner ||
+      p.currentApplicationAccessLocation ||
+      p.currentApplicationLiveSince
+  );
+}
 
 export async function buildExistingAutomationsDeck(
   companyId: string,
@@ -84,6 +132,12 @@ export async function buildExistingAutomationsDeck(
           ratingCompliance: true,
           accumulatedSavingBRL: true,
           operationalStatus: true,
+          currentApplicationHosting: true,
+          currentApplicationHostingCustom: true,
+          currentApplicationAuthor: true,
+          currentApplicationOwner: true,
+          currentApplicationAccessLocation: true,
+          currentApplicationLiveSince: true,
         },
       }),
     ]);
@@ -98,6 +152,7 @@ export async function buildExistingAutomationsDeck(
   addAreaSummarySlide(pres, areaSummary);
   addRankingSlide(pres, "Ranking por economia acumulada", rankingEconomia, "economia");
   addRankingSlide(pres, "Ranking por qualitativo", rankingQualitativo, "qualitativo");
+  addInventorySlide(pres, projects);
   if (interviews.length > 0) {
     addInterviewsSlide(pres, interviews);
   }
@@ -117,6 +172,11 @@ export async function buildExistingAutomationsDeck(
             : "Não informado",
         isSaving: true,
       },
+      { label: "Onde roda", value: hostingLabel(project) },
+      { label: "Quem desenvolveu", value: project.currentApplicationAuthor ?? "Não informado" },
+      { label: "Responsável hoje", value: project.currentApplicationOwner ?? "Não informado" },
+      { label: "Onde ficam os acessos", value: accessLabel(project) },
+      { label: "Em produção desde", value: liveSinceLabel(project) },
     ];
     addProjectSlide(pres, project, extraLines);
   }
@@ -210,4 +270,43 @@ function addRankingSlide(
   ]);
 
   addSlideTable(slide, [header, ...rows], [0.6, 5, 2.9, 2.4, 1.3]);
+}
+
+// Slide de inventário técnico (Passo 7): uma linha por automação com ficha de
+// sustentação preenchida — visão única para levar numa reunião com TI, sem
+// precisar abrir slide por slide. Igual a `addRankingSlide`, a tabela cresce
+// sem paginação/limite (autoPage do addSlideTable cobre a quebra de página).
+function addInventorySlide(pres: PptxGenJS, projects: ExistingAutomationProject[]): void {
+  const withData = projects.filter(hasSustentacaoData);
+  const slide = addTitledSlide(pres, "Inventário técnico — sustentação e acessos");
+
+  if (withData.length === 0) {
+    slide.addText("Nenhuma automação existente com ficha de sustentação preenchida.", {
+      x: 0.5,
+      y: 1.5,
+      fontSize: 14,
+      color: COLOR_MUTED,
+    });
+    return;
+  }
+
+  const header: TableRow = [
+    { text: "Automação", options: TABLE_HEADER_OPTS },
+    { text: "Onde roda", options: TABLE_HEADER_OPTS },
+    { text: "Quem fez", options: TABLE_HEADER_OPTS },
+    { text: "Responsável", options: TABLE_HEADER_OPTS },
+    { text: "Acessos", options: TABLE_HEADER_OPTS },
+    { text: "Desde", options: TABLE_HEADER_OPTS },
+  ];
+
+  const rows: TableRow[] = withData.map((p) => [
+    { text: p.title },
+    { text: hostingLabel(p) },
+    { text: p.currentApplicationAuthor ?? "-" },
+    { text: p.currentApplicationOwner ?? "-" },
+    { text: accessLabel(p) },
+    { text: liveSinceLabel(p) },
+  ]);
+
+  addSlideTable(slide, [header, ...rows], [3.2, 2.2, 2, 2, 2, 1.2]);
 }
