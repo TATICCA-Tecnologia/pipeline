@@ -9,6 +9,9 @@ import {
   PROCESS_FREQUENCIES,
   HAS_EXISTING_SYSTEM_OPTIONS,
   HAS_CURRENT_APPLICATION_OPTIONS,
+  CURRENT_APPLICATION_HOSTING_OPTIONS,
+  CURRENT_APPLICATION_ACCESS_LOCATION_OPTIONS,
+  CURRENT_APPLICATION_ACCESS_REFERENCE_MAX_LENGTH,
   BENEFIT_OPTIONS,
 } from "../utils/solicitar.utils";
 import { useTaxonomy } from "../utils/use-taxonomy";
@@ -91,7 +94,50 @@ export default function AjudaXmlPage() {
       tag: "detalhesAplicacaoExistente",
       required: false,
       description:
-        "Detalhes da aplicação existente: plataforma usada, quem desenvolveu, desde quando está em uso, etc. Preencha só se aplicacaoExistenteHoje for Sim.",
+        "Observações livres sobre a aplicação existente: limitações conhecidas, o que costuma quebrar, integrações. Preencha só se aplicacaoExistenteHoje for Sim. Os dados estruturados da automação (onde roda, quem fez, acessos) têm tags próprias, abaixo.",
+    },
+    {
+      tag: "hospedagemAplicacaoExistente",
+      required: false,
+      description:
+        'Onde a automação roda hoje. Preencha só se aplicacaoExistenteHoje for Sim. Se não corresponder a nenhuma opção conhecida, é tratado como "Outro" e o texto original é preservado.',
+      acceptedValues: CURRENT_APPLICATION_HOSTING_OPTIONS.map((o) => o.label),
+    },
+    {
+      tag: "hospedagemCustomAplicacaoExistente",
+      required: false,
+      description:
+        'Descrição livre de onde a automação roda. Use só quando hospedagemAplicacaoExistente for "Outro".',
+    },
+    {
+      tag: "autorAplicacaoExistente",
+      required: false,
+      description:
+        "Quem desenvolveu a automação que já existe: pessoa, equipe interna ou fornecedor. Não confunda com colaboradoresEnvolvidos, que é quem executa o processo.",
+    },
+    {
+      tag: "responsavelAplicacaoExistente",
+      required: false,
+      description:
+        "Quem cuida da automação hoje — quem é chamado quando ela para. Pode ser diferente de quem desenvolveu.",
+    },
+    {
+      tag: "localAcessosAplicacaoExistente",
+      required: false,
+      description:
+        'Onde ficam guardadas as credenciais que a automação usa. Se não corresponder a nenhuma opção conhecida, é tratado como "Outro".',
+      acceptedValues: CURRENT_APPLICATION_ACCESS_LOCATION_OPTIONS.map((o) => o.label),
+    },
+    {
+      tag: "referenciaAcessosAplicacaoExistente",
+      required: false,
+      description: `Referência curta de onde encontrar o acesso — nome do cofre, caminho da pasta, com quem está. Máximo de ${CURRENT_APPLICATION_ACCESS_REFERENCE_MAX_LENGTH} caracteres; acima disso o texto é cortado e você recebe um aviso. Nunca escreva senhas, tokens ou chaves aqui.`,
+    },
+    {
+      tag: "producaoDesdeAplicacaoExistente",
+      required: false,
+      description:
+        "Data em que a automação entrou em produção, no formato AAAA-MM-DD. Fora desse formato, o valor é ignorado e você recebe um aviso.",
     },
     {
       tag: "colaboradoresEnvolvidos",
