@@ -124,6 +124,31 @@ export const HAS_CURRENT_APPLICATION_OPTIONS = [
   { value: "outro", label: "Outro" },
 ];
 
+// Ficha de sustentação da automação existente — listas curtas e estáveis, por
+// isso constantes aqui em vez de tabela configurável (ao contrário de
+// ProjectArea/MainTool/UrgencyLevel, que variam por cliente).
+export const CURRENT_APPLICATION_HOSTING_OPTIONS = [
+  { value: "servidor-proprio", label: "Servidor próprio (on-premise)" },
+  { value: "vm-cliente", label: "Máquina virtual da empresa" },
+  { value: "nuvem", label: "Nuvem (Azure, AWS, GCP)" },
+  { value: "maquina-usuario", label: "Máquina de um usuário" },
+  { value: "saas", label: "Plataforma SaaS do fornecedor" },
+  { value: "nao-sei", label: "Não sei" },
+  { value: "outro", label: "Outro" },
+];
+
+export const CURRENT_APPLICATION_ACCESS_LOCATION_OPTIONS = [
+  { value: "cofre-senhas", label: "Cofre de senhas corporativo" },
+  { value: "planilha", label: "Planilha ou documento compartilhado" },
+  { value: "com-pessoa", label: "Com uma pessoa específica" },
+  { value: "nao-se-sabe", label: "Não se sabe" },
+  { value: "outro", label: "Outro" },
+];
+
+// Limite do ponteiro de acessos. Curto de propósito: desencoraja colar um bloco
+// de credenciais num campo que é para dizer ONDE procurar, não O QUE usar.
+export const CURRENT_APPLICATION_ACCESS_REFERENCE_MAX_LENGTH = 200;
+
 export const BENEFIT_OPTIONS = [
   {
     key: "reducao-trabalho-operacional",
