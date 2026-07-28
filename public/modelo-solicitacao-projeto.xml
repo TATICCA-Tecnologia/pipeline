@@ -18,6 +18,13 @@
   <!-- CAMPO RESTRITO: use exatamente Sim ou Não, sem texto adicional. Detalhes vão em detalhesAplicacaoExistente. -->
   <aplicacaoExistenteHoje></aplicacaoExistenteHoje>
   <detalhesAplicacaoExistente></detalhesAplicacaoExistente>
+  <hospedagemAplicacaoExistente></hospedagemAplicacaoExistente>
+  <hospedagemCustomAplicacaoExistente></hospedagemCustomAplicacaoExistente>
+  <autorAplicacaoExistente></autorAplicacaoExistente>
+  <responsavelAplicacaoExistente></responsavelAplicacaoExistente>
+  <localAcessosAplicacaoExistente></localAcessosAplicacaoExistente>
+  <referenciaAcessosAplicacaoExistente></referenciaAcessosAplicacaoExistente>
+  <producaoDesdeAplicacaoExistente></producaoDesdeAplicacaoExistente>
   <colaboradoresEnvolvidos></colaboradoresEnvolvidos>
   <detalhesColaboradores></detalhesColaboradores>
   <duracaoPorExecucao></duracaoPorExecucao>

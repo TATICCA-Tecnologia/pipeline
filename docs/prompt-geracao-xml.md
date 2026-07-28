@@ -12,6 +12,16 @@ recorrente for identificado.
 
 ## Histórico
 
+- **2026-07-28**: adicionadas sete tags da ficha de sustentação da automação
+  existente (`hospedagemAplicacaoExistente`,
+  `hospedagemCustomAplicacaoExistente`, `autorAplicacaoExistente`,
+  `responsavelAplicacaoExistente`, `localAcessosAplicacaoExistente`,
+  `referenciaAcessosAplicacaoExistente`, `producaoDesdeAplicacaoExistente`).
+  O que antes era texto corrido em `<detalhesAplicacaoExistente>` agora tem
+  campos próprios, filtráveis e exibidos no inventário técnico. Regra de
+  segurança explícita: `referenciaAcessosAplicacaoExistente` é ponteiro para
+  onde o acesso está, nunca a credencial em si — credenciais literais na
+  transcrição devem ser ignoradas.
 - **2026-07-07 (7)**: simplificada a regra de `<aplicacaoExistenteHoje>` — um
   caso real (script Python inativo após troca de máquina) mostrou a tag
   marcada "Sim" mesmo com o processo 100% manual hoje. A regra era ambígua
@@ -123,6 +133,13 @@ Antes de preencher qualquer XML, faça esta leitura analítica:
 <detalhesProcessoAtual></detalhesProcessoAtual>
 <aplicacaoExistenteHoje></aplicacaoExistenteHoje>
 <detalhesAplicacaoExistente></detalhesAplicacaoExistente>
+<hospedagemAplicacaoExistente></hospedagemAplicacaoExistente>
+<hospedagemCustomAplicacaoExistente></hospedagemCustomAplicacaoExistente>
+<autorAplicacaoExistente></autorAplicacaoExistente>
+<responsavelAplicacaoExistente></responsavelAplicacaoExistente>
+<localAcessosAplicacaoExistente></localAcessosAplicacaoExistente>
+<referenciaAcessosAplicacaoExistente></referenciaAcessosAplicacaoExistente>
+<producaoDesdeAplicacaoExistente></producaoDesdeAplicacaoExistente>
 <colaboradoresEnvolvidos></colaboradoresEnvolvidos>
 <duracaoPorExecucao></duracaoPorExecucao>
 <periodicidade></periodicidade>
@@ -172,6 +189,19 @@ Antes de preencher qualquer XML, faça esta leitura analítica:
   CERTO: transcrição diz "já rodamos isso num fluxo do n8n" ou "temos um script em Python que faz isso hoje" (ativo, funcionando), <aplicacaoExistenteHoje>Sim</aplicacaoExistenteHoje> — e em <detalhesAplicacaoExistente>: "Automação feita hoje em n8n" (ou "script em Python", "fluxo no Power Automate", "planilha com macro" — a ferramenta específica citada).
   CERTO: transcrição diz "tínhamos um script, mas parou de funcionar, hoje é manual", <aplicacaoExistenteHoje>Não</aplicacaoExistenteHoje> — e em <detalhesAplicacaoExistente> (ou <detalhesProcessoAtual>): "Existiu um script em Python que fazia isso, hoje inativo após troca de máquina; processo voltou a ser manual."
 - <detalhesAplicacaoExistente>: preencha só se aplicacaoExistenteHoje = "Sim". Descreva em 1-2 frases: plataforma/tecnologia usada (nome da ferramenta, ex.: n8n, Python, Power Automate, Power Apps, UiPath), quem desenvolveu, desde quando está em produção, limitações conhecidas — não deixe genérico, use os detalhes específicos citados na transcrição.
+- <hospedagemAplicacaoExistente>: **CAMPO RESTRITO**. Preencha só se aplicacaoExistenteHoje = "Sim". Onde a automação roda hoje. Use EXATAMENTE uma destas opções: "Servidor próprio (on-premise)", "Máquina virtual da empresa", "Nuvem (Azure, AWS, GCP)", "Máquina de um usuário", "Plataforma SaaS do fornecedor", "Não sei", "Outro". Se a transcrição não disser onde roda, deixe VAZIO — não chute "Não sei" (vazio significa "não perguntado"; "Não sei" significa "perguntado e ninguém sabia", que é uma informação diferente e útil para o TI).
+  CERTO: "roda num servidor nosso lá na sala do TI" → "Servidor próprio (on-premise)"
+  CERTO: "fica na máquina da Fernanda, ela liga de manhã" → "Máquina de um usuário"
+  ERRADO: <hospedagemAplicacaoExistente>Servidor próprio do cliente, na sala do TI</hospedagemAplicacaoExistente> (valor com complemento colado — o detalhe vai em <detalhesAplicacaoExistente>)
+- <hospedagemCustomAplicacaoExistente>: só quando hospedagem = "Outro". Descreva em poucas palavras onde roda.
+- <autorAplicacaoExistente>: quem desenvolveu a automação existente — nome da pessoa, da equipe interna ou do fornecedor, como citado na transcrição. Não confunda com <colaboradoresEnvolvidos> (quem executa o processo). Se a transcrição só disser "foi um estagiário que saiu" ou "veio de uma consultoria", escreva isso mesmo — é exatamente o tipo de informação que o TI precisa.
+- <responsavelAplicacaoExistente>: quem cuida da automação HOJE — quem é chamado quando ela para. Pode ser diferente de quem desenvolveu. Se a transcrição indicar que ninguém cuida, escreva "Ninguém definido".
+- <localAcessosAplicacaoExistente>: **CAMPO RESTRITO**. Onde ficam guardadas as credenciais/acessos que a automação usa. Use EXATAMENTE uma destas opções: "Cofre de senhas corporativo", "Planilha ou documento compartilhado", "Com uma pessoa específica", "Não se sabe", "Outro". Deixe vazio se o assunto não apareceu na reunião.
+- <referenciaAcessosAplicacaoExistente>: ponteiro curto (máx. 200 caracteres) de ONDE encontrar o acesso — nome do cofre, caminho da pasta, com quem está. **NUNCA transcreva senhas, tokens, chaves ou usuários+senha, mesmo que apareçam na transcrição.** Se a transcrição contiver uma credencial literal, ignore-a completamente e descreva só a localização.
+  CERTO: "Cofre do TI, pasta Automações Financeiro"
+  CERTO: "Com o João do Financeiro"
+  ERRADO: "usuário robo_fin senha Abc12345" (credencial literal — nunca)
+- <producaoDesdeAplicacaoExistente>: data em que a automação entrou em produção, no formato AAAA-MM-DD. Se a transcrição só der o mês ou o ano ("desde o começo de 2024", "faz uns dois anos"), use o primeiro dia do período mais provável (2024-01-01) e registre a imprecisão em <informacoesAdicionais>. Se não houver pista nenhuma, deixe vazio.
 - <colaboradoresEnvolvidos>: **campo importante, não deixe vazio por padrão** — número inteiro de pessoas envolvidas na execução MANUAL do processo hoje. Busque ativamente na transcrição qualquer pista sobre quem faz a tarefa (nomes citados, "eu que faço isso", "duas pessoas revezam", "o time todo passa por isso") e converta para um número — só deixe vazio se a transcrição genuinamente não der nenhuma pista, o que deve ser raro numa reunião de levantamento.
   NÃO confunda com quem desenvolveu uma automação/script/fluxo informal já existente (isso vai em <detalhesAplicacaoExistente>, não aqui) — "colaboradoresEnvolvidos" é sobre quem executa o processo, não quem programou uma ferramenta para ele.
   ERRADO: deixar vazio porque a transcrição só menciona "foi o Leandro que desenvolveu o fluxo em Power Automate" (isso é sobre desenvolvimento da automação, não sobre quem faz o processo manualmente)
@@ -241,6 +271,13 @@ XML resultante:
 <detalhesProcessoAtual>Duas pessoas baixam os extratos e batem com o razão manualmente no Excel, no fechamento. Processo "no braço", propenso a erro de conciliação.</detalhesProcessoAtual>
 <aplicacaoExistenteHoje>Não</aplicacaoExistenteHoje>
 <detalhesAplicacaoExistente></detalhesAplicacaoExistente>
+<hospedagemAplicacaoExistente></hospedagemAplicacaoExistente>
+<hospedagemCustomAplicacaoExistente></hospedagemCustomAplicacaoExistente>
+<autorAplicacaoExistente></autorAplicacaoExistente>
+<responsavelAplicacaoExistente></responsavelAplicacaoExistente>
+<localAcessosAplicacaoExistente></localAcessosAplicacaoExistente>
+<referenciaAcessosAplicacaoExistente></referenciaAcessosAplicacaoExistente>
+<producaoDesdeAplicacaoExistente></producaoDesdeAplicacaoExistente>
 <colaboradoresEnvolvidos>2</colaboradoresEnvolvidos>
 <duracaoPorExecucao>8</duracaoPorExecucao>
 <periodicidade>Mensal</periodicidade>

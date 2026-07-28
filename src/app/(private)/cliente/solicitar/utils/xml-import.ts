@@ -7,6 +7,9 @@ import {
   HAS_EXISTING_SYSTEM_OPTIONS,
   HAS_CURRENT_APPLICATION_OPTIONS,
   BENEFIT_OPTIONS,
+  CURRENT_APPLICATION_HOSTING_OPTIONS,
+  CURRENT_APPLICATION_ACCESS_LOCATION_OPTIONS,
+  CURRENT_APPLICATION_ACCESS_REFERENCE_MAX_LENGTH,
 } from "./solicitar.utils";
 
 export interface XmlImportContext {
@@ -201,6 +204,64 @@ export function parseSolicitacaoXml(
 
   const currentApplicationDetails = getDirectChildText(root, "detalhesAplicacaoExistente");
 
+  // Ficha de sustentação da automação existente. Segue o padrão desta função:
+  // valor não reconhecido vira "outro" + texto original preservado no campo
+  // custom, com aviso — nunca bloqueia a importação.
+  const hospedagemTag = getDirectChildText(root, "hospedagemAplicacaoExistente");
+  let currentApplicationHosting = "";
+  let currentApplicationHostingCustom =
+    getDirectChildText(root, "hospedagemCustomAplicacaoExistente") ?? "";
+  if (hospedagemTag) {
+    const match = matchByLabel(hospedagemTag, CURRENT_APPLICATION_HOSTING_OPTIONS);
+    currentApplicationHosting = match ? match.value : "outro";
+    if (!match) {
+      currentApplicationHostingCustom = hospedagemTag;
+      warnings.push(
+        `<hospedagemAplicacaoExistente> com valor '${hospedagemTag}' não corresponde a nenhuma opção conhecida; foi tratado como "Outro" e o texto original foi preservado.`
+      );
+    }
+  }
+
+  const currentApplicationAuthor = getDirectChildText(root, "autorAplicacaoExistente") ?? "";
+  const currentApplicationOwner = getDirectChildText(root, "responsavelAplicacaoExistente") ?? "";
+
+  const localAcessosTag = getDirectChildText(root, "localAcessosAplicacaoExistente");
+  let currentApplicationAccessLocation = "";
+  if (localAcessosTag) {
+    const match = matchByLabel(localAcessosTag, CURRENT_APPLICATION_ACCESS_LOCATION_OPTIONS);
+    currentApplicationAccessLocation = match ? match.value : "outro";
+    if (!match) {
+      warnings.push(
+        `<localAcessosAplicacaoExistente> com valor '${localAcessosTag}' não corresponde a nenhuma opção conhecida; foi tratado como "Outro".`
+      );
+    }
+  }
+
+  const referenciaAcessosTag =
+    getDirectChildText(root, "referenciaAcessosAplicacaoExistente") ?? "";
+  let currentApplicationAccessReference = referenciaAcessosTag;
+  if (referenciaAcessosTag.length > CURRENT_APPLICATION_ACCESS_REFERENCE_MAX_LENGTH) {
+    currentApplicationAccessReference = referenciaAcessosTag.slice(
+      0,
+      CURRENT_APPLICATION_ACCESS_REFERENCE_MAX_LENGTH
+    );
+    warnings.push(
+      `<referenciaAcessosAplicacaoExistente> tinha mais de ${CURRENT_APPLICATION_ACCESS_REFERENCE_MAX_LENGTH} caracteres e foi truncada.`
+    );
+  }
+
+  const producaoDesdeTag = getDirectChildText(root, "producaoDesdeAplicacaoExistente");
+  let currentApplicationLiveSince = "";
+  if (producaoDesdeTag) {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(producaoDesdeTag)) {
+      currentApplicationLiveSince = producaoDesdeTag;
+    } else {
+      warnings.push(
+        `<producaoDesdeAplicacaoExistente> deve estar no formato AAAA-MM-DD; valor '${producaoDesdeTag}' foi ignorado.`
+      );
+    }
+  }
+
   // <colaboradoresEnvolvidos> — deve ser um número (contagem). Se vier texto (ex.: nomes),
   // não bloqueia o import: o número fica vazio e o texto é preservado em <detalhesColaboradores>.
   const colaboradoresTag = getDirectChildText(root, "colaboradoresEnvolvidos");
@@ -367,15 +428,13 @@ export function parseSolicitacaoXml(
     hasCurrentApplication,
     customHasCurrentApplication,
     currentApplicationDetails,
-    // Ficha de sustentação (Task 4) ainda não tem tags de XML dedicadas — fica
-    // em branco na importação e é preenchida manualmente no formulário.
-    currentApplicationHosting: "",
-    currentApplicationHostingCustom: "",
-    currentApplicationAuthor: "",
-    currentApplicationOwner: "",
-    currentApplicationAccessLocation: "",
-    currentApplicationAccessReference: "",
-    currentApplicationLiveSince: "",
+    currentApplicationHosting,
+    currentApplicationHostingCustom,
+    currentApplicationAuthor,
+    currentApplicationOwner,
+    currentApplicationAccessLocation,
+    currentApplicationAccessReference,
+    currentApplicationLiveSince,
     peopleInvolved,
     peopleInvolvedDetails,
     taskDurationHours,
