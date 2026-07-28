@@ -11,7 +11,10 @@ import {
   findOrCreateProjectKind,
 } from "./project-import-xml-helpers";
 import type { FrontendProjectStatus } from "../mappers";
-import { PROCESS_FREQUENCY_MULTIPLIERS } from "@/shared/constants/project-taxonomy";
+import {
+  PROCESS_FREQUENCY_MULTIPLIERS,
+  CURRENT_APPLICATION_ACCESS_REFERENCE_MAX_LENGTH,
+} from "@/shared/constants/project-taxonomy";
 import {
   computeQualitativeScore,
   computeComplexityScore,
@@ -398,6 +401,17 @@ export const projectRouter = router({
         existingSystemDetails: z.string().optional(),
         hasCurrentApplication: z.string().optional(),
         currentApplicationDetails: z.string().optional(),
+        // Ficha de sustentação da automação existente
+        currentApplicationHosting: z.string().optional(),
+        currentApplicationHostingCustom: z.string().optional(),
+        currentApplicationAuthor: z.string().optional(),
+        currentApplicationOwner: z.string().optional(),
+        currentApplicationAccessLocation: z.string().optional(),
+        currentApplicationAccessReference: z
+          .string()
+          .max(CURRENT_APPLICATION_ACCESS_REFERENCE_MAX_LENGTH)
+          .optional(),
+        currentApplicationLiveSince: z.date().optional(),
         projectNarrative: z.string().optional(),
         benefits: z.array(z.string()).optional(),
         benefitsDetails: z.string().optional(),
@@ -467,6 +481,13 @@ export const projectRouter = router({
           existingSystemDetails: input.existingSystemDetails ?? null,
           hasCurrentApplication: input.hasCurrentApplication ?? null,
           currentApplicationDetails: input.currentApplicationDetails ?? null,
+          currentApplicationHosting: input.currentApplicationHosting ?? null,
+          currentApplicationHostingCustom: input.currentApplicationHostingCustom ?? null,
+          currentApplicationAuthor: input.currentApplicationAuthor ?? null,
+          currentApplicationOwner: input.currentApplicationOwner ?? null,
+          currentApplicationAccessLocation: input.currentApplicationAccessLocation ?? null,
+          currentApplicationAccessReference: input.currentApplicationAccessReference ?? null,
+          currentApplicationLiveSince: input.currentApplicationLiveSince ?? null,
           projectNarrative: input.projectNarrative ?? null,
           benefits: input.benefits ?? undefined,
           benefitsDetails: input.benefitsDetails ?? null,
@@ -564,6 +585,17 @@ export const projectRouter = router({
         hasExistingSystem: z.string().nullable().optional(),
         existingSystemDetails: z.string().nullable().optional(),
         currentApplicationDetails: z.string().nullable().optional(),
+        currentApplicationHosting: z.string().nullable().optional(),
+        currentApplicationHostingCustom: z.string().nullable().optional(),
+        currentApplicationAuthor: z.string().nullable().optional(),
+        currentApplicationOwner: z.string().nullable().optional(),
+        currentApplicationAccessLocation: z.string().nullable().optional(),
+        currentApplicationAccessReference: z
+          .string()
+          .max(CURRENT_APPLICATION_ACCESS_REFERENCE_MAX_LENGTH)
+          .nullable()
+          .optional(),
+        currentApplicationLiveSince: z.date().nullable().optional(),
         projectNarrative: z.string().nullable().optional(),
         benefits: z.array(z.string()).nullable().optional(),
         benefitsDetails: z.string().nullable().optional(),
@@ -671,6 +703,20 @@ export const projectRouter = router({
         data.existingSystemDetails = rest.existingSystemDetails;
       if (rest.currentApplicationDetails !== undefined)
         data.currentApplicationDetails = rest.currentApplicationDetails;
+      if (rest.currentApplicationHosting !== undefined)
+        data.currentApplicationHosting = rest.currentApplicationHosting;
+      if (rest.currentApplicationHostingCustom !== undefined)
+        data.currentApplicationHostingCustom = rest.currentApplicationHostingCustom;
+      if (rest.currentApplicationAuthor !== undefined)
+        data.currentApplicationAuthor = rest.currentApplicationAuthor;
+      if (rest.currentApplicationOwner !== undefined)
+        data.currentApplicationOwner = rest.currentApplicationOwner;
+      if (rest.currentApplicationAccessLocation !== undefined)
+        data.currentApplicationAccessLocation = rest.currentApplicationAccessLocation;
+      if (rest.currentApplicationAccessReference !== undefined)
+        data.currentApplicationAccessReference = rest.currentApplicationAccessReference;
+      if (rest.currentApplicationLiveSince !== undefined)
+        data.currentApplicationLiveSince = rest.currentApplicationLiveSince;
       if (rest.projectNarrative !== undefined) data.projectNarrative = rest.projectNarrative;
       if (rest.benefits !== undefined) data.benefits = rest.benefits;
       if (rest.benefitsDetails !== undefined) data.benefitsDetails = rest.benefitsDetails;
