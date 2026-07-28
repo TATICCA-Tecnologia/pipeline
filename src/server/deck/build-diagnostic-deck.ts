@@ -10,6 +10,7 @@ import {
   computePaybackCurve,
   computeStructureCostAt,
   findPaybackDate,
+  resolveDeveloperDailyRate,
   type PaybackPoint,
   type StructureCostItem,
 } from "@/shared/lib/payback";
@@ -147,7 +148,7 @@ type ProjectDeckRow = {
 export async function buildDiagnosticDeck(companyId: string, actingUserId: string): Promise<Buffer> {
   const company = await db.company.findUnique({
     where: { id: companyId },
-    select: { name: true },
+    select: { name: true, developerDailyRateBRL: true },
   });
   if (!company) {
     throw new Error(`Empresa não encontrada (id: ${companyId}).`);
@@ -224,8 +225,18 @@ export async function buildDiagnosticDeck(companyId: string, actingUserId: strin
   addRankingSlide(pres, "Ranking por qualitativo", rankingQualitativo, "qualitativo");
   addRankingSlide(pres, "Ranking combinado", rankingCombinado, "combinado");
   addScheduleSlide(pres, rankingCombinado, settings.wave1StartDate);
-  addPaybackSlide(pres, rankingCombinado, settings, structureCosts);
-  addPaybackCompositionSlide(pres, rankingCombinado, settings, structureCosts);
+  // Taxa efetiva resolvida UMA vez aqui: os slides de payback recebem um número
+  // já decidido (empresa > global > 0) em vez de decidirem por conta própria,
+  // que é o que mantém o .pptx idêntico à aba Payback da tela de priorização.
+  const paybackSettings = {
+    developerDailyRateBRL: resolveDeveloperDailyRate(
+      company.developerDailyRateBRL,
+      settings.developerDailyRateBRL
+    ),
+    wave1StartDate: settings.wave1StartDate,
+  };
+  addPaybackSlide(pres, rankingCombinado, paybackSettings, structureCosts);
+  addPaybackCompositionSlide(pres, rankingCombinado, paybackSettings, structureCosts);
   // Entrevistas: se não houver nenhuma, o slide é pulado inteiramente (não
   // criamos um slide vazio nem lançamos erro — decisão explícita do Passo 8a).
   if (interviews.length > 0) {
@@ -456,7 +467,7 @@ function addScheduleSlide(pres: PptxGenJS, ranking: Ranking, wave1StartDateRaw: 
 function addPaybackSlide(
   pres: PptxGenJS,
   ranking: Ranking,
-  settings: { developerDailyRateBRL: number | null; wave1StartDate: Date | null },
+  settings: { developerDailyRateBRL: number; wave1StartDate: Date | null },
   structureCosts: StructureCostItem[]
 ): void {
   const slide = addTitledSlide(pres, "Payback / ROI acumulado");
@@ -473,7 +484,7 @@ function addPaybackSlide(
     estimatedAnnualSavingBRL: savingByProjectId.get(item.projectId) ?? 0,
   }));
 
-  const dailyRate = settings.developerDailyRateBRL ?? 0;
+  const dailyRate = settings.developerDailyRateBRL;
   const curve = computePaybackCurve(paybackSchedule, dailyRate, structureCosts);
   const paybackDate = findPaybackDate(curve);
 
@@ -541,7 +552,7 @@ function addPaybackSlide(
 function addPaybackCompositionSlide(
   pres: PptxGenJS,
   ranking: Ranking,
-  settings: { developerDailyRateBRL: number | null; wave1StartDate: Date | null },
+  settings: { developerDailyRateBRL: number; wave1StartDate: Date | null },
   structureCosts: StructureCostItem[]
 ): void {
   const { wave1, wave2 } = computeWaveSchedules(ranking, settings.wave1StartDate);
@@ -556,7 +567,7 @@ function addPaybackCompositionSlide(
   const savingByProjectId = new Map(
     ranking.map((row) => [row.id, row.estimatedAnnualSavingBRL ?? 0])
   );
-  const dailyRate = settings.developerDailyRateBRL ?? 0;
+  const dailyRate = settings.developerDailyRateBRL;
   const structureCostToDate = computeStructureCostAt(structureCosts, new Date());
 
   const header: TableRow = [
