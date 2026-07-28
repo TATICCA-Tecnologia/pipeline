@@ -58,6 +58,13 @@ function mapProject(p: {
   existingSystemDetails?: string | null;
   hasCurrentApplication?: string | null;
   currentApplicationDetails?: string | null;
+  currentApplicationHosting?: string | null;
+  currentApplicationHostingCustom?: string | null;
+  currentApplicationAuthor?: string | null;
+  currentApplicationOwner?: string | null;
+  currentApplicationAccessLocation?: string | null;
+  currentApplicationAccessReference?: string | null;
+  currentApplicationLiveSince?: Date | null;
   projectNarrative?: string | null;
   benefits?: string[] | null;
   benefitsDetails?: string | null;
@@ -102,6 +109,13 @@ function mapProject(p: {
     existingSystemDetails: p.existingSystemDetails ?? undefined,
     hasCurrentApplication: p.hasCurrentApplication ?? undefined,
     currentApplicationDetails: p.currentApplicationDetails ?? undefined,
+    currentApplicationHosting: p.currentApplicationHosting ?? undefined,
+    currentApplicationHostingCustom: p.currentApplicationHostingCustom ?? undefined,
+    currentApplicationAuthor: p.currentApplicationAuthor ?? undefined,
+    currentApplicationOwner: p.currentApplicationOwner ?? undefined,
+    currentApplicationAccessLocation: p.currentApplicationAccessLocation ?? undefined,
+    currentApplicationAccessReference: p.currentApplicationAccessReference ?? undefined,
+    currentApplicationLiveSince: p.currentApplicationLiveSince ?? undefined,
     projectNarrative: p.projectNarrative ?? undefined,
     benefits: p.benefits ?? undefined,
     benefitsDetails: p.benefitsDetails ?? undefined,
