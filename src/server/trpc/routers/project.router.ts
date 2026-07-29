@@ -575,6 +575,9 @@ export const projectRouter = router({
         hourlyRateBRL: z.number().min(0).nullable().optional(),
         estimatedAnnualSavingBRL: z.number().nullable().optional(),
         implementationEffortDays: z.number().int().min(0).nullable().optional(),
+        // null = volta a herdar SystemSettings.defaultMaintenanceHoursPerWeek.
+        // Aceita fração (0.5h/semana é uma estimativa legítima), por isso não é int.
+        maintenanceHoursPerWeek: z.number().min(0).nullable().optional(),
         implementationWave: z.number().int().min(0).nullable().optional(),
         waveOrder: z.number().int().min(0).nullable().optional(),
         hasCurrentApplication: z.string().nullable().optional(),
@@ -690,6 +693,8 @@ export const projectRouter = router({
       }
       if (rest.implementationEffortDays !== undefined)
         data.implementationEffortDays = rest.implementationEffortDays;
+      if (rest.maintenanceHoursPerWeek !== undefined)
+        data.maintenanceHoursPerWeek = rest.maintenanceHoursPerWeek;
       if (rest.implementationWave !== undefined) data.implementationWave = rest.implementationWave;
       if (rest.waveOrder !== undefined) data.waveOrder = rest.waveOrder;
       if (rest.hasCurrentApplication !== undefined)
@@ -993,6 +998,7 @@ export const projectRouter = router({
             implementationWave: true,
             waveOrder: true,
             implementationEffortDays: true,
+            maintenanceHoursPerWeek: true,
           },
         }),
         ctx.db.systemSettings.findUnique({ where: { id: "default" } }),
@@ -1044,6 +1050,7 @@ export const projectRouter = router({
           implementationWave: p.implementationWave,
           waveOrder: p.waveOrder,
           implementationEffortDays: p.implementationEffortDays,
+          maintenanceHoursPerWeek: p.maintenanceHoursPerWeek,
         };
       });
 

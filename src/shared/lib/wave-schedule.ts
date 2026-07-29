@@ -44,7 +44,13 @@ export type WaveScheduleItem = {
  * visualmente (borda tracejada + "(?)" no rótulo).
  */
 const FALLBACK_EFFORT_HOURS = 160;
-const HOURS_PER_BUSINESS_DAY = 8;
+/**
+ * Jornada considerada em todo o modelo: 8h por dia útil. Exportada porque o
+ * payback converte a taxa HORÁRIA do desenvolvedor (como o custo é negociado
+ * na prática) para o custo por dia útil que a curva consome — as duas
+ * conversões precisam usar a mesma jornada, senão cronograma e custo divergem.
+ */
+export const HOURS_PER_BUSINESS_DAY = 8;
 const FALLBACK_EFFORT_DAYS = FALLBACK_EFFORT_HOURS / HOURS_PER_BUSINESS_DAY;
 
 /**

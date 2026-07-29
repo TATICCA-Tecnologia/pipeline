@@ -1,4 +1,5 @@
-import { addDays, differenceInCalendarDays, isWeekend } from "date-fns";
+import { addDays, addMonths, differenceInCalendarDays, isWeekend } from "date-fns";
+import { HOURS_PER_BUSINESS_DAY } from "@/shared/lib/wave-schedule";
 
 /**
  * Curva de payback (custo acumulado x economia acumulada) de uma onda de
@@ -18,6 +19,14 @@ export type PaybackScheduleItem = {
   startDate: Date;
   endDate: Date;
   estimatedAnnualSavingBRL: number;
+  /**
+   * Custo de sustentação do robô por semana, JÁ valorizado pelo caller
+   * (horas/semana × taxa horária de manutenção). Recebe o valor pronto em vez
+   * de horas + taxa porque a resolução de qual taxa e quantas horas valem
+   * (projeto > global > padrão) é responsabilidade de quem monta o schedule —
+   * a curva só distribui o número no tempo.
+   */
+  maintenanceCostPerWeekBRL: number;
 };
 
 export type PaybackPoint = {
@@ -38,12 +47,22 @@ export type StructureCostItem = {
 const POINT_INTERVAL_DAYS = 7;
 
 /**
- * Janela mínima da curva (dias corridos) mesmo quando o cronograma total é
- * muito curto (ex.: 1 robô de poucos dias) — sem isso a curva ficaria com 1-2
- * pontos e não mostraria a economia se estabilizando/crescendo depois da
- * entrega, que é o objetivo do gráfico (slide de referência do deck original).
+ * Carência antes da sustentação começar a custar: 1 mês após a entrega do
+ * robô. Assume-se que o primeiro mês em produção ainda é estabilização coberta
+ * pelo desenvolvimento, e a manutenção recorrente começa depois disso.
  */
-const MIN_WINDOW_DAYS = 60;
+const MAINTENANCE_GRACE_MONTHS = 1;
+
+/**
+ * Janela mínima da curva: 5 anos corridos. O horizonte precisa ser longo o
+ * bastante para o payback aparecer DENTRO do gráfico — com a janela antiga
+ * (60 dias, ou 2x a duração do cronograma) uma onda curta rendia uma tela de
+ * ~4 meses, em que a economia mal tinha começado a acumular e o cruzamento com
+ * o custo caía fora do período calculado. A granularidade continua semanal
+ * (`POINT_INTERVAL_DAYS`), então 5 anos são ~261 pontos de controle: o eixo X
+ * é rareado na renderização, não aqui.
+ */
+const MIN_WINDOW_DAYS = 365 * 5;
 
 /**
  * Conta quantos dias úteis do robô (dentro de `[windowStart, windowEnd]`) já
@@ -107,6 +126,13 @@ export function computeStructureCostAt(structureCosts: StructureCostItem[], asOf
  * já entra em produção e passa a economizar a partir do dia em que termina
  * de ser desenvolvido) — por isso `daysSinceDelivery` usa `+ 1` (o dia da
  * entrega conta como o 1º dia de economia, não o dia seguinte).
+ *
+ * Manutenção: custo recorrente de sustentação de cada robô, distribuído por
+ * dia corrido (`maintenanceCostPerWeekBRL / 7`, mesmo padrão de rateio da
+ * economia e do custo de estrutura), a partir de `MAINTENANCE_GRACE_MONTHS`
+ * após a entrega e sem data de fim — um robô entregue custa sustentação para
+ * sempre, e é isso que faz a curva de custo continuar subindo depois que todo
+ * o desenvolvimento acabou.
  */
 function computePointAt(
   schedule: PaybackScheduleItem[],
@@ -120,6 +146,12 @@ function computePointAt(
   for (const item of schedule) {
     cumulativeCost +=
       dailyRateBRL * businessDaysElapsedInWindow(item.startDate, item.endDate, asOf);
+
+    const maintenanceStart = addMonths(item.endDate, MAINTENANCE_GRACE_MONTHS);
+    if (asOf >= maintenanceStart) {
+      const maintenanceDays = differenceInCalendarDays(asOf, maintenanceStart) + 1;
+      cumulativeCost += (item.maintenanceCostPerWeekBRL / 7) * maintenanceDays;
+    }
 
     if (asOf >= item.endDate) {
       const daysSinceDelivery = differenceInCalendarDays(asOf, item.endDate) + 1;
@@ -192,9 +224,18 @@ export function findPaybackDate(curve: PaybackPoint[]): Date | null {
 }
 
 /**
- * Resolve a taxa diária do desenvolvedor efetiva de uma empresa.
+ * Taxa horária padrão do desenvolvedor quando nada foi configurado — nem na
+ * empresa, nem no global. Custo de desenvolvimento é negociado por hora na
+ * prática, então a premissa é horária e o custo do dia útil sai dela
+ * (160/h × 8h = R$ 1.280/dia útil).
+ */
+export const DEFAULT_DEVELOPER_HOURLY_RATE_BRL = 160;
+
+/**
+ * Resolve a taxa HORÁRIA do desenvolvedor efetiva de uma empresa.
  *
- * Precedência: valor da empresa > valor global de `SystemSettings` > 0.
+ * Precedência: valor da empresa > valor global de `SystemSettings` >
+ * `DEFAULT_DEVELOPER_HOURLY_RATE_BRL`.
  *
  * `0` na empresa é um valor legítimo e VENCE o global — só `null`/`undefined`
  * herdam. Isso permite modelar uma empresa cujo custo de desenvolvimento não
@@ -205,9 +246,58 @@ export function findPaybackDate(curve: PaybackPoint[]): Date | null {
  * (src/server/deck/build-diagnostic-deck.ts) — se um dos dois calcular a taxa
  * por conta própria, o .pptx passa a divergir do gráfico da tela.
  */
-export function resolveDeveloperDailyRate(
+export function resolveDeveloperHourlyRate(
   companyRate: number | null | undefined,
   globalRate: number | null | undefined
 ): number {
-  return companyRate ?? globalRate ?? 0;
+  return companyRate ?? globalRate ?? DEFAULT_DEVELOPER_HOURLY_RATE_BRL;
+}
+
+/**
+ * Converte a taxa horária do desenvolvedor no custo de um dia útil, que é a
+ * unidade que `computePaybackCurve` consome (o cronograma do Passo 5 é medido
+ * em dias úteis). Existe como função para a conversão viver num lugar só —
+ * tela e deck não podem multiplicar por jornadas diferentes.
+ */
+export function developerDailyRateFrom(hourlyRateBRL: number): number {
+  return hourlyRateBRL * HOURS_PER_BUSINESS_DAY;
+}
+
+/**
+ * Taxa horária padrão de manutenção quando nada foi configurado. Igual à de
+ * desenvolvimento por ora — o ponto de existir um campo próprio é permitir
+ * que sustentação seja precificada diferente do desenvolvimento, não presumir
+ * um desconto que ninguém pediu.
+ */
+export const DEFAULT_MAINTENANCE_HOURLY_RATE_BRL = 160;
+
+/** Horas de sustentação por semana assumidas quando o robô não tem estimativa própria. */
+export const DEFAULT_MAINTENANCE_HOURS_PER_WEEK = 1;
+
+/**
+ * Resolve a taxa HORÁRIA de manutenção efetiva de uma empresa. Mesma regra de
+ * precedência de `resolveDeveloperHourlyRate` (empresa > global > padrão, com
+ * `0` da empresa vencendo o global).
+ */
+export function resolveMaintenanceHourlyRate(
+  companyRate: number | null | undefined,
+  globalRate: number | null | undefined
+): number {
+  return companyRate ?? globalRate ?? DEFAULT_MAINTENANCE_HOURLY_RATE_BRL;
+}
+
+/**
+ * Custo semanal de sustentação de um robô: horas/semana estimadas (do projeto,
+ * ou o padrão global quando o projeto não tem estimativa) × taxa horária de
+ * manutenção. É o valor que `PaybackScheduleItem.maintenanceCostPerWeekBRL`
+ * espera receber pronto.
+ */
+export function maintenanceCostPerWeek(
+  projectHoursPerWeek: number | null | undefined,
+  defaultHoursPerWeek: number | null | undefined,
+  maintenanceHourlyRateBRL: number
+): number {
+  const hours =
+    projectHoursPerWeek ?? defaultHoursPerWeek ?? DEFAULT_MAINTENANCE_HOURS_PER_WEEK;
+  return hours * maintenanceHourlyRateBRL;
 }

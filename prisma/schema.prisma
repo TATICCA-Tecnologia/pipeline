@@ -107,11 +107,15 @@ model Company {
   zipCode   String?
   website   String?
   isActive  Boolean  @default(true)
-  /// Taxa diária do desenvolvedor usada no cálculo de payback desta empresa.
-  /// `null` = herda SystemSettings.developerDailyRateBRL (ver
-  /// resolveDeveloperDailyRate em src/shared/lib/payback.ts). Zero é um valor
+  /// Taxa HORÁRIA do desenvolvedor usada no cálculo de payback desta empresa.
+  /// `null` = herda SystemSettings.developerHourlyRateBRL (ver
+  /// resolveDeveloperHourlyRate em src/shared/lib/payback.ts). Zero é um valor
   /// legítimo e vence o global — só null herda.
-  developerDailyRateBRL Float?
+  developerHourlyRateBRL Float?
+  /// Taxa HORÁRIA de manutenção (sustentação pós-entrega) desta empresa —
+  /// deliberadamente separada da taxa de desenvolvimento, que costuma ser
+  /// outra. `null` = herda SystemSettings.maintenanceHourlyRateBRL.
+  maintenanceHourlyRateBRL Float?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -204,6 +208,10 @@ model Project {
 
   // Esforço de implementação (preenchido pelo arquiteto, nunca exposto ao cliente)
   implementationEffortDays Int? // dias úteis estimados de desenvolvimento do robô
+  /// Horas de sustentação por semana estimadas para este robô depois de
+  /// entregue. `null` = herda SystemSettings.defaultMaintenanceHoursPerWeek.
+  /// Valorizadas pela taxa horária de MANUTENÇÃO (não a de desenvolvimento).
+  maintenanceHoursPerWeek  Float?
   implementationWave       Int? // 1 = onda 1 (priorizada), 2 = onda 2, null = não classificado ainda
   waveOrder                Int? // ordem de execução dentro da onda (menor = primeiro), null = ainda não sequenciado
 
@@ -752,8 +760,14 @@ model SystemSettings {
   scoreWeightComplexidade      Float @default(0.2)
 
   // Premissas de implementação (usadas em timeline e payback)
-  developerDailyRateBRL Float?
-  wave1StartDate        DateTime?
+  developerHourlyRateBRL Float?
+  wave1StartDate         DateTime?
+
+  // Sustentação pós-entrega: taxa horária própria (≠ da taxa de
+  // desenvolvimento) e horas/semana padrão por robô, sobrescrevível em
+  // Project.maintenanceHoursPerWeek.
+  maintenanceHourlyRateBRL     Float?
+  defaultMaintenanceHoursPerWeek Float @default(1)
 
   // Taxa horária padrão usada para calcular estimatedAnnualSavingBRL a partir
   // de monthlyHoursSaved, quando o projeto não tem hourlyRateBRL próprio.

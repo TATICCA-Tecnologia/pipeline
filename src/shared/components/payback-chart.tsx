@@ -76,6 +76,14 @@ export function PaybackChart({ curve, paybackDate, className }: PaybackChartProp
   // correspondente comparando o dia formatado, sem precisar guardar o índice.
   const paybackLabel = paybackDate ? format(paybackDate, "dd/MM/yy") : null;
 
+  // A janela é de 5 anos com pontos semanais (~261 rótulos): deixar o recharts
+  // decidir os ticks empilha as datas umas sobre as outras. O intervalo é
+  // calculado para render ~12 rótulos independente do tamanho da curva — os
+  // pontos continuam todos na série (tooltip e linha seguem semanais), só o
+  // eixo é rareado.
+  const TARGET_X_LABELS = 12;
+  const xAxisInterval = Math.max(0, Math.ceil(data.length / TARGET_X_LABELS) - 1);
+
   return (
     <div className={className ?? "h-96 w-full"}>
       <ResponsiveContainer width="100%" height="100%">
@@ -86,7 +94,7 @@ export function PaybackChart({ curve, paybackDate, className }: PaybackChartProp
             angle={-30}
             textAnchor="end"
             height={70}
-            interval="preserveStartEnd"
+            interval={xAxisInterval}
             tick={{ fontSize: 11, fill: "var(--color-muted-foreground)" }}
             axisLine={false}
             tickLine={false}

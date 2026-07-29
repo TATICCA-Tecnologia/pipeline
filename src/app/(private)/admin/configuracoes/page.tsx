@@ -22,6 +22,11 @@ import {
 } from "@/src/shared/components/ui/select";
 import { AI_PROVIDERS, type AiProvider } from "@/server/ai/ai-provider-client";
 import {
+  DEFAULT_DEVELOPER_HOURLY_RATE_BRL,
+  DEFAULT_MAINTENANCE_HOURLY_RATE_BRL,
+} from "@/shared/lib/payback";
+import { HOURS_PER_BUSINESS_DAY } from "@/shared/lib/wave-schedule";
+import {
   Building,
   Bell,
   Shield,
@@ -164,10 +169,15 @@ export default function AdminConfiguracoesPage() {
     scoreWeightComplexidade: "",
   });
 
-  // Premissas de implementação (taxa diária do desenvolvedor, data de início da onda 1).
-  const [developerDailyRateBRL, setDeveloperDailyRateBRL] = useState<string>("");
+  // Premissas de implementação (taxa horária de desenvolvimento, data de
+  // início da onda 1) e de sustentação (taxa horária de manutenção e horas/semana
+  // padrão por robô).
+  const [developerHourlyRateBRL, setDeveloperHourlyRateBRL] = useState<string>("");
   const [wave1StartDate, setWave1StartDate] = useState<string>("");
   const [defaultHourlyRateBRL, setDefaultHourlyRateBRL] = useState<string>("");
+  const [maintenanceHourlyRateBRL, setMaintenanceHourlyRateBRL] = useState<string>("");
+  const [defaultMaintenanceHoursPerWeek, setDefaultMaintenanceHoursPerWeek] =
+    useState<string>("");
 
   // Semeia os inputs a partir dos valores reais quando a query resolve.
   useEffect(() => {
@@ -183,13 +193,17 @@ export default function AdminConfiguracoesPage() {
       scoreWeightQualitativo: String(s.scoreWeightQualitativo),
       scoreWeightComplexidade: String(s.scoreWeightComplexidade),
     });
-    setDeveloperDailyRateBRL(
-      s.developerDailyRateBRL != null ? String(s.developerDailyRateBRL) : ""
+    setDeveloperHourlyRateBRL(
+      s.developerHourlyRateBRL != null ? String(s.developerHourlyRateBRL) : ""
     );
     setWave1StartDate(
       s.wave1StartDate ? new Date(s.wave1StartDate).toISOString().slice(0, 10) : ""
     );
     setDefaultHourlyRateBRL(String(s.defaultHourlyRateBRL));
+    setMaintenanceHourlyRateBRL(
+      s.maintenanceHourlyRateBRL != null ? String(s.maintenanceHourlyRateBRL) : ""
+    );
+    setDefaultMaintenanceHoursPerWeek(String(s.defaultMaintenanceHoursPerWeek));
   }, [settingsQuery.data]);
 
   const qualSum = sumWeights(
@@ -206,8 +220,10 @@ export default function AdminConfiguracoesPage() {
 
   function handleSaveWeights() {
     if (!weightsValid) return;
-    const parsedRate = Number(developerDailyRateBRL);
+    const parsedRate = Number(developerHourlyRateBRL);
     const parsedHourlyRate = Number(defaultHourlyRateBRL);
+    const parsedMaintenanceRate = Number(maintenanceHourlyRateBRL);
+    const parsedMaintenanceHours = Number(defaultMaintenanceHoursPerWeek);
     updateWeights.mutate({
       qualWeightErrorReduction: Number(weights.qualWeightErrorReduction),
       qualWeightProcessCriticality: Number(weights.qualWeightProcessCriticality),
@@ -217,14 +233,26 @@ export default function AdminConfiguracoesPage() {
       scoreWeightEconomia: Number(weights.scoreWeightEconomia),
       scoreWeightQualitativo: Number(weights.scoreWeightQualitativo),
       scoreWeightComplexidade: Number(weights.scoreWeightComplexidade),
-      developerDailyRateBRL:
-        developerDailyRateBRL.trim() !== "" && !Number.isNaN(parsedRate) && parsedRate >= 0
+      developerHourlyRateBRL:
+        developerHourlyRateBRL.trim() !== "" && !Number.isNaN(parsedRate) && parsedRate >= 0
           ? parsedRate
           : null,
       wave1StartDate: wave1StartDate ? new Date(wave1StartDate) : null,
       defaultHourlyRateBRL:
         defaultHourlyRateBRL.trim() !== "" && !Number.isNaN(parsedHourlyRate) && parsedHourlyRate >= 0
           ? parsedHourlyRate
+          : undefined,
+      maintenanceHourlyRateBRL:
+        maintenanceHourlyRateBRL.trim() !== "" &&
+        !Number.isNaN(parsedMaintenanceRate) &&
+        parsedMaintenanceRate >= 0
+          ? parsedMaintenanceRate
+          : null,
+      defaultMaintenanceHoursPerWeek:
+        defaultMaintenanceHoursPerWeek.trim() !== "" &&
+        !Number.isNaN(parsedMaintenanceHours) &&
+        parsedMaintenanceHours >= 0
+          ? parsedMaintenanceHours
           : undefined,
     });
   }
@@ -730,24 +758,28 @@ export default function AdminConfiguracoesPage() {
                 <p className="text-sm font-semibold">Premissas de implementação</p>
                 <p className="text-xs text-muted-foreground">
                   Usadas para calcular a timeline e o payback de implementação dos
-                  robôs (ondas de priorização). A taxa diária abaixo é o{" "}
-                  <strong>custo de construir</strong> o robô — a taxa horária do bloco
-                  &quot;Saving estimado anual&quot; é outra coisa: o custo/hora de quem faz
-                  a atividade manualmente hoje.
+                  robôs (ondas de priorização). As taxas abaixo são o{" "}
+                  <strong>custo de construir e sustentar</strong> o robô — a taxa horária do
+                  bloco &quot;Saving estimado anual&quot; é outra coisa: o custo/hora de quem
+                  faz a atividade manualmente hoje. Todas podem ser sobrescritas por empresa,
+                  na aba Payback da tela de priorização.
                 </p>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
                     <label className="text-sm font-medium">
-                      Taxa diária do desenvolvedor (R$)
+                      Taxa horária de desenvolvimento (R$/h)
                     </label>
                     <Input
                       type="number"
                       min={0}
                       step="any"
-                      value={developerDailyRateBRL}
-                      onChange={(e) => setDeveloperDailyRateBRL(e.target.value)}
-                      placeholder="Ex.: 800"
+                      value={developerHourlyRateBRL}
+                      onChange={(e) => setDeveloperHourlyRateBRL(e.target.value)}
+                      placeholder={`Padrão: ${DEFAULT_DEVELOPER_HOURLY_RATE_BRL}`}
                     />
+                    <p className="text-xs text-muted-foreground">
+                      O custo por dia útil sai daqui: taxa × {HOURS_PER_BUSINESS_DAY}h.
+                    </p>
                   </div>
                   <div className="space-y-2">
                     <label className="text-sm font-medium">
@@ -758,6 +790,39 @@ export default function AdminConfiguracoesPage() {
                       value={wave1StartDate}
                       onChange={(e) => setWave1StartDate(e.target.value)}
                     />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">
+                      Taxa horária de manutenção (R$/h)
+                    </label>
+                    <Input
+                      type="number"
+                      min={0}
+                      step="any"
+                      value={maintenanceHourlyRateBRL}
+                      onChange={(e) => setMaintenanceHourlyRateBRL(e.target.value)}
+                      placeholder={`Padrão: ${DEFAULT_MAINTENANCE_HOURLY_RATE_BRL}`}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Sustentação pós-entrega — separada da taxa de desenvolvimento de propósito.
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">
+                      Manutenção padrão por robô (h/semana)
+                    </label>
+                    <Input
+                      type="number"
+                      min={0}
+                      step="any"
+                      value={defaultMaintenanceHoursPerWeek}
+                      onChange={(e) => setDefaultMaintenanceHoursPerWeek(e.target.value)}
+                      placeholder="Ex.: 1"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Usada nos robôs sem estimativa própria. Entra no payback a partir de 1 mês
+                      após a entrega de cada robô.
+                    </p>
                   </div>
                 </div>
               </div>

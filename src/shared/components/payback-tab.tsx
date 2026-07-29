@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import Link from "next/link";
 import { differenceInBusinessDays, differenceInCalendarDays, format } from "date-fns";
 import { toast } from "sonner";
@@ -20,11 +20,19 @@ import { formatCurrency } from "@/shared/utils";
 import {
   computePaybackCurve,
   computeStructureCostAt,
+  DEFAULT_DEVELOPER_HOURLY_RATE_BRL,
+  DEFAULT_MAINTENANCE_HOURLY_RATE_BRL,
+  DEFAULT_MAINTENANCE_HOURS_PER_WEEK,
+  developerDailyRateFrom,
   findPaybackDate,
-  resolveDeveloperDailyRate,
+  maintenanceCostPerWeek,
+  resolveDeveloperHourlyRate,
+  resolveMaintenanceHourlyRate,
+  type PaybackPoint,
+  type PaybackScheduleItem,
   type StructureCostItem,
 } from "@/shared/lib/payback";
-import type { WaveScheduleItem } from "@/shared/lib/wave-schedule";
+import { HOURS_PER_BUSINESS_DAY, type WaveScheduleItem } from "@/shared/lib/wave-schedule";
 import { PaybackChart } from "@/src/shared/components/payback-chart";
 import { CompanyCostItemsCard } from "@/src/shared/components/company-cost-items-card";
 import { ToggleGroup, ToggleGroupItem } from "@/src/shared/components/ui/toggle-group";
@@ -76,10 +84,18 @@ interface PaybackTabProps {
   savingByProjectId: Map<string, number>;
   /** Esforço em dias úteis por projeto (null = ainda não estimado). */
   effortDaysByProjectId: Map<string, number | null>;
+  /** Horas de sustentação/semana por projeto (null = herda o padrão global). */
+  maintenanceHoursByProjectId: Map<string, number | null>;
   /** Valor cru gravado na empresa — `null` significa "herda o global". */
-  companyDailyRateBRL: number | null;
+  companyHourlyRateBRL: number | null;
   /** Valor global de SystemSettings, usado como fallback e como placeholder. */
-  globalDailyRateBRL: number | null;
+  globalHourlyRateBRL: number | null;
+  /** Taxa horária de manutenção da empresa — `null` = herda o global. */
+  companyMaintenanceHourlyRateBRL: number | null;
+  /** Taxa horária de manutenção global de SystemSettings. */
+  globalMaintenanceHourlyRateBRL: number | null;
+  /** Horas de sustentação/semana assumidas para robôs sem estimativa própria. */
+  defaultMaintenanceHoursPerWeek: number | null;
   /** Usada como início de referência quando não há nenhum robô agendado. */
   wave1StartDate: Date;
 }
@@ -165,6 +181,60 @@ function EditableNumber({
   );
 }
 
+/**
+ * Card compacto com a curva de payback de uma onda isolada. Recebe a curva já
+ * calculada (não recalcula nada) porque quem sabe resolver taxas, horas de
+ * manutenção e custos de estrutura é o `PaybackTab` — duplicar essa resolução
+ * aqui seria a forma mais fácil de o gráfico da onda divergir do consolidado.
+ */
+function WavePaybackCard({
+  title,
+  curve,
+  paybackDate,
+  robotCount,
+  isLoading,
+  emptyMessage,
+}: {
+  title: string;
+  curve: PaybackPoint[];
+  paybackDate: Date | null;
+  robotCount: number;
+  isLoading: boolean;
+  emptyMessage: string;
+}) {
+  const months =
+    paybackDate && curve.length > 0
+      ? Math.max(0, Math.round(differenceInCalendarDays(paybackDate, curve[0].date) / 30.44))
+      : null;
+
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-base">{title}</CardTitle>
+        <p className="text-sm font-medium">
+          {robotCount === 0
+            ? emptyMessage
+            : months != null
+              ? `Payback em ${months} ${months === 1 ? "mês" : "meses"}`
+              : "Payback não atingido no período calculado"}
+        </p>
+        <p className="text-xs text-muted-foreground">
+          {robotCount} robô{robotCount === 1 ? "" : "s"} — cenário &quot;se só esta onda
+          existisse&quot;, carregando o custo de estrutura inteiro da empresa. As duas ondas
+          isoladas não somam a curva consolidada acima.
+        </p>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <p className="text-sm text-muted-foreground py-10 text-center">Carregando...</p>
+        ) : (
+          <PaybackChart curve={curve} paybackDate={paybackDate} className="h-64 w-full" />
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 function KpiTile({
   label,
   value,
@@ -191,15 +261,24 @@ export function PaybackTab({
   unassignedSchedule,
   savingByProjectId,
   effortDaysByProjectId,
-  companyDailyRateBRL,
-  globalDailyRateBRL,
+  maintenanceHoursByProjectId,
+  companyHourlyRateBRL,
+  globalHourlyRateBRL,
+  companyMaintenanceHourlyRateBRL,
+  globalMaintenanceHourlyRateBRL,
+  defaultMaintenanceHoursPerWeek,
   wave1StartDate,
 }: PaybackTabProps) {
   const utils = trpc.useUtils();
 
   const [scope, setScope] = useState<PaybackScope>("ondas");
 
-  const dailyRate = resolveDeveloperDailyRate(companyDailyRateBRL, globalDailyRateBRL);
+  const hourlyRate = resolveDeveloperHourlyRate(companyHourlyRateBRL, globalHourlyRateBRL);
+  const dailyRate = developerDailyRateFrom(hourlyRate);
+  const maintenanceHourlyRate = resolveMaintenanceHourlyRate(
+    companyMaintenanceHourlyRateBRL,
+    globalMaintenanceHourlyRateBRL
+  );
 
   const { data: costItems = [] } = trpc.company.listCostItems.useQuery({ companyId });
 
@@ -250,15 +329,34 @@ export function PaybackTab({
     return items;
   }, [wave1Schedule, wave2Schedule, unassignedSchedule, scope]);
 
-  const paybackSchedule = useMemo(
-    () =>
-      scopedItems.map((item) => ({
+  // Converte um recorte qualquer do cronograma nos itens que a curva consome.
+  // Existe como função (e não inline) porque a mesma conversão alimenta a curva
+  // consolidada e as curvas isoladas de cada onda — se divergirem, os três
+  // gráficos da tela passam a contar histórias diferentes.
+  const toPaybackItems = useCallback(
+    (items: WaveScheduleItem[]): PaybackScheduleItem[] =>
+      items.map((item) => ({
         projectId: item.projectId,
         startDate: item.startDate,
         endDate: item.endDate,
         estimatedAnnualSavingBRL: savingByProjectId.get(item.projectId) ?? 0,
+        maintenanceCostPerWeekBRL: maintenanceCostPerWeek(
+          maintenanceHoursByProjectId.get(item.projectId),
+          defaultMaintenanceHoursPerWeek,
+          maintenanceHourlyRate
+        ),
       })),
-    [scopedItems, savingByProjectId]
+    [
+      savingByProjectId,
+      maintenanceHoursByProjectId,
+      defaultMaintenanceHoursPerWeek,
+      maintenanceHourlyRate,
+    ]
+  );
+
+  const paybackSchedule = useMemo(
+    () => toPaybackItems(scopedItems),
+    [scopedItems, toPaybackItems]
   );
 
   const curve = useMemo(
@@ -267,6 +365,21 @@ export function PaybackTab({
   );
 
   const paybackDate = useMemo(() => findPaybackDate(curve), [curve]);
+
+  // Curvas isoladas por onda: "e se só esta onda existisse?". Cada uma carrega
+  // o custo de estrutura INTEIRO da empresa (estrutura é custo de empresa, não
+  // rateável por onda), então as duas não somam a consolidada — é comparação
+  // entre cenários, não decomposição. O rótulo na tela diz isso.
+  const wave1Curve = useMemo(
+    () => computePaybackCurve(toPaybackItems(wave1Schedule), dailyRate, structureCosts),
+    [wave1Schedule, toPaybackItems, dailyRate, structureCosts]
+  );
+  const wave2Curve = useMemo(
+    () => computePaybackCurve(toPaybackItems(wave2Schedule), dailyRate, structureCosts),
+    [wave2Schedule, toPaybackItems, dailyRate, structureCosts]
+  );
+  const wave1PaybackDate = useMemo(() => findPaybackDate(wave1Curve), [wave1Curve]);
+  const wave2PaybackDate = useMemo(() => findPaybackDate(wave2Curve), [wave2Curve]);
 
   // "Data de início do cronograma": a menor startDate entre os robôs do escopo
   // atual — usada só para expressar o payback em "N meses a partir do início",
@@ -288,6 +401,12 @@ export function PaybackTab({
     return scopedItems.map((item) => {
       const businessDays = differenceInBusinessDays(item.endDate, item.startDate) + 1;
       const annualSavingBRL = savingByProjectId.get(item.projectId) ?? 0;
+      const maintenanceHours = maintenanceHoursByProjectId.get(item.projectId) ?? null;
+      const maintenanceWeeklyBRL = maintenanceCostPerWeek(
+        maintenanceHours,
+        defaultMaintenanceHoursPerWeek,
+        maintenanceHourlyRate
+      );
       return {
         projectId: item.projectId,
         title: item.title,
@@ -301,20 +420,35 @@ export function PaybackTab({
         // `businessDays` (derivado do cronograma) quando o esforço é null e o
         // Passo 5 aplicou o fallback de 20 dias úteis.
         effortDays: effortDaysByProjectId.get(item.projectId) ?? null,
+        maintenanceHours,
+        maintenanceWeeklyBRL,
+        // Custo anual de sustentação — a forma comparável com a economia/ano da
+        // coluna ao lado, que é o que interessa pra julgar se o robô "se paga"
+        // depois de entregue, não só até a entrega.
+        maintenanceAnnualBRL: (maintenanceWeeklyBRL / 7) * 365,
       };
     });
-  }, [scopedItems, savingByProjectId, effortDaysByProjectId, dailyRate]);
+  }, [
+    scopedItems,
+    savingByProjectId,
+    effortDaysByProjectId,
+    maintenanceHoursByProjectId,
+    defaultMaintenanceHoursPerWeek,
+    maintenanceHourlyRate,
+    dailyRate,
+  ]);
 
   const totals = useMemo(() => {
     const developmentCost = composition.reduce((sum, i) => sum + i.developmentCostBRL, 0);
     const annualSaving = composition.reduce((sum, i) => sum + i.annualSavingBRL, 0);
+    const annualMaintenance = composition.reduce((sum, i) => sum + i.maintenanceAnnualBRL, 0);
     // Sem robôs agendados a curva é vazia e não existe "fim da janela"; nesse
     // caso o custo de estrutura é medido até hoje, senão o KPI mostraria R$ 0
     // logo acima da linha da tabela que exibe esse mesmo custo acumulado — a
     // empresa pode ter estrutura rodando sem nenhum robô nas ondas ainda.
     const lastPoint = curve[curve.length - 1];
     const structureCost = computeStructureCostAt(structureCosts, lastPoint?.date ?? new Date());
-    return { developmentCost, annualSaving, structureCost };
+    return { developmentCost, annualSaving, annualMaintenance, structureCost };
   }, [composition, curve, structureCosts]);
 
   // Total de custo de estrutura já acumulado até hoje (fora da janela
@@ -343,37 +477,64 @@ export function PaybackTab({
         <CardHeader className="pb-3">
           <CardTitle className="text-base">Premissas de custo</CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="max-w-xs space-y-1.5">
-            <Label htmlFor="developer-daily-rate">Taxa diária do desenvolvedor (R$)</Label>
-            <EditableNumber
-              id="developer-daily-rate"
-              value={companyDailyRateBRL}
-              allowEmpty
-              step="0.01"
-              onCommit={(next) =>
-                companyMutation.mutate({ id: companyId, developerDailyRateBRL: next })
-              }
-            />
-            <p className="text-xs text-muted-foreground">
-              {companyDailyRateBRL == null
-                ? `Vazio = usa o padrão global de ${formatCurrency(globalDailyRateBRL ?? 0)} (Configurações).`
-                : `Valor específico desta empresa. Apague o campo para voltar ao padrão global de ${formatCurrency(globalDailyRateBRL ?? 0)}.`}
-            </p>
-            {/*
-              As duas taxas do payback são fáceis de trocar: esta é o CUSTO de
-              construir o robô, e a outra (taxa horária, na aba Arquitetura de
-              cada projeto) é o custo/hora de quem faz a atividade manualmente
-              hoje, que vira a ECONOMIA. Dizer isso aqui, ao lado do campo,
-              evita que a taxa do dev acabe preenchida no lugar da outra.
-            */}
-            <p className="text-xs text-muted-foreground">
-              Só o lado do <strong>custo</strong>: quanto custa um dia de
-              desenvolvimento do robô. Não confundir com a{" "}
-              <em>taxa horária do profissional que executa a atividade</em>{" "}
-              (aba Arquitetura de cada projeto), que é o que alimenta a economia.
-            </p>
+        <CardContent className="space-y-4">
+          <div className="grid gap-5 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="developer-hourly-rate">
+                Taxa horária de desenvolvimento (R$/h)
+              </Label>
+              <EditableNumber
+                id="developer-hourly-rate"
+                value={companyHourlyRateBRL}
+                allowEmpty
+                step="0.01"
+                onCommit={(next) =>
+                  companyMutation.mutate({ id: companyId, developerHourlyRateBRL: next })
+                }
+              />
+              <p className="text-xs text-muted-foreground">
+                {companyHourlyRateBRL == null
+                  ? `Vazio = usa o padrão global de ${formatCurrency(globalHourlyRateBRL ?? DEFAULT_DEVELOPER_HOURLY_RATE_BRL)}/h (Configurações).`
+                  : `Valor específico desta empresa. Apague o campo para voltar ao padrão global de ${formatCurrency(globalHourlyRateBRL ?? DEFAULT_DEVELOPER_HOURLY_RATE_BRL)}/h.`}{" "}
+                Equivale a {formatCurrency(dailyRate)} por dia útil ({HOURS_PER_BUSINESS_DAY}h).
+              </p>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="maintenance-hourly-rate">
+                Taxa horária de manutenção (R$/h)
+              </Label>
+              <EditableNumber
+                id="maintenance-hourly-rate"
+                value={companyMaintenanceHourlyRateBRL}
+                allowEmpty
+                step="0.01"
+                onCommit={(next) =>
+                  companyMutation.mutate({ id: companyId, maintenanceHourlyRateBRL: next })
+                }
+              />
+              <p className="text-xs text-muted-foreground">
+                {companyMaintenanceHourlyRateBRL == null
+                  ? `Vazio = usa o padrão global de ${formatCurrency(globalMaintenanceHourlyRateBRL ?? DEFAULT_MAINTENANCE_HOURLY_RATE_BRL)}/h (Configurações).`
+                  : `Valor específico desta empresa. Apague o campo para voltar ao padrão global de ${formatCurrency(globalMaintenanceHourlyRateBRL ?? DEFAULT_MAINTENANCE_HOURLY_RATE_BRL)}/h.`}{" "}
+                Aplicada às horas de sustentação de cada robô (coluna
+                &quot;Manut. h/sem&quot; na composição), a partir de 1 mês após a entrega.
+              </p>
+            </div>
           </div>
+
+          {/*
+            Três taxas circulam no payback e é fácil trocá-las. As duas acima são
+            CUSTO (construir e sustentar o robô); a terceira, na aba Arquitetura
+            de cada projeto, é o custo/hora de quem faz a atividade manualmente
+            hoje e alimenta a ECONOMIA. Enumerar as três aqui, ao lado dos
+            campos, é o que impede a taxa errada de acabar num campo errado.
+          */}
+          <p className="text-xs text-muted-foreground border-t border-border/50 pt-3">
+            As duas taxas acima são o lado do <strong>custo</strong>. Não confundir com a{" "}
+            <em>taxa horária do profissional que executa a atividade</em> (aba Arquitetura de
+            cada projeto), que é o custo evitado e alimenta a <strong>economia</strong>.
+          </p>
         </CardContent>
       </Card>
 
@@ -415,7 +576,7 @@ export function PaybackTab({
           </p>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <KpiTile
               label="Custo total projetado"
               value={formatCurrency(totals.developmentCost + totals.structureCost)}
@@ -427,6 +588,11 @@ export function PaybackTab({
               hint={`${composition.length} robô${composition.length === 1 ? "" : "s"} ${
                 scope === "pipeline" ? "no pipeline (ondas 1, 2 e sem onda)" : "nas ondas 1 e 2"
               }`}
+            />
+            <KpiTile
+              label="Manutenção anual"
+              value={formatCurrency(totals.annualMaintenance)}
+              hint={`recorrente, começa 1 mês após cada entrega — economia líquida ${formatCurrency(totals.annualSaving - totals.annualMaintenance)}/ano`}
             />
             <KpiTile
               label="Payback"
@@ -450,16 +616,43 @@ export function PaybackTab({
         </CardContent>
       </Card>
 
+      {/*
+        Curvas isoladas por onda, lado a lado. Não são uma decomposição da curva
+        consolidada acima — cada uma responde "e se só esta onda existisse?" e
+        por isso carrega o custo de estrutura inteiro da empresa. Somadas, elas
+        não dão a de cima, e o texto do card diz isso para ninguém tentar.
+      */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        <WavePaybackCard
+          title="Payback isolado — Onda 1"
+          curve={wave1Curve}
+          paybackDate={wave1PaybackDate}
+          robotCount={wave1Schedule.length}
+          isLoading={isLoading}
+          emptyMessage="Nenhum robô na onda 1."
+        />
+        <WavePaybackCard
+          title="Payback isolado — Onda 2"
+          curve={wave2Curve}
+          paybackDate={wave2PaybackDate}
+          robotCount={wave2Schedule.length}
+          isLoading={isLoading}
+          emptyMessage="Nenhum robô na onda 2."
+        />
+      </div>
+
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-base">Composição do cálculo</CardTitle>
           <p className="text-xs text-muted-foreground">
             Um robô por linha, no escopo selecionado acima, com os números que alimentam a
-            curva — custo de desenvolvimento = dias úteis × taxa diária do desenvolvedor;
-            economia = horas/mês economizadas × 12 × taxa horária do profissional que executa
-            a atividade (definida por projeto, na aba Arquitetura). Dias úteis e economia são
-            editáveis: a alteração é gravada no projeto e recalcula cronograma e curva. Dias úteis
-            em branco = ainda não estimado; o cronograma usa o padrão mostrado em cinza no campo.
+            curva — custo de desenvolvimento = dias úteis × {HOURS_PER_BUSINESS_DAY}h × taxa
+            horária de desenvolvimento; manutenção = horas/semana × taxa horária de manutenção,
+            recorrente a partir de 1 mês após a entrega; economia = horas/mês economizadas × 12
+            × taxa horária do profissional que executa a atividade (definida por projeto, na aba
+            Arquitetura). Dias úteis, manutenção e economia são editáveis: a alteração é gravada
+            no projeto e recalcula cronograma e curva. Campo em branco = ainda não estimado; o
+            cálculo usa o padrão mostrado em cinza no campo.
           </p>
         </CardHeader>
         <CardContent className="p-0">
@@ -471,6 +664,8 @@ export function PaybackTab({
                 <TableHead>Entrega</TableHead>
                 <TableHead className="w-28 text-right">Dias úteis</TableHead>
                 <TableHead className="text-right">Custo de dev.</TableHead>
+                <TableHead className="w-28 text-right">Manut. h/sem</TableHead>
+                <TableHead className="text-right">Manut./ano</TableHead>
                 <TableHead className="text-right">Economia/mês</TableHead>
                 <TableHead className="w-40 text-right">Economia/ano</TableHead>
               </TableRow>
@@ -478,7 +673,7 @@ export function PaybackTab({
             <TableBody>
               {composition.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
+                  <TableCell colSpan={9} className="h-24 text-center text-muted-foreground">
                     {scope === "pipeline"
                       ? "Nenhum robô no pipeline desta empresa."
                       : "Nenhum robô nas ondas 1/2 ainda."}
@@ -530,6 +725,29 @@ export function PaybackTab({
                     <TableCell className="text-right tabular-nums">
                       {formatCurrency(item.developmentCostBRL)}
                     </TableCell>
+                    <TableCell className="text-right">
+                      <EditableNumber
+                        className="h-8 w-20 text-right"
+                        step="0.5"
+                        value={item.maintenanceHours}
+                        // Vazio = herda o padrão global; o cinza revela quantas
+                        // horas o cálculo está de fato usando nesta linha.
+                        allowEmpty
+                        placeholder={String(
+                          defaultMaintenanceHoursPerWeek ?? DEFAULT_MAINTENANCE_HOURS_PER_WEEK
+                        )}
+                        ariaLabel={`Horas de manutenção por semana de ${item.title}`}
+                        onCommit={(next) =>
+                          projectMutation.mutate({
+                            id: item.projectId,
+                            maintenanceHoursPerWeek: next,
+                          })
+                        }
+                      />
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {formatCurrency(item.maintenanceAnnualBRL)}
+                    </TableCell>
                     <TableCell className="text-right tabular-nums">
                       {formatCurrency(item.monthlySavingBRL)}
                     </TableCell>
@@ -555,7 +773,7 @@ export function PaybackTab({
                   <TableCell className="font-medium" colSpan={4}>
                     Estrutura (pessoas/licenças) acumulada até hoje
                   </TableCell>
-                  <TableCell className="text-right tabular-nums font-medium" colSpan={3}>
+                  <TableCell className="text-right tabular-nums font-medium" colSpan={5}>
                     {formatCurrency(structureCostToDate)}
                   </TableCell>
                 </TableRow>

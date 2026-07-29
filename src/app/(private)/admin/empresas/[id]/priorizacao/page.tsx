@@ -319,6 +319,11 @@ export default function PriorizacaoPage({ params }: Props) {
     [displayRanking]
   );
 
+  const maintenanceHoursByProjectId = useMemo(
+    () => new Map(displayRanking.map((row) => [row.id, row.maintenanceHoursPerWeek])),
+    [displayRanking]
+  );
+
   function handleWaveChange(row: RankingRow, value: string) {
     if (value === WAVE_NONE) {
       updateMutation.mutate({ id: row.id, implementationWave: null, waveOrder: null });
@@ -670,8 +675,12 @@ export default function PriorizacaoPage({ params }: Props) {
             unassignedSchedule={unassignedSchedule}
             savingByProjectId={savingByProjectId}
             effortDaysByProjectId={effortDaysByProjectId}
-            companyDailyRateBRL={company?.developerDailyRateBRL ?? null}
-            globalDailyRateBRL={settings?.developerDailyRateBRL ?? null}
+            maintenanceHoursByProjectId={maintenanceHoursByProjectId}
+            companyHourlyRateBRL={company?.developerHourlyRateBRL ?? null}
+            globalHourlyRateBRL={settings?.developerHourlyRateBRL ?? null}
+            companyMaintenanceHourlyRateBRL={company?.maintenanceHourlyRateBRL ?? null}
+            globalMaintenanceHourlyRateBRL={settings?.maintenanceHourlyRateBRL ?? null}
+            defaultMaintenanceHoursPerWeek={settings?.defaultMaintenanceHoursPerWeek ?? null}
             wave1StartDate={wave1StartDate}
           />
         </TabsContent>

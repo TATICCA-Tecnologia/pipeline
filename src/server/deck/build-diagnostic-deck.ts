@@ -9,9 +9,13 @@ import { computeWaveSchedule, type WaveScheduleItem } from "@/shared/lib/wave-sc
 import {
   computePaybackCurve,
   computeStructureCostAt,
+  developerDailyRateFrom,
   findPaybackDate,
-  resolveDeveloperDailyRate,
+  maintenanceCostPerWeek,
+  resolveDeveloperHourlyRate,
+  resolveMaintenanceHourlyRate,
   type PaybackPoint,
+  type PaybackScheduleItem,
   type StructureCostItem,
 } from "@/shared/lib/payback";
 import {
@@ -148,7 +152,11 @@ type ProjectDeckRow = {
 export async function buildDiagnosticDeck(companyId: string, actingUserId: string): Promise<Buffer> {
   const company = await db.company.findUnique({
     where: { id: companyId },
-    select: { name: true, developerDailyRateBRL: true },
+    select: {
+      name: true,
+      developerHourlyRateBRL: true,
+      maintenanceHourlyRateBRL: true,
+    },
   });
   if (!company) {
     throw new Error(`Empresa não encontrada (id: ${companyId}).`);
@@ -225,14 +233,22 @@ export async function buildDiagnosticDeck(companyId: string, actingUserId: strin
   addRankingSlide(pres, "Ranking por qualitativo", rankingQualitativo, "qualitativo");
   addRankingSlide(pres, "Ranking combinado", rankingCombinado, "combinado");
   addScheduleSlide(pres, rankingCombinado, settings.wave1StartDate);
-  // Taxa efetiva resolvida UMA vez aqui: os slides de payback recebem um número
-  // já decidido (empresa > global > 0) em vez de decidirem por conta própria,
-  // que é o que mantém o .pptx idêntico à aba Payback da tela de priorização.
+  // Premissas resolvidas UMA vez aqui: os slides de payback recebem números já
+  // decididos (empresa > global > padrão) em vez de decidirem por conta
+  // própria, que é o que mantém o .pptx idêntico à aba Payback da tela de
+  // priorização.
   const paybackSettings = {
-    developerDailyRateBRL: resolveDeveloperDailyRate(
-      company.developerDailyRateBRL,
-      settings.developerDailyRateBRL
+    developerDailyRateBRL: developerDailyRateFrom(
+      resolveDeveloperHourlyRate(
+        company.developerHourlyRateBRL,
+        settings.developerHourlyRateBRL
+      )
     ),
+    maintenanceHourlyRateBRL: resolveMaintenanceHourlyRate(
+      company.maintenanceHourlyRateBRL,
+      settings.maintenanceHourlyRateBRL
+    ),
+    defaultMaintenanceHoursPerWeek: settings.defaultMaintenanceHoursPerWeek,
     wave1StartDate: settings.wave1StartDate,
   };
   addPaybackSlide(pres, rankingCombinado, paybackSettings, structureCosts);
@@ -464,25 +480,55 @@ function addScheduleSlide(pres: PptxGenJS, ranking: Ranking, wave1StartDateRaw: 
   addSlideTable(slide, [header, ...rows], [1.4, 6.2, 2.3, 2.3]);
 }
 
+/**
+ * Premissas de custo já resolvidas (empresa > global > padrão) que os slides de
+ * payback consomem. Recebem valores prontos de propósito: se cada slide
+ * resolvesse por conta própria, o .pptx passaria a divergir da aba Payback.
+ */
+type PaybackDeckSettings = {
+  developerDailyRateBRL: number;
+  maintenanceHourlyRateBRL: number;
+  defaultMaintenanceHoursPerWeek: number;
+  wave1StartDate: Date | null;
+};
+
+/**
+ * Monta os itens da curva a partir de um recorte do cronograma — mesma
+ * conversão que a aba Payback faz em `toPaybackItems`, incluindo o custo
+ * semanal de sustentação de cada robô.
+ */
+function toDeckPaybackItems(
+  items: WaveScheduleItem[],
+  ranking: Ranking,
+  settings: PaybackDeckSettings
+): PaybackScheduleItem[] {
+  const byId = new Map(ranking.map((row) => [row.id, row]));
+  return items.map((item) => {
+    const row = byId.get(item.projectId);
+    return {
+      projectId: item.projectId,
+      startDate: item.startDate,
+      endDate: item.endDate,
+      estimatedAnnualSavingBRL: row?.estimatedAnnualSavingBRL ?? 0,
+      maintenanceCostPerWeekBRL: maintenanceCostPerWeek(
+        row?.maintenanceHoursPerWeek,
+        settings.defaultMaintenanceHoursPerWeek,
+        settings.maintenanceHourlyRateBRL
+      ),
+    };
+  });
+}
+
 function addPaybackSlide(
   pres: PptxGenJS,
   ranking: Ranking,
-  settings: { developerDailyRateBRL: number; wave1StartDate: Date | null },
+  settings: PaybackDeckSettings,
   structureCosts: StructureCostItem[]
 ): void {
   const slide = addTitledSlide(pres, "Payback / ROI acumulado");
   const { wave1, wave2, startDate } = computeWaveSchedules(ranking, settings.wave1StartDate);
 
-  const savingByProjectId = new Map(
-    ranking.map((row) => [row.id, row.estimatedAnnualSavingBRL ?? 0])
-  );
-
-  const paybackSchedule = [...wave1, ...wave2].map((item) => ({
-    projectId: item.projectId,
-    startDate: item.startDate,
-    endDate: item.endDate,
-    estimatedAnnualSavingBRL: savingByProjectId.get(item.projectId) ?? 0,
-  }));
+  const paybackSchedule = toDeckPaybackItems([...wave1, ...wave2], ranking, settings);
 
   const dailyRate = settings.developerDailyRateBRL;
   const curve = computePaybackCurve(paybackSchedule, dailyRate, structureCosts);
@@ -552,7 +598,7 @@ function addPaybackSlide(
 function addPaybackCompositionSlide(
   pres: PptxGenJS,
   ranking: Ranking,
-  settings: { developerDailyRateBRL: number; wave1StartDate: Date | null },
+  settings: PaybackDeckSettings,
   structureCosts: StructureCostItem[]
 ): void {
   const { wave1, wave2 } = computeWaveSchedules(ranking, settings.wave1StartDate);
@@ -576,20 +622,31 @@ function addPaybackCompositionSlide(
     { text: "Entrega", options: TABLE_HEADER_OPTS },
     { text: "Dias úteis", options: TABLE_HEADER_OPTS },
     { text: "Custo de dev.", options: TABLE_HEADER_OPTS },
+    { text: "Manut./ano", options: TABLE_HEADER_OPTS },
     { text: "Economia/mês", options: TABLE_HEADER_OPTS },
     { text: "Economia/ano", options: TABLE_HEADER_OPTS },
   ];
+
+  const maintenanceByProjectId = new Map(
+    toDeckPaybackItems(withWave, ranking, settings).map((item) => [
+      item.projectId,
+      item.maintenanceCostPerWeekBRL,
+    ])
+  );
 
   const rows: TableRow[] = withWave.map((item) => {
     const businessDays = differenceInBusinessDays(item.endDate, item.startDate) + 1;
     const developmentCostBRL = businessDays * dailyRate;
     const annualSavingBRL = savingByProjectId.get(item.projectId) ?? 0;
+    const maintenanceAnnualBRL =
+      ((maintenanceByProjectId.get(item.projectId) ?? 0) / 7) * 365;
     return [
       { text: item.title },
       { text: `Onda ${item.wave}` },
       { text: formatDate(item.endDate) },
       { text: String(businessDays) },
       { text: formatCurrency(developmentCostBRL) },
+      { text: formatCurrency(maintenanceAnnualBRL) },
       { text: formatCurrency(annualSavingBRL / 12) },
       { text: formatCurrency(annualSavingBRL) },
     ];
@@ -600,10 +657,11 @@ function addPaybackCompositionSlide(
       { text: "Estrutura (pessoas/licenças) acumulada até hoje", options: { colspan: 5 } },
       { text: formatCurrency(structureCostToDate) },
       { text: "" },
+      { text: "" },
     ]);
   }
 
-  addSlideTable(slide, [header, ...rows], [4.1, 1.1, 1.5, 1.1, 1.6, 1.5, 1.4]);
+  addSlideTable(slide, [header, ...rows], [3.5, 1.0, 1.3, 1.0, 1.5, 1.3, 1.4, 1.3]);
 }
 
 export function addInterviewsSlide(pres: PptxGenJS, interviews: Interviews): void {

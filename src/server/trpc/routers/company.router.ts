@@ -25,7 +25,8 @@ export const companyRouter = router({
       isActive: c.isActive,
       usersCount: c._count.users,
       projectsCount: c._count.projects,
-      developerDailyRateBRL: c.developerDailyRateBRL,
+      developerHourlyRateBRL: c.developerHourlyRateBRL,
+      maintenanceHourlyRateBRL: c.maintenanceHourlyRateBRL,
       createdAt: c.createdAt,
     }));
   }),
@@ -72,7 +73,8 @@ export const companyRouter = router({
         phone: z.string().optional(),
         isActive: z.boolean().optional(),
         // null = volta a herdar a taxa global de SystemSettings.
-        developerDailyRateBRL: z.number().min(0).nullable().optional(),
+        developerHourlyRateBRL: z.number().min(0).nullable().optional(),
+        maintenanceHourlyRateBRL: z.number().min(0).nullable().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
