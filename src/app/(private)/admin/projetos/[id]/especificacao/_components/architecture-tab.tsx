@@ -85,8 +85,14 @@ export function ArchitectureTab({ projectId }: ArchitectureTabProps) {
 
   const { data: mainTools = [] } = trpc.taxonomy.listMainTools.useQuery();
   const mainToolOptions = useMemo(() => {
+    // Ferramentas SEM categoria aparecem sempre, em qualquer projeto: elas não
+    // pertencem a nenhuma categoria, então filtrá-las junto com as categorizadas
+    // as tornava invisíveis em todo projeto que tivesse uma categoria escolhida
+    // — era isso que fazia uma ferramenta criada aqui não se reaproveitar nas
+    // outras oportunidades. Para categorizá-la (e aí sim restringir onde ela
+    // aparece), basta atribuir a categoria em Configurações › Categorias.
     const filtered = mainTools.filter(
-      (t) => !mainToolCategoryId || t.categoryId === mainToolCategoryId
+      (t) => !mainToolCategoryId || t.categoryId === mainToolCategoryId || t.categoryId == null
     );
     const opts = filtered.map((t) => ({ value: t.id, label: t.name }));
     if (project?.mainTool && !opts.some((o) => o.value === project.mainTool!.id)) {
