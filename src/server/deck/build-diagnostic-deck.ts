@@ -54,6 +54,10 @@ const COLOR_ZEBRA = "F8FAFC"; // fundo das linhas pares da tabela
 const COLOR_SURFACE = "FFFFFF";
 const COLOR_SECONDARY = "334155"; // slate-700 — subtítulos e texto de apoio
 const COLOR_MUTED_SURFACE = "E8ECF1"; // fundo de linhas de total/destaque
+// Pares para uso sobre o navy da capa: o acento e o cinza normais não têm
+// contraste suficiente contra fundo escuro.
+const COLOR_ACCENT_ON_DARK = "7DD3FC"; // azul claro
+const COLOR_ON_DARK_MUTED = "94A3B8"; // cinza claro
 
 /**
  * Tipografia do deck.
@@ -89,8 +93,10 @@ const TYPE = {
 
 /** Nome do master usado pelos slides de conteúdo (título + logo + rodapé). */
 const MASTER_CONTENT = "CONTENT";
-/** Master sem chrome, para capa e divisórias de seção. */
+/** Master sem chrome, para divisórias de seção. */
 const MASTER_FULL_BLEED = "FULL_BLEED";
+/** Master da capa: fundo navy sólido, sem rodapé. */
+const MASTER_COVER = "COVER";
 
 /** Margem esquerda/direita única do deck — tudo se alinha nela. */
 const MARGIN_X = 0.6;
@@ -138,8 +144,12 @@ const INTERVIEW_STATUS_LABEL: Record<string, string> = {
 // Destaque teal do card React ("Principais ações da automação" e cabeçalhos da
 // tabela quantitativa) — mantido aqui para que o slide por processo tenha o
 // mesmo vocabulário visual do componente de referência.
-const COLOR_TEAL = "0D9488"; // teal-600
-const COLOR_TEAL_BG = "F0FDFA"; // teal-50
+// O slide de processo herdou um teal do card React de referência que destoava
+// do resto do deck (navy + azul). Apontar para as cores da paleta mantém o
+// destaque sem introduzir uma terceira família de cor num material que só usa
+// duas.
+const COLOR_TEAL = COLOR_ACCENT;
+const COLOR_TEAL_BG = "EFF6FF"; // azul-50, par claro do acento
 const COLOR_HIGHLIGHT_BG = "F8FAFC"; // slate-50 (caixa do architectNotes)
 const COLOR_SAVING = "059669"; // emerald-600 (economia estimada)
 
@@ -185,6 +195,7 @@ type ProjectDeckRow = {
   ratingInternalImpact: number | null;
   ratingExternalImpact: number | null;
   ratingCompliance: number | null;
+  area: { name: string } | null;
 };
 
 /**
@@ -260,6 +271,9 @@ export async function buildDiagnosticDeck(companyId: string, actingUserId: strin
         ratingInternalImpact: true,
         ratingExternalImpact: true,
         ratingCompliance: true,
+        // Área usada como subtítulo do slide de processo: com dezenas de
+        // slides individuais, o título sozinho não diz de quem é o processo.
+        area: { select: { name: true } },
       },
     }),
     caller.company.listCostItems({ companyId }),
@@ -287,6 +301,7 @@ export async function buildDiagnosticDeck(companyId: string, actingUserId: strin
     "Priorização das oportunidades",
     "Nem todo processo automatizável merece ser automatizado primeiro. As páginas a seguir ordenam as oportunidades por três critérios diferentes — retorno financeiro, peso estratégico e um score combinado — para que a escolha da ordem de execução seja uma decisão explícita, e não uma consequência de quem pediu primeiro."
   );
+  addPrioritizationMethodSlide(pres);
   addRankingSlide(pres, "Ranking por economia", rankingEconomia, "economia");
   addRankingSlide(pres, "Ranking por qualitativo", rankingQualitativo, "qualitativo");
   addRankingSlide(pres, "Ranking combinado", rankingCombinado, "combinado");
@@ -315,6 +330,7 @@ export async function buildDiagnosticDeck(companyId: string, actingUserId: strin
     defaultMaintenanceHoursPerWeek: settings.defaultMaintenanceHoursPerWeek,
     wave1StartDate: settings.wave1StartDate,
   };
+  addPaybackMethodSlide(pres);
   addPaybackSlide(pres, rankingCombinado, paybackSettings, structureCosts);
   addPaybackCompositionSlide(pres, rankingCombinado, paybackSettings, structureCosts);
   // Entrevistas: se não houver nenhuma, o slide é pulado inteiramente (não
@@ -429,9 +445,18 @@ export function defineDeckTheme(
     title: MASTER_FULL_BLEED,
     background: { color: COLOR_SURFACE },
     objects: [
-      // Faixa vertical de acento na borda esquerda: âncora visual da capa e das
-      // divisórias, e o único elemento puramente gráfico do deck.
+      // Faixa vertical de acento na borda esquerda: âncora visual das
+      // divisórias, e o único elemento puramente gráfico do miolo.
       { rect: { x: 0, y: 0, w: 0.22, h: 7.5, fill: { color: COLOR_ACCENT } } },
+    ],
+  });
+
+  pres.defineSlideMaster({
+    title: MASTER_COVER,
+    background: { color: COLOR_PRIMARY },
+    objects: [
+      // Faixa de acento no rodapé da capa, fechando a composição.
+      { rect: { x: 0, y: 7.32, w: 13.33, h: 0.18, fill: { color: COLOR_ACCENT } } },
     ],
   });
 }
@@ -441,62 +466,70 @@ export function addCoverSlide(
   companyName: string,
   title = "Diagnóstico de robotização"
 ): void {
-  const slide = pres.addSlide({ masterName: MASTER_FULL_BLEED });
+  // Capa em fundo navy sólido, não branco: é o único slide do deck que troca de
+  // fundo, e é isso que dá o "peso" de abertura de material de consultoria —
+  // o miolo continua branco para não pesar na leitura nem na impressão.
+  const slide = pres.addSlide({ masterName: MASTER_COVER });
+
   if (LOGO_DATA_URI) {
-    const width = 2.6;
+    // Logo bem maior e centralizado no terço superior: na capa ele é o
+    // elemento principal, não uma marca de canto.
+    const width = 4.6;
     slide.addImage({
       data: LOGO_DATA_URI,
-      x: MARGIN_X + 0.2,
-      y: 0.7,
+      x: (13.33 - width) / 2,
+      y: 1.15,
       w: width,
       h: width / LOGO_ASPECT_RATIO,
     });
   }
-  // Eyebrow (rótulo em caixa alta acima do título): dá contexto imediato sem
-  // roubar peso do título, padrão de capa de material de consultoria.
+
   slide.addText("RELATÓRIO DE DIAGNÓSTICO", {
-    x: MARGIN_X + 0.2,
-    y: 2.55,
-    w: CONTENT_W,
+    x: 0,
+    y: 3.35,
+    w: 13.33,
     h: 0.3,
+    align: "center",
     fontSize: TYPE.eyebrow,
     bold: true,
-    charSpacing: 2,
-    color: COLOR_ACCENT,
+    charSpacing: 3,
+    color: COLOR_ACCENT_ON_DARK,
   });
   slide.addText(title, {
-    x: MARGIN_X + 0.2,
-    y: 2.95,
-    w: CONTENT_W,
-    h: 0.9,
+    x: 0,
+    y: 3.8,
+    w: 13.33,
+    h: 0.95,
+    align: "center",
     fontSize: TYPE.coverTitle,
     bold: true,
-    color: COLOR_PRIMARY,
+    color: COLOR_SURFACE,
+  });
+  // Régua centralizada entre o título e o nome da empresa.
+  slide.addShape("rect", {
+    x: (13.33 - 2.2) / 2,
+    y: 4.92,
+    w: 2.2,
+    h: 0.035,
+    fill: { color: COLOR_ACCENT_ON_DARK },
   });
   slide.addText(companyName, {
-    x: MARGIN_X + 0.2,
-    y: 3.95,
-    w: CONTENT_W,
-    h: 0.6,
+    x: 0,
+    y: 5.2,
+    w: 13.33,
+    h: 0.55,
+    align: "center",
     fontSize: TYPE.coverSubtitle,
-    color: COLOR_SECONDARY,
-  });
-  // Régua curta entre o nome da empresa e a data — separa identificação de
-  // metadado, evitando três linhas de texto empilhadas sem hierarquia.
-  slide.addShape("rect", {
-    x: MARGIN_X + 0.2,
-    y: 4.75,
-    w: 1.6,
-    h: 0.03,
-    fill: { color: COLOR_ACCENT },
+    color: COLOR_SURFACE,
   });
   slide.addText(formatDate(new Date()), {
-    x: MARGIN_X + 0.2,
-    y: 4.95,
-    w: CONTENT_W,
+    x: 0,
+    y: 5.85,
+    w: 13.33,
     h: 0.4,
+    align: "center",
     fontSize: TYPE.bodyLarge,
-    color: COLOR_MUTED,
+    color: COLOR_ON_DARK_MUTED,
   });
 }
 
@@ -547,11 +580,135 @@ export function addSectionSlide(
   }
 }
 
+/**
+ * Os cinco critérios da avaliação qualitativa, com o que cada nota significa.
+ * Espelham `ratingErrorReduction`/`ratingProcessCriticality`/... do Project e
+ * os pesos configuráveis em SystemSettings.
+ */
+const QUALITATIVE_CRITERIA: { name: string; question: string }[] = [
+  {
+    name: "Redução de erros",
+    question:
+      "Quanto o processo manual está sujeito a falhas hoje e quanto a automação elimina esse risco",
+  },
+  {
+    name: "Criticidade do processo",
+    question:
+      "O quanto a operação depende deste processo e qual o impacto de ele parar ou atrasar",
+  },
+  {
+    name: "Impacto interno",
+    question: "Quantas pessoas e áreas internas se beneficiam diretamente da automação",
+  },
+  {
+    name: "Impacto externo",
+    question: "Efeito percebido por clientes, fornecedores ou órgãos externos",
+  },
+  {
+    name: "Compliance",
+    question:
+      "Exigência regulatória, de auditoria ou de rastreabilidade atendida pela automação",
+  },
+];
+
+/**
+ * Metodologia da avaliação qualitativa, antes dos rankings.
+ *
+ * Sem este slide o leitor encontra uma coluna "Score" nos rankings seguintes e
+ * um percentual nos slides de processo sem nenhuma explicação de onde saem —
+ * era a lacuna mais visível do deck gerado em relação ao feito à mão.
+ */
+function addPrioritizationMethodSlide(pres: PptxGenJS): void {
+  const slide = addTitledSlide(
+    pres,
+    "Metodologia de priorização",
+    "Cada oportunidade levantada é avaliada em cinco critérios, com nota de 1 a 5. A média ponderada dessas notas forma a avaliação qualitativa, que é combinada à economia estimada e à complexidade de implementação para produzir o score de priorização usado nos rankings a seguir."
+  );
+
+  const header: TableRow = [
+    { text: "Critério", options: TABLE_HEADER_OPTS },
+    { text: "O que é avaliado", options: TABLE_HEADER_OPTS },
+  ];
+  const rows: TableRow[] = QUALITATIVE_CRITERIA.map((criterion) => [
+    { text: criterion.name, options: { bold: true } },
+    { text: criterion.question },
+  ]);
+
+  addSlideTable(slide, [header, ...rows], [3.4, 8.7], { y: CONTENT_TOP_Y_WITH_SUBTITLE });
+
+  // Legenda da escala logo abaixo da tabela: é a informação que o leitor
+  // procura ao ver "4" numa célula, e precisa estar no mesmo slide.
+  slide.addText(
+    "Escala aplicada a todos os critérios:  1 — muito baixo   ·   2 — baixo   ·   3 — moderado   ·   4 — alto   ·   5 — muito alto",
+    {
+      x: MARGIN_X,
+      y: 6.05,
+      w: CONTENT_W,
+      h: 0.4,
+      fontSize: TYPE.caption,
+      color: COLOR_MUTED,
+      valign: "middle",
+    }
+  );
+}
+
+/**
+ * Metodologia do payback, antes da curva. Declara as premissas de custo e de
+ * economia em texto, para o número de meses do slide seguinte não aparecer sem
+ * lastro.
+ */
+function addPaybackMethodSlide(pres: PptxGenJS): void {
+  const slide = addTitledSlide(
+    pres,
+    "Metodologia do cálculo de retorno",
+    "O payback compara, ao longo do tempo, tudo o que a automação custa contra tudo o que ela economiza. As premissas abaixo são as que alimentam a curva e a composição apresentadas na sequência, e podem ser ajustadas por empresa."
+  );
+
+  const header: TableRow = [
+    { text: "Componente", options: TABLE_HEADER_OPTS },
+    { text: "Como é calculado", options: TABLE_HEADER_OPTS },
+  ];
+  const rows: TableRow[] = [
+    [
+      { text: "Custo de desenvolvimento", options: { bold: true } },
+      {
+        text: "Dias úteis estimados de construção do robô × jornada de 8h × taxa horária de desenvolvimento. Reconhecido de forma distribuída ao longo dos dias em que o robô está sendo desenvolvido.",
+      },
+    ],
+    [
+      { text: "Custo de manutenção", options: { bold: true } },
+      {
+        text: "Horas de sustentação por semana × taxa horária de manutenção, específica e distinta da taxa de desenvolvimento. Recorrente, iniciando um mês após a entrega de cada robô.",
+      },
+    ],
+    [
+      { text: "Custo de estrutura", options: { bold: true } },
+      {
+        text: "Pessoas, licenças e infraestrutura da operação de automação, cadastradas por empresa. Independem da quantidade de robôs entregues.",
+      },
+    ],
+    [
+      { text: "Economia", options: { bold: true } },
+      {
+        text: "Horas de trabalho manual eliminadas por mês × 12 × taxa horária do profissional que executa a atividade hoje. Começa a contar na data de entrega de cada robô.",
+      },
+    ],
+    [
+      { text: "Cronograma", options: { bold: true } },
+      {
+        text: "Um desenvolvedor dedicado, um robô por vez, em sequência estrita — sem paralelismo. A data de entrega de cada robô determina quando sua economia entra na conta.",
+      },
+    ],
+  ];
+
+  addSlideTable(slide, [header, ...rows], [3.4, 8.7], { y: CONTENT_TOP_Y_WITH_SUBTITLE });
+}
+
 function addAreaSummarySlide(pres: PptxGenJS, areaSummary: AreaSummary): void {
   const slide = addTitledSlide(
     pres,
     "Resultados agregados por área",
-    "Visão consolidada do potencial de automação da empresa, agrupado pela área responsável por cada processo. Mostra onde o esforço manual está concentrado hoje e quanto cada área tem a ganhar — normalmente o ponto de partida da conversa com cada gestor."
+    "Após o levantamento de oportunidades realizado junto às áreas, a tabela abaixo consolida as oportunidades identificadas por área responsável, com a economia anual estimada e o volume de horas de trabalho manual envolvido hoje. É a visão que permite enxergar onde o esforço operacional está concentrado e priorizar as conversas seguintes com cada gestor."
   );
 
   if (areaSummary.length === 0) {
@@ -617,11 +774,11 @@ function activeScoreOf(row: Ranking[number], sortBy: "economia" | "qualitativo" 
  */
 const RANKING_SUBTITLE: Record<"economia" | "qualitativo" | "combinado", string> = {
   economia:
-    "Processos ordenados exclusivamente pelo retorno financeiro: horas de trabalho manual economizadas por ano, valorizadas pelo custo/hora do profissional que executa a atividade hoje. É a leitura de quem precisa justificar o investimento.",
+    "Aplicando o critério financeiro isoladamente, as oportunidades são ordenadas pela economia anual estimada — resultado das horas de trabalho manual eliminadas, valorizadas pelo custo/hora do profissional que executa a atividade hoje. Esta é a leitura indicada para sustentar a aprovação do investimento junto à diretoria.",
   qualitativo:
-    "Processos ordenados pelo peso estratégico, independentemente do valor economizado: criticidade para a operação, impacto interno e externo, exigência de compliance e redução de erros. Processos baratos de automatizar podem liderar aqui.",
+    "Sob a ótica estratégica, as oportunidades são reordenadas pela avaliação qualitativa apresentada anteriormente, independentemente do valor economizado. Processos de baixo retorno financeiro podem assumir as primeiras posições quando envolvem risco de compliance ou criticidade operacional elevada.",
   combinado:
-    "Leitura recomendada para decidir a ordem de execução: combina o retorno financeiro, o peso estratégico e a complexidade de implementação num único score. Processos no topo entregam mais valor com menos esforço.",
+    "Recomendamos esta leitura para definir a ordem de execução: ela pondera economia, avaliação qualitativa e complexidade de implementação num único indicador. As oportunidades no topo da lista são as que entregam maior valor com menor esforço, e formam a base das ondas propostas a seguir.",
 };
 
 function addRankingSlide(
@@ -1140,6 +1297,24 @@ export function addProjectSlide(
 ): void {
   const slide = addTitledSlide(pres, project.title);
 
+  // Área como subtítulo curto ao lado da régua: com dezenas de slides de
+  // processo em sequência, só o título não deixa localizar de quem é o
+  // processo ao folhear o deck. Fica no lugar do texto explicativo (que estes
+  // slides não usam), então não desloca o conteúdo abaixo.
+  if (project.area?.name) {
+    slide.addText(project.area.name.toUpperCase(), {
+      x: MARGIN_X + 1.05,
+      y: 0.86,
+      w: CONTENT_W - 1.05,
+      h: 0.26,
+      fontSize: TYPE.eyebrow,
+      bold: true,
+      charSpacing: 1.5,
+      color: COLOR_MUTED,
+      valign: "middle",
+    });
+  }
+
   // ----- Coluna esquerda: textos (só campos já preenchidos) -----
   // Alinhadas à margem única do deck (MARGIN_X) e ao topo de conteúdo padrão,
   // para o slide de processo não "dançar" em relação aos demais quando o deck
@@ -1348,19 +1523,24 @@ export function addTitledSlide(pres: PptxGenJS, title: string, narrative?: strin
       // Medida de leitura controlada: o parágrafo ocupa ~75% da largura em vez
       // da linha inteira de 12", que ficaria longa demais para ler confortável.
       w: CONTENT_W * 0.78,
-      h: 0.62,
+      h: 1.0,
       fontSize: TYPE.slideSubtitle,
       color: COLOR_SECONDARY,
-      lineSpacingMultiple: 1.25,
+      lineSpacingMultiple: 1.3,
       valign: "top",
     });
   }
   return slide;
 }
 
-/** Onde o conteúdo pode começar, conforme o slide tenha texto explicativo ou não. */
+/**
+ * Onde o conteúdo pode começar, conforme o slide tenha texto explicativo ou
+ * não. O valor com texto dá uma folga generosa depois do parágrafo: colada nele
+ * a tabela parecia continuação da frase, e o texto perdia a função de
+ * introduzir o que vem abaixo.
+ */
 export const CONTENT_TOP_Y = 1.22;
-export const CONTENT_TOP_Y_WITH_SUBTITLE = 1.82;
+export const CONTENT_TOP_Y_WITH_SUBTITLE = 2.25;
 
 /**
  * Tabela padrão do deck.

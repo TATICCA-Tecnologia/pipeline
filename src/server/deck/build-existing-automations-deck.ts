@@ -137,6 +137,8 @@ export async function buildExistingAutomationsDeck(
           ratingInternalImpact: true,
           ratingExternalImpact: true,
           ratingCompliance: true,
+          // Subtítulo de área no slide de processo (ver addProjectSlide).
+          area: { select: { name: true } },
           accumulatedSavingBRL: true,
           operationalStatus: true,
           currentApplicationHosting: true,
