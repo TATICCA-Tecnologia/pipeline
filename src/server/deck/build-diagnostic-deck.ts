@@ -305,7 +305,7 @@ export async function buildDiagnosticDeck(companyId: string, actingUserId: strin
     "Priorização das oportunidades",
     "Nem todo processo automatizável merece ser automatizado primeiro. As páginas a seguir ordenam as oportunidades por três critérios diferentes — retorno financeiro, critério estratégico e um score combinado — para que a escolha da ordem de execução seja uma decisão aderente às diretrizes da empresa, e não uma consequência de quem pediu primeiro."
   );
-  addPrioritizationMethodSlide(pres);
+  addPrioritizationMethodSlide(pres, settings);
   addRankingSlide(pres, "Ranking por economia", rankingEconomia, "economia");
   addRankingSlide(pres, "Ranking por qualitativo", rankingQualitativo, "qualitativo");
   addRankingSlide(pres, "Ranking combinado", rankingCombinado, "combinado");
@@ -336,7 +336,7 @@ export async function buildDiagnosticDeck(companyId: string, actingUserId: strin
   };
   addPaybackMethodSlide(pres);
   addPaybackSlide(pres, rankingCombinado, paybackSettings, structureCosts);
-  addPaybackCompositionSlide(pres, rankingCombinado, paybackSettings, structureCosts);
+  addPaybackCompositionSlide(pres, rankingCombinado, paybackSettings);
   // Entrevistas: se não houver nenhuma, o slide é pulado inteiramente (não
   // criamos um slide vazio nem lançamos erro — decisão explícita do Passo 8a).
   if (interviews.length > 0) {
@@ -589,12 +589,11 @@ export function addSectionSlide(
     slide.addText(description, {
       x: MARGIN_X + 0.2,
       y: 4.1,
-      // Metade da largura: parágrafo de abertura de seção é para ser lido, não
-      // varrido — linha longa demais derruba a legibilidade.
-      w: CONTENT_W * 0.55,
+      w: CONTENT_W,
       h: 1.2,
       fontSize: TYPE.bodyLarge,
       color: COLOR_SECONDARY,
+      align: "justify",
       lineSpacingMultiple: 1.35,
       valign: "top",
     });
@@ -606,26 +605,41 @@ export function addSectionSlide(
  * Espelham `ratingErrorReduction`/`ratingProcessCriticality`/... do Project e
  * os pesos configuráveis em SystemSettings.
  */
-const QUALITATIVE_CRITERIA: { name: string; question: string }[] = [
+const QUALITATIVE_CRITERIA: {
+  name: string;
+  question: string;
+  /** Campo de SystemSettings que guarda o peso configurado deste critério. */
+  weightKey:
+    | "qualWeightErrorReduction"
+    | "qualWeightProcessCriticality"
+    | "qualWeightInternalImpact"
+    | "qualWeightExternalImpact"
+    | "qualWeightCompliance";
+}[] = [
   {
+    weightKey: "qualWeightErrorReduction",
     name: "Redução de erros",
     question:
       "Quanto o processo manual está sujeito a falhas hoje e quanto a automação elimina esse risco",
   },
   {
+    weightKey: "qualWeightProcessCriticality",
     name: "Criticidade do processo",
     question:
       "O quanto a operação depende deste processo e qual o impacto se houver uma parada ou atraso",
   },
   {
+    weightKey: "qualWeightInternalImpact",
     name: "Impacto interno",
     question: "Quantas pessoas e áreas internas se beneficiam diretamente da automação",
   },
   {
+    weightKey: "qualWeightExternalImpact",
     name: "Impacto externo",
     question: "Efeito percebido por clientes, fornecedores ou órgãos externos",
   },
   {
+    weightKey: "qualWeightCompliance",
     name: "Compliance",
     question:
       "Exigência regulatória, de auditoria ou de rastreabilidade atendida pela automação",
@@ -639,23 +653,28 @@ const QUALITATIVE_CRITERIA: { name: string; question: string }[] = [
  * um percentual nos slides de processo sem nenhuma explicação de onde saem —
  * era a lacuna mais visível do deck gerado em relação ao feito à mão.
  */
-function addPrioritizationMethodSlide(pres: PptxGenJS): void {
+function addPrioritizationMethodSlide(pres: PptxGenJS, weights: ScoringWeights): void {
   const slide = addTitledSlide(
     pres,
     "Metodologia de priorização",
-    "Cada oportunidade levantada é avaliada em cinco critérios, com nota de 1 a 5. A média ponderada dessas notas forma a avaliação qualitativa — o critério estratégico da priorização — que depois é combinada à economia estimada e à complexidade de implementação para produzir o score usado no ranking combinado."
+    "Cada oportunidade levantada é avaliada em cinco critérios, com nota de 1 a 5. A média ponderada dessas notas — pelos pesos indicados na tabela abaixo — forma a avaliação qualitativa, que é o critério estratégico da priorização. Ela é depois combinada à economia estimada e à complexidade de implementação para produzir o score usado no ranking combinado."
   );
 
   const header: TableRow = [
     { text: "Critério", options: TABLE_HEADER_OPTS },
     { text: "O que é avaliado", options: TABLE_HEADER_OPTS },
+    { text: "Peso", options: TABLE_HEADER_OPTS },
   ];
+  // Pesos vindos das configurações reais da instalação, não de constantes: eles
+  // são editáveis em Configurações, e um slide com os padrões cravados passaria
+  // a mentir no instante em que alguém os ajustasse.
   const rows: TableRow[] = QUALITATIVE_CRITERIA.map((criterion) => [
     { text: criterion.name, options: { bold: true } },
     { text: criterion.question },
+    { text: formatWeight(weights[criterion.weightKey]), options: { align: "right" } },
   ]);
 
-  addSlideTable(slide, [header, ...rows], [3.4, 8.7], { y: CONTENT_TOP_Y_WITH_SUBTITLE });
+  addSlideTable(slide, [header, ...rows], [3.0, 8.0, 1.1], { y: CONTENT_TOP_Y_WITH_SUBTITLE });
 
   // Legenda da escala logo abaixo da tabela: é a informação que o leitor
   // procura ao ver "4" numa célula, e precisa estar no mesmo slide.
@@ -677,7 +696,7 @@ function addPrioritizationMethodSlide(pres: PptxGenJS): void {
   // precisa do critério pronto para interpretar a coluna "Score".
   addSectionLabel(slide, "Como o ranking combinado é calculado", MARGIN_X, 6.15, CONTENT_W);
   slide.addText(
-    "Score combinado = economia estimada (peso 40%) + avaliação qualitativa (peso 40%) + facilidade de implementação (peso 20%). Cada dimensão é normalizada de 0 a 100 antes da ponderação: a economia de cada processo é medida em relação à maior economia do conjunto, e a complexidade entra invertida — quanto mais simples de implementar, maior a nota. Os pesos são configuráveis e podem ser ajustados conforme a diretriz da empresa.",
+    `Score combinado = economia estimada (peso ${formatWeight(weights.scoreWeightEconomia)}) + avaliação qualitativa (peso ${formatWeight(weights.scoreWeightQualitativo)}) + facilidade de implementação (peso ${formatWeight(weights.scoreWeightComplexidade)}). Cada dimensão é normalizada de 0 a 100 antes da ponderação: a economia de cada processo é medida em relação à maior economia do conjunto, e a complexidade entra invertida — quanto mais simples de implementar, maior a nota.`,
     {
       x: MARGIN_X,
       y: 6.45,
@@ -685,10 +704,28 @@ function addPrioritizationMethodSlide(pres: PptxGenJS): void {
       h: 0.5,
       fontSize: TYPE.caption,
       color: COLOR_SECONDARY,
+      align: "justify",
       lineSpacingMultiple: 1.2,
       valign: "top",
     }
   );
+}
+
+/** Pesos configuráveis lidos de SystemSettings e impressos no deck. */
+type ScoringWeights = {
+  qualWeightErrorReduction: number;
+  qualWeightProcessCriticality: number;
+  qualWeightInternalImpact: number;
+  qualWeightExternalImpact: number;
+  qualWeightCompliance: number;
+  scoreWeightEconomia: number;
+  scoreWeightQualitativo: number;
+  scoreWeightComplexidade: number;
+};
+
+/** 0.24 -> "24%". Pesos são gravados como fração e apresentados em percentual. */
+function formatWeight(weight: number): string {
+  return `${Math.round(weight * 100)}%`;
 }
 
 /**
@@ -1001,7 +1038,11 @@ function addPaybackSlide(
   const slide = addTitledSlide(
     pres,
     "Payback / ROI acumulado",
-    "Duas curvas ao longo do tempo: tudo que a automação custa (desenvolvimento, sustentação mensal e estrutura) contra tudo que ela economiza. O ponto em que a curva de economia cruza a de custo é o payback — a partir dali a operação passa a gerar retorno líquido."
+    "Duas curvas ao longo do tempo: tudo que a automação custa (desenvolvimento, sustentação mensal e estrutura) contra tudo que ela economiza. O ponto em que a curva de economia cruza a de custo é o payback — a partir dali a operação passa a gerar retorno líquido.",
+    undefined,
+    false,
+    // Reduzida para abrir a coluna do bloco de métrica à direita.
+    0.76
   );
   const { wave1, wave2, startDate } = computeWaveSchedules(ranking, settings.wave1StartDate);
 
@@ -1028,8 +1069,8 @@ function addPaybackSlide(
   // explicativo, na coluna que sobra (a narrativa ocupa 78% da largura), e não
   // abaixo dele: empilhado, ele comia a altura do gráfico e chegou a sobrepor a
   // área de plotagem. Aqui ele ganha destaque sem disputar espaço vertical.
-  const metricX = MARGIN_X + CONTENT_W * 0.78 + 0.2;
-  const metricW = CONTENT_W - CONTENT_W * 0.78 - 0.2;
+  const metricX = MARGIN_X + CONTENT_W * 0.76 + 0.2;
+  const metricW = CONTENT_W - CONTENT_W * 0.76 - 0.2;
   slide.addText("PAYBACK ESTIMADO", {
     x: metricX,
     y: 1.06,
@@ -1135,11 +1176,15 @@ function addPaybackSlide(
 // (mesma tabela "Composição do cálculo" da aba Payback em /admin/empresas/
 // [id]/priorizacao) — autoPage/autoPageRepeatHeader de addSlideTable cobre
 // decks com muitos robôs sem estourar o slide.
+//
+// Não recebe mais os custos de estrutura: a linha "Estrutura acumulada até
+// hoje" foi retirada da tabela. Estrutura é custo de empresa, não de processo,
+// e no meio de uma tabela processo-a-processo ela era lida como se fosse mais
+// um robô. O custo continua entrando na curva do slide anterior.
 function addPaybackCompositionSlide(
   pres: PptxGenJS,
   ranking: Ranking,
-  settings: PaybackDeckSettings,
-  structureCosts: StructureCostItem[]
+  settings: PaybackDeckSettings
 ): void {
   const { wave1, wave2 } = computeWaveSchedules(ranking, settings.wave1StartDate);
   const withWave = [
@@ -1158,7 +1203,6 @@ function addPaybackCompositionSlide(
     ranking.map((row) => [row.id, row.estimatedAnnualSavingBRL ?? 0])
   );
   const dailyRate = settings.developerDailyRateBRL;
-  const structureCostToDate = computeStructureCostAt(structureCosts, new Date());
 
   const header: TableRow = [
     { text: "Processo", options: TABLE_HEADER_OPTS },
@@ -1195,19 +1239,6 @@ function addPaybackCompositionSlide(
       { text: formatCurrency(annualSavingBRL) },
     ];
   });
-
-  if (structureCostToDate > 0) {
-    const structureOpts = { bold: true, fill: { color: COLOR_MUTED_SURFACE }, color: COLOR_PRIMARY };
-    rows.push([
-      {
-        text: "Estrutura (pessoas/licenças) acumulada até hoje",
-        options: { ...structureOpts, colspan: 5 },
-      },
-      { text: formatCurrency(structureCostToDate), options: structureOpts },
-      { text: "", options: structureOpts },
-      { text: "", options: structureOpts },
-    ]);
-  }
 
   addSlideTable(
     slide,
@@ -1580,7 +1611,13 @@ export function addTitledSlide(
    * passava por cima da régua. Nesse modo o título usa um corpo menor, para a
    * folga extra caber sem empurrar o conteúdo do slide.
    */
-  tallTitle = false
+  tallTitle = false,
+  /**
+   * Fração da largura útil que o texto explicativo ocupa. Padrão 1 (linha
+   * inteira). Só o slide de payback reduz, para abrir a coluna do bloco de
+   * métrica à direita.
+   */
+  narrativeWidthRatio = 1
 ): Slide {
   const slide = pres.addSlide({ masterName: MASTER_CONTENT });
   const tagW = tag ? 3.2 : 0;
@@ -1620,12 +1657,14 @@ export function addTitledSlide(
     slide.addText(narrative, {
       x: MARGIN_X,
       y: 1.04,
-      // Medida de leitura controlada: o parágrafo ocupa ~75% da largura em vez
-      // da linha inteira de 12", que ficaria longa demais para ler confortável.
-      w: CONTENT_W * 0.78,
+      w: CONTENT_W * narrativeWidthRatio,
       h: 1.0,
       fontSize: TYPE.slideSubtitle,
       color: COLOR_SECONDARY,
+      // Justificado e ocupando a linha inteira: alinhado só à esquerda e com
+      // medida reduzida, o parágrafo parava perto da metade do slide e deixava
+      // um vazio à direita que lia como erro de diagramação.
+      align: "justify",
       lineSpacingMultiple: 1.3,
       valign: "top",
     });
