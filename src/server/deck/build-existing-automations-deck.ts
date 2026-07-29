@@ -13,6 +13,7 @@ import {
   addCoverSlide,
   addTitledSlide,
   addSlideTable,
+  defineDeckTheme,
   addInterviewsSlide,
   addProjectSlide,
   COLOR_MUTED,
@@ -150,11 +151,15 @@ export async function buildExistingAutomationsDeck(
 
   const pres = new PptxGenJS();
   pres.layout = "LAYOUT_WIDE";
-  pres.author = "Pipeline";
-  pres.company = "Pipeline";
+  pres.author = "TATICCA";
+  pres.company = "TATICCA";
   pres.subject = `Automações existentes — ${company.name}`;
+  // Obrigatório antes de qualquer addCoverSlide/addTitledSlide: esses helpers
+  // criam slides a partir dos masters definidos aqui. Sem esta chamada eles
+  // referenciariam um master inexistente nesta apresentação.
+  defineDeckTheme(pres, company.name, "Automações existentes");
 
-  addCoverSlide(pres, company.name);
+  addCoverSlide(pres, company.name, "Automações existentes");
   addAreaSummarySlide(pres, areaSummary);
   addRankingSlide(pres, "Ranking por economia acumulada", rankingEconomia, "economia");
   addRankingSlide(pres, "Ranking por qualitativo", rankingQualitativo, "qualitativo");

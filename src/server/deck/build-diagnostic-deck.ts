@@ -41,14 +41,61 @@ import { formatCurrency, formatDate } from "@/shared/utils";
  * isolada fácil de acrescentar sem reescrever a orquestração.
  */
 
-// Paleta simples e neutra reutilizada pelos slides (hex sem "#", como o
-// pptxgenjs espera).
-const COLOR_PRIMARY = "1E293B"; // slate-800
-const COLOR_ACCENT = "2563EB"; // blue-600
-export const COLOR_MUTED = "64748B"; // slate-500
-const COLOR_HEADER_BG = "1E293B";
+// Paleta reutilizada pelos slides (hex sem "#", como o pptxgenjs espera).
+// Navy + azul de acento: contraste alto sobre branco em qualquer projetor, e
+// nenhuma cor decorativa competindo com os dados.
+const COLOR_PRIMARY = "0F172A"; // navy — títulos e texto principal
+const COLOR_ACCENT = "0369A1"; // azul — números-chave, régua de título, capa
+export const COLOR_MUTED = "64748B"; // cinza — legendas, notas de rodapé
+const COLOR_HEADER_BG = "0F172A";
 const COLOR_HEADER_TEXT = "FFFFFF";
 const COLOR_TABLE_BORDER = "E2E8F0";
+const COLOR_ZEBRA = "F8FAFC"; // fundo das linhas pares da tabela
+const COLOR_SURFACE = "FFFFFF";
+const COLOR_SECONDARY = "334155"; // slate-700 — subtítulos e texto de apoio
+const COLOR_MUTED_SURFACE = "E8ECF1"; // fundo de linhas de total/destaque
+
+/**
+ * Tipografia do deck.
+ *
+ * Escolha deliberada de uma fonte que EXISTE na máquina de quem abre o arquivo:
+ * um .pptx não embarca fontes, então uma Google Font (Lexend, Inter...) seria
+ * substituída por qualquer coisa no PowerPoint do cliente e quebraria todo o
+ * alinhamento. Segoe UI acompanha o Windows desde o 7 e o Office; Calibri é o
+ * fallback declarado por vir junto com o Office também no macOS. Trocar o deck
+ * inteiro de fonte = mudar estas duas constantes.
+ */
+const FONT_HEADING = "Segoe UI";
+const FONT_BODY = "Segoe UI";
+
+/**
+ * Escala tipográfica (pt). Passos deliberadamente distantes entre si — a versão
+ * antiga usava 22/16/14/11/10 e a diferença entre um título de seção e um
+ * rótulo de tabela quase não se lia, que é o que fazia o deck parecer um dump
+ * de dados em vez de um material de consultoria.
+ */
+const TYPE = {
+  coverTitle: 40,
+  coverSubtitle: 20,
+  sectionTitle: 30,
+  slideTitle: 24,
+  slideSubtitle: 13,
+  metricValue: 28,
+  bodyLarge: 13,
+  body: 11,
+  caption: 10,
+  eyebrow: 10,
+} as const;
+
+/** Nome do master usado pelos slides de conteúdo (título + logo + rodapé). */
+const MASTER_CONTENT = "CONTENT";
+/** Master sem chrome, para capa e divisórias de seção. */
+const MASTER_FULL_BLEED = "FULL_BLEED";
+
+/** Margem esquerda/direita única do deck — tudo se alinha nela. */
+const MARGIN_X = 0.6;
+/** Largura útil = 13.33 (LAYOUT_WIDE) - 2 margens. */
+const CONTENT_W = 13.33 - MARGIN_X * 2;
 
 // Logo carregado uma única vez no module scope (não recarregado por slide).
 // Se o arquivo não existir por algum motivo em produção, a capa é gerada sem
@@ -69,6 +116,10 @@ export const TABLE_HEADER_OPTS = {
   bold: true,
   color: COLOR_HEADER_TEXT,
   fill: { color: COLOR_HEADER_BG },
+  // Caixa alta espaçada no cabeçalho: distingue rótulo de dado sem precisar de
+  // borda, e é o que faz a tabela ler como relatório em vez de planilha.
+  fontSize: TYPE.caption,
+  charSpacing: 0.8,
 } as const;
 
 type Ranking = Awaited<ReturnType<ReturnType<typeof createCaller>["project"]["getPrioritizedRanking"]>>;
@@ -223,15 +274,18 @@ export async function buildDiagnosticDeck(companyId: string, actingUserId: strin
 
   const pres = new PptxGenJS();
   pres.layout = "LAYOUT_WIDE";
-  pres.author = "Pipeline";
-  pres.company = "Pipeline";
+  pres.author = "TATICCA";
+  pres.company = "TATICCA";
   pres.subject = `Diagnóstico de robotização — ${company.name}`;
+  defineDeckTheme(pres, company.name);
 
   addCoverSlide(pres, company.name);
   addAreaSummarySlide(pres, areaSummary);
+  addSectionSlide(pres, "Parte 1", "Priorização das oportunidades");
   addRankingSlide(pres, "Ranking por economia", rankingEconomia, "economia");
   addRankingSlide(pres, "Ranking por qualitativo", rankingQualitativo, "qualitativo");
   addRankingSlide(pres, "Ranking combinado", rankingCombinado, "combinado");
+  addSectionSlide(pres, "Parte 2", "Plano de implementação e retorno");
   addScheduleSlide(pres, rankingCombinado, settings.wave1StartDate);
   // Premissas resolvidas UMA vez aqui: os slides de payback recebem números já
   // decididos (empresa > global > padrão) em vez de decidirem por conta
@@ -258,6 +312,11 @@ export async function buildDiagnosticDeck(companyId: string, actingUserId: strin
   if (interviews.length > 0) {
     addInterviewsSlide(pres, interviews);
   }
+  // Divisória só quando existe conteúdo depois dela — uma seção anunciada e
+  // vazia é pior do que não ter divisória.
+  if (projects.length > 0) {
+    addSectionSlide(pres, "Parte 3", "Detalhamento por processo");
+  }
   // Um slide por processo, na ordem determinística já definida na query.
   for (const project of projects) {
     addProjectSlide(pres, project);
@@ -273,53 +332,199 @@ export async function buildDiagnosticDeck(companyId: string, actingUserId: strin
 // Slides
 // ---------------------------------------------------------------------------
 
-export function addCoverSlide(pres: PptxGenJS, companyName: string): void {
-  const slide = pres.addSlide();
+/**
+ * Define a fonte-tema e os dois slide masters do deck.
+ *
+ * Por que masters em vez de desenhar o chrome slide a slide: o logo, a régua de
+ * rodapé e o número de página passam a existir em TODOS os slides de conteúdo
+ * automaticamente, inclusive nas páginas que o `autoPage` das tabelas cria
+ * sozinho (que antes nasciam sem nenhuma identidade visual). Era essa a causa
+ * de "o logo da TATICCA não aparece": ele só era desenhado na capa, e a partir
+ * do segundo slide o material perdia qualquer marca.
+ *
+ * `pres.theme` define a fonte padrão do arquivo, então os ~40 `addText`
+ * espalhados pelos slides herdam a tipografia sem precisar repetir `fontFace`
+ * em cada chamada.
+ */
+export function defineDeckTheme(
+  pres: PptxGenJS,
+  companyName: string,
+  deckLabel = "Diagnóstico de robotização"
+): void {
+  pres.theme = { headFontFace: FONT_HEADING, bodyFontFace: FONT_BODY };
+
+  const logoW = 1.5;
+  const logoH = logoW / LOGO_ASPECT_RATIO;
+
+  pres.defineSlideMaster({
+    title: MASTER_CONTENT,
+    background: { color: COLOR_SURFACE },
+    objects: [
+      // Régua fina do rodapé — separa o conteúdo da assinatura sem pesar.
+      {
+        rect: {
+          x: MARGIN_X,
+          y: 6.92,
+          w: CONTENT_W,
+          h: 0.012,
+          fill: { color: COLOR_TABLE_BORDER },
+        },
+      },
+      {
+        text: {
+          text: `TATICCA · ${deckLabel} · ${companyName}`,
+          options: {
+            x: MARGIN_X,
+            y: 7.0,
+            w: CONTENT_W - 2.0,
+            h: 0.3,
+            fontSize: TYPE.caption,
+            color: COLOR_MUTED,
+            valign: "middle",
+          },
+        },
+      },
+      ...(LOGO_DATA_URI
+        ? [
+            {
+              image: {
+                data: LOGO_DATA_URI,
+                x: 13.33 - MARGIN_X - logoW,
+                y: 6.99,
+                w: logoW,
+                h: logoH,
+              },
+            },
+          ]
+        : []),
+    ],
+    slideNumber: {
+      x: 13.33 - MARGIN_X - logoW - 0.55,
+      y: 7.0,
+      w: 0.45,
+      h: 0.3,
+      fontSize: TYPE.caption,
+      color: COLOR_MUTED,
+      align: "right",
+      valign: "middle",
+    },
+  });
+
+  pres.defineSlideMaster({
+    title: MASTER_FULL_BLEED,
+    background: { color: COLOR_SURFACE },
+    objects: [
+      // Faixa vertical de acento na borda esquerda: âncora visual da capa e das
+      // divisórias, e o único elemento puramente gráfico do deck.
+      { rect: { x: 0, y: 0, w: 0.22, h: 7.5, fill: { color: COLOR_ACCENT } } },
+    ],
+  });
+}
+
+export function addCoverSlide(
+  pres: PptxGenJS,
+  companyName: string,
+  title = "Diagnóstico de robotização"
+): void {
+  const slide = pres.addSlide({ masterName: MASTER_FULL_BLEED });
   if (LOGO_DATA_URI) {
-    const width = 2.8;
+    const width = 2.6;
     slide.addImage({
       data: LOGO_DATA_URI,
-      x: 0.6,
-      y: 0.6,
+      x: MARGIN_X + 0.2,
+      y: 0.7,
       w: width,
       h: width / LOGO_ASPECT_RATIO,
     });
   }
-  slide.addText("Diagnóstico de robotização", {
-    x: 0.6,
-    y: 2.2,
-    w: "90%",
-    h: 1,
-    fontSize: 36,
+  // Eyebrow (rótulo em caixa alta acima do título): dá contexto imediato sem
+  // roubar peso do título, padrão de capa de material de consultoria.
+  slide.addText("RELATÓRIO DE DIAGNÓSTICO", {
+    x: MARGIN_X + 0.2,
+    y: 2.55,
+    w: CONTENT_W,
+    h: 0.3,
+    fontSize: TYPE.eyebrow,
+    bold: true,
+    charSpacing: 2,
+    color: COLOR_ACCENT,
+  });
+  slide.addText(title, {
+    x: MARGIN_X + 0.2,
+    y: 2.95,
+    w: CONTENT_W,
+    h: 0.9,
+    fontSize: TYPE.coverTitle,
     bold: true,
     color: COLOR_PRIMARY,
   });
   slide.addText(companyName, {
-    x: 0.6,
-    y: 3.3,
-    w: "90%",
-    h: 0.8,
-    fontSize: 24,
-    color: COLOR_ACCENT,
+    x: MARGIN_X + 0.2,
+    y: 3.95,
+    w: CONTENT_W,
+    h: 0.6,
+    fontSize: TYPE.coverSubtitle,
+    color: COLOR_SECONDARY,
+  });
+  // Régua curta entre o nome da empresa e a data — separa identificação de
+  // metadado, evitando três linhas de texto empilhadas sem hierarquia.
+  slide.addShape("rect", {
+    x: MARGIN_X + 0.2,
+    y: 4.75,
+    w: 1.6,
+    h: 0.03,
+    fill: { color: COLOR_ACCENT },
   });
   slide.addText(formatDate(new Date()), {
-    x: 0.6,
-    y: 4.1,
-    w: "90%",
-    h: 0.6,
-    fontSize: 16,
+    x: MARGIN_X + 0.2,
+    y: 4.95,
+    w: CONTENT_W,
+    h: 0.4,
+    fontSize: TYPE.bodyLarge,
     color: COLOR_MUTED,
   });
 }
 
+/**
+ * Slide divisor de seção. Um deck de 9+ slides sem divisórias lê como um dump
+ * de tabelas; as divisórias dão ao apresentador pontos naturais de respiro e
+ * ao leitor um índice implícito.
+ */
+export function addSectionSlide(pres: PptxGenJS, kicker: string, title: string): void {
+  const slide = pres.addSlide({ masterName: MASTER_FULL_BLEED });
+  slide.addText(kicker.toUpperCase(), {
+    x: MARGIN_X + 0.2,
+    y: 3.1,
+    w: CONTENT_W,
+    h: 0.3,
+    fontSize: TYPE.eyebrow,
+    bold: true,
+    charSpacing: 2,
+    color: COLOR_ACCENT,
+  });
+  slide.addText(title, {
+    x: MARGIN_X + 0.2,
+    y: 3.5,
+    w: CONTENT_W,
+    h: 0.8,
+    fontSize: TYPE.sectionTitle,
+    bold: true,
+    color: COLOR_PRIMARY,
+  });
+}
+
 function addAreaSummarySlide(pres: PptxGenJS, areaSummary: AreaSummary): void {
-  const slide = addTitledSlide(pres, "Resultados agregados por área");
+  const slide = addTitledSlide(
+    pres,
+    "Resultados agregados por área",
+    "Oportunidades em pipeline, agrupadas pela área responsável pelo processo"
+  );
 
   if (areaSummary.length === 0) {
     slide.addText("Nenhum projeto com área definida para esta empresa.", {
-      x: 0.5,
-      y: 1.5,
-      fontSize: 14,
+      x: MARGIN_X,
+      y: CONTENT_TOP_Y_WITH_SUBTITLE,
+      fontSize: TYPE.bodyLarge,
       color: COLOR_MUTED,
     });
     return;
@@ -339,23 +544,31 @@ function addAreaSummarySlide(pres: PptxGenJS, areaSummary: AreaSummary): void {
     { text: `${Math.round(a.totalCurrentAnnualHours)} h` },
   ]);
 
+  // Linha de total com fundo próprio: a zebra da tabela não pode deixá-la
+  // parecer só mais uma linha de dados.
+  const totalOpts = { bold: true, fill: { color: COLOR_MUTED_SURFACE }, color: COLOR_PRIMARY };
   const totals: TableRow = [
-    { text: "Total", options: { bold: true } },
+    { text: "Total", options: totalOpts },
     {
       text: String(areaSummary.reduce((sum, a) => sum + a.projectCount, 0)),
-      options: { bold: true },
+      options: totalOpts,
     },
     {
       text: formatCurrency(areaSummary.reduce((sum, a) => sum + a.totalEstimatedSavingBRL, 0)),
-      options: { bold: true },
+      options: totalOpts,
     },
     {
       text: `${Math.round(areaSummary.reduce((sum, a) => sum + a.totalCurrentAnnualHours, 0))} h`,
-      options: { bold: true },
+      options: totalOpts,
     },
   ];
 
-  addSlideTable(slide, [header, ...rows, totals], [4, 1.8, 3.5, 2.5]);
+  addSlideTable(
+    slide,
+    [header, ...rows, totals],
+    [4.2, 1.8, 3.6, 2.5],
+    { y: CONTENT_TOP_Y_WITH_SUBTITLE }
+  );
 }
 
 function activeScoreOf(row: Ranking[number], sortBy: "economia" | "qualitativo" | "combinado"): number {
@@ -364,19 +577,30 @@ function activeScoreOf(row: Ranking[number], sortBy: "economia" | "qualitativo" 
   return Math.round(row.combinedScore);
 }
 
+/**
+ * Cada ranking existe porque ordena por um critério diferente — sem dizer qual,
+ * três slides quase idênticos em sequência confundem mais do que informam.
+ */
+const RANKING_SUBTITLE: Record<"economia" | "qualitativo" | "combinado", string> = {
+  economia: "Ordenado pela economia anual estimada de cada processo",
+  qualitativo:
+    "Ordenado pelo score qualitativo (criticidade, impacto, compliance e redução de erros)",
+  combinado: "Ordenado pelo score combinado de economia, qualitativo e complexidade",
+};
+
 function addRankingSlide(
   pres: PptxGenJS,
   title: string,
   ranking: Ranking,
   sortBy: "economia" | "qualitativo" | "combinado"
 ): void {
-  const slide = addTitledSlide(pres, title);
+  const slide = addTitledSlide(pres, title, RANKING_SUBTITLE[sortBy]);
 
   if (ranking.length === 0) {
     slide.addText("Nenhum projeto encontrado para esta empresa.", {
-      x: 0.5,
-      y: 1.5,
-      fontSize: 14,
+      x: MARGIN_X,
+      y: CONTENT_TOP_Y_WITH_SUBTITLE,
+      fontSize: TYPE.bodyLarge,
       color: COLOR_MUTED,
     });
     return;
@@ -400,7 +624,12 @@ function addRankingSlide(
     { text: String(activeScoreOf(row, sortBy)) },
   ]);
 
-  addSlideTable(slide, [header, ...rows], [0.6, 5, 2.9, 2.4, 1.3]);
+  addSlideTable(
+    slide,
+    [header, ...rows],
+    [0.6, 5.0, 2.8, 2.4, 1.3],
+    { y: CONTENT_TOP_Y_WITH_SUBTITLE }
+  );
 }
 
 /**
@@ -445,7 +674,11 @@ function computeWaveSchedules(
 }
 
 function addScheduleSlide(pres: PptxGenJS, ranking: Ranking, wave1StartDateRaw: Date | null): void {
-  const slide = addTitledSlide(pres, "Cronograma de implementação");
+  const slide = addTitledSlide(
+    pres,
+    "Cronograma de implementação",
+    "Sequencial, um desenvolvedor por vez — a onda 2 começa após o fim da onda 1"
+  );
   const { wave1, wave2 } = computeWaveSchedules(ranking, wave1StartDateRaw);
 
   const items = [
@@ -455,9 +688,9 @@ function addScheduleSlide(pres: PptxGenJS, ranking: Ranking, wave1StartDateRaw: 
 
   if (items.length === 0) {
     slide.addText("Nenhum projeto atribuído a uma onda de implementação.", {
-      x: 0.5,
-      y: 1.5,
-      fontSize: 14,
+      x: MARGIN_X,
+      y: CONTENT_TOP_Y_WITH_SUBTITLE,
+      fontSize: TYPE.bodyLarge,
       color: COLOR_MUTED,
     });
     return;
@@ -477,7 +710,12 @@ function addScheduleSlide(pres: PptxGenJS, ranking: Ranking, wave1StartDateRaw: 
     { text: formatDate(item.endDate) },
   ]);
 
-  addSlideTable(slide, [header, ...rows], [1.4, 6.2, 2.3, 2.3]);
+  addSlideTable(
+    slide,
+    [header, ...rows],
+    [1.3, 6.2, 2.3, 2.3],
+    { y: CONTENT_TOP_Y_WITH_SUBTITLE }
+  );
 }
 
 /**
@@ -525,7 +763,11 @@ function addPaybackSlide(
   settings: PaybackDeckSettings,
   structureCosts: StructureCostItem[]
 ): void {
-  const slide = addTitledSlide(pres, "Payback / ROI acumulado");
+  const slide = addTitledSlide(
+    pres,
+    "Payback / ROI acumulado",
+    "Custo acumulado (desenvolvimento + manutenção + estrutura) contra economia acumulada, ondas 1 e 2"
+  );
   const { wave1, wave2, startDate } = computeWaveSchedules(ranking, settings.wave1StartDate);
 
   const paybackSchedule = toDeckPaybackItems([...wave1, ...wave2], ranking, settings);
@@ -547,12 +789,15 @@ function addPaybackSlide(
     ? `Payback estimado em ${paybackMonths} ${paybackMonths === 1 ? "mês" : "meses"}`
     : "Payback não atingido no período calculado";
 
+  // O número que o slide existe para comunicar, tratado como número — grande,
+  // em cor de acento, acima do gráfico. Antes era uma linha de 16pt indistinta
+  // da legenda do gráfico.
   slide.addText(summaryText, {
-    x: 0.5,
-    y: 1.1,
-    w: "90%",
-    h: 0.5,
-    fontSize: 16,
+    x: MARGIN_X,
+    y: CONTENT_TOP_Y_WITH_SUBTITLE + 0.02,
+    w: CONTENT_W,
+    h: 0.55,
+    fontSize: TYPE.metricValue,
     bold: true,
     color: COLOR_ACCENT,
   });
@@ -560,7 +805,12 @@ function addPaybackSlide(
   if (curve.length === 0) {
     slide.addText(
       "Sem dados suficientes para calcular a curva de payback (nenhum projeto atribuído a uma onda).",
-      { x: 0.5, y: 1.8, fontSize: 14, color: COLOR_MUTED }
+      {
+        x: MARGIN_X,
+        y: CONTENT_TOP_Y_WITH_SUBTITLE + 0.7,
+        fontSize: TYPE.bodyLarge,
+        color: COLOR_MUTED,
+      }
     );
     return;
   }
@@ -580,14 +830,34 @@ function addPaybackSlide(
   ];
 
   slide.addChart("line", chartData, {
-    x: 0.5,
-    y: 1.8,
-    w: 12,
-    h: 5,
+    x: MARGIN_X,
+    y: 2.35,
+    w: CONTENT_W,
+    h: 4.35,
     showLegend: true,
     legendPos: "b",
+    legendFontSize: TYPE.caption,
     lineDataSymbol: "none",
+    lineSize: 2.5,
+    // Custo em cinza, economia em azul: a linha que interessa é a que cruza,
+    // e ela precisa ser a única com cor de acento.
     chartColors: [COLOR_MUTED, COLOR_ACCENT],
+    // A curva tem ~261 pontos semanais (janela de 5 anos): sem rarear, o eixo X
+    // vira uma faixa preta ilegível. Mesma decisão do gráfico da tela.
+    // `catAxisLabelFrequency` é tipado como string pelo pptxgenjs (vai direto
+    // pro XML do gráfico), por isso o String(...).
+    catAxisLabelFrequency: String(Math.max(1, Math.ceil(labels.length / 12))),
+    catAxisLabelFontSize: TYPE.caption - 1,
+    valAxisLabelFontSize: TYPE.caption - 1,
+    catAxisLabelColor: COLOR_MUTED,
+    valAxisLabelColor: COLOR_MUTED,
+    // Sem escala "mi"/"mil": os valores variam de milhares a milhões conforme a
+    // empresa, e um divisor fixo mostraria "R$ 0" para os decks menores.
+    valAxisLabelFormatCode: "R$ #,##0",
+    // Linhas de grade discretas: a grade não pode competir com os dados.
+    valGridLine: { style: "solid", size: 0.5, color: COLOR_TABLE_BORDER },
+    catGridLine: { style: "none" },
+    border: { pt: 0, color: COLOR_SURFACE },
   });
 }
 
@@ -609,7 +879,11 @@ function addPaybackCompositionSlide(
 
   if (withWave.length === 0) return;
 
-  const slide = addTitledSlide(pres, "Composição do payback");
+  const slide = addTitledSlide(
+    pres,
+    "Composição do payback",
+    "Os números que alimentam a curva, processo a processo"
+  );
   const savingByProjectId = new Map(
     ranking.map((row) => [row.id, row.estimatedAnnualSavingBRL ?? 0])
   );
@@ -653,19 +927,32 @@ function addPaybackCompositionSlide(
   });
 
   if (structureCostToDate > 0) {
+    const structureOpts = { bold: true, fill: { color: COLOR_MUTED_SURFACE }, color: COLOR_PRIMARY };
     rows.push([
-      { text: "Estrutura (pessoas/licenças) acumulada até hoje", options: { colspan: 5 } },
-      { text: formatCurrency(structureCostToDate) },
-      { text: "" },
-      { text: "" },
+      {
+        text: "Estrutura (pessoas/licenças) acumulada até hoje",
+        options: { ...structureOpts, colspan: 5 },
+      },
+      { text: formatCurrency(structureCostToDate), options: structureOpts },
+      { text: "", options: structureOpts },
+      { text: "", options: structureOpts },
     ]);
   }
 
-  addSlideTable(slide, [header, ...rows], [3.5, 1.0, 1.3, 1.0, 1.5, 1.3, 1.4, 1.3]);
+  addSlideTable(
+    slide,
+    [header, ...rows],
+    [3.4, 0.9, 1.2, 1.0, 1.5, 1.4, 1.4, 1.3],
+    { y: CONTENT_TOP_Y_WITH_SUBTITLE }
+  );
 }
 
 export function addInterviewsSlide(pres: PptxGenJS, interviews: Interviews): void {
-  const slide = addTitledSlide(pres, "Entrevistas");
+  const slide = addTitledSlide(
+    pres,
+    "Entrevistas",
+    "Levantamento realizado junto às áreas para mapear os processos"
+  );
 
   const header: TableRow = [
     { text: "Participante", options: TABLE_HEADER_OPTS },
@@ -681,7 +968,12 @@ export function addInterviewsSlide(pres: PptxGenJS, interviews: Interviews): voi
     { text: INTERVIEW_STATUS_LABEL[interview.status] ?? interview.status },
   ]);
 
-  addSlideTable(slide, [header, ...rows], [4.5, 3.5, 2.5, 2]);
+  addSlideTable(
+    slide,
+    [header, ...rows],
+    [4.4, 3.5, 2.2, 2.0],
+    { y: CONTENT_TOP_Y_WITH_SUBTITLE }
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -787,16 +1079,21 @@ function estimateQuantTableHeight(lines: QuantitativeLine[]): number {
   }, 0);
 }
 
+/**
+ * Rótulo de bloco dentro de um slide (caixa alta, espaçado). Em cor de acento,
+ * não em `COLOR_PRIMARY`: em navy ele competia com o texto do próprio bloco e
+ * a seção não se lia como um separador.
+ */
 function addSectionLabel(slide: Slide, text: string, x: number, y: number, w: number): void {
   slide.addText(text.toUpperCase(), {
     x,
     y,
     w,
     h: 0.3,
-    fontSize: 10,
+    fontSize: TYPE.eyebrow,
     bold: true,
-    color: COLOR_PRIMARY,
-    charSpacing: 1,
+    color: COLOR_ACCENT,
+    charSpacing: 1.5,
   });
 }
 
@@ -808,9 +1105,12 @@ export function addProjectSlide(
   const slide = addTitledSlide(pres, project.title);
 
   // ----- Coluna esquerda: textos (só campos já preenchidos) -----
-  const leftX = 0.5;
-  const leftW = 6.2;
-  let leftY = 1.1;
+  // Alinhadas à margem única do deck (MARGIN_X) e ao topo de conteúdo padrão,
+  // para o slide de processo não "dançar" em relação aos demais quando o deck
+  // é folheado.
+  const leftX = MARGIN_X;
+  const leftW = 6.1;
+  let leftY = CONTENT_TOP_Y;
 
   if (project.description) {
     addSectionLabel(slide, "O processo hoje", leftX, leftY, leftW);
@@ -878,11 +1178,11 @@ export function addProjectSlide(
   }
 
   // ----- Coluna direita: tabela quantitativa + radar qualitativo -----
-  const rightX = 7.0;
-  const rightW = 5.8;
+  const rightX = 7.05;
+  const rightW = 13.33 - MARGIN_X - rightX;
 
   const quantitativeLines = [...buildQuantitativeLines(project), ...extraQuantitativeLines];
-  addSectionLabel(slide, "Avaliação Quantitativa", rightX, 1.1, rightW);
+  addSectionLabel(slide, "Avaliação Quantitativa", rightX, CONTENT_TOP_Y, rightW);
 
   if (quantitativeLines.length > 0) {
     const rows: TableRow[] = quantitativeLines.map((line) => [
@@ -977,30 +1277,95 @@ export function addProjectSlide(
 // Helpers
 // ---------------------------------------------------------------------------
 
-export function addTitledSlide(pres: PptxGenJS, title: string): Slide {
-  const slide = pres.addSlide();
+/**
+ * Slide de conteúdo: título + régua de acento curta + subtítulo opcional.
+ *
+ * A régua abaixo do título é o que ancora visualmente a página — sem ela o
+ * título flutuava sobre a tabela e os dois pareciam blocos desconexos. O
+ * subtítulo existe para o slide poder declarar sua própria premissa (ex.: "1
+ * desenvolvedor, sem paralelismo") em vez de deixar o leitor inferir da tabela.
+ */
+export function addTitledSlide(pres: PptxGenJS, title: string, subtitle?: string): Slide {
+  const slide = pres.addSlide({ masterName: MASTER_CONTENT });
   slide.addText(title, {
-    x: 0.5,
-    y: 0.3,
-    w: "90%",
-    h: 0.6,
-    fontSize: 22,
+    x: MARGIN_X,
+    y: 0.38,
+    w: CONTENT_W,
+    h: 0.5,
+    fontSize: TYPE.slideTitle,
     bold: true,
     color: COLOR_PRIMARY,
   });
+  slide.addShape("rect", {
+    x: MARGIN_X,
+    y: 0.95,
+    w: 0.9,
+    h: 0.035,
+    fill: { color: COLOR_ACCENT },
+  });
+  if (subtitle) {
+    slide.addText(subtitle, {
+      x: MARGIN_X,
+      y: 1.06,
+      w: CONTENT_W,
+      h: 0.3,
+      fontSize: TYPE.slideSubtitle,
+      color: COLOR_MUTED,
+    });
+  }
   return slide;
 }
 
-export function addSlideTable(slide: Slide, rows: TableRow[], colW: number[]): void {
-  slide.addTable(rows, {
-    x: 0.5,
-    y: 1.1,
-    w: 12.3,
+/** Onde o conteúdo pode começar, conforme o slide tenha subtítulo ou não. */
+export const CONTENT_TOP_Y = 1.25;
+export const CONTENT_TOP_Y_WITH_SUBTITLE = 1.55;
+
+/**
+ * Tabela padrão do deck.
+ *
+ * Mudança de estilo em relação à versão anterior, que desenhava uma borda sólida
+ * em TODAS as células: grade fechada é a marca visual de planilha, não de
+ * material de consultoria. Aqui só existem linhas horizontais finas, com zebra
+ * alternada para o olho seguir a linha — o alinhamento das colunas já separa
+ * verticalmente, sem precisar de traço.
+ */
+export function addSlideTable(
+  slide: Slide,
+  rows: TableRow[],
+  colW: number[],
+  options?: { y?: number }
+): void {
+  // Zebra aplicada aqui (e não em quem monta as linhas) para que a alternância
+  // continue correta mesmo quando o chamador já definiu `fill` em alguma
+  // célula — as opções da linha vencem as do nível da tabela.
+  const striped = rows.map((row, index) =>
+    index > 0 && index % 2 === 0
+      ? row.map((cell) => ({
+          ...cell,
+          options: { fill: { color: COLOR_ZEBRA }, ...cell.options },
+        }))
+      : row
+  );
+
+  slide.addTable(striped, {
+    x: MARGIN_X,
+    y: options?.y ?? CONTENT_TOP_Y,
+    w: CONTENT_W,
     colW,
-    fontSize: 11,
-    border: { type: "solid", pt: 1, color: COLOR_TABLE_BORDER },
+    fontSize: TYPE.body,
+    color: COLOR_PRIMARY,
+    border: [
+      { type: "none" },
+      { type: "none" },
+      { type: "solid", pt: 0.75, color: COLOR_TABLE_BORDER },
+      { type: "none" },
+    ],
     valign: "middle",
+    // Respiro interno: a tabela antiga colava o texto na borda da célula, o que
+    // é o detalhe que mais denuncia "gerado por script" num deck.
+    margin: [0.06, 0.1, 0.06, 0.1],
     autoPage: true,
     autoPageRepeatHeader: true,
+    autoPageSlideStartY: CONTENT_TOP_Y,
   });
 }
