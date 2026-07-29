@@ -281,11 +281,21 @@ export async function buildDiagnosticDeck(companyId: string, actingUserId: strin
 
   addCoverSlide(pres, company.name);
   addAreaSummarySlide(pres, areaSummary);
-  addSectionSlide(pres, "Parte 1", "Priorização das oportunidades");
+  addSectionSlide(
+    pres,
+    "Parte 1",
+    "Priorização das oportunidades",
+    "Nem todo processo automatizável merece ser automatizado primeiro. As páginas a seguir ordenam as oportunidades por três critérios diferentes — retorno financeiro, peso estratégico e um score combinado — para que a escolha da ordem de execução seja uma decisão explícita, e não uma consequência de quem pediu primeiro."
+  );
   addRankingSlide(pres, "Ranking por economia", rankingEconomia, "economia");
   addRankingSlide(pres, "Ranking por qualitativo", rankingQualitativo, "qualitativo");
   addRankingSlide(pres, "Ranking combinado", rankingCombinado, "combinado");
-  addSectionSlide(pres, "Parte 2", "Plano de implementação e retorno");
+  addSectionSlide(
+    pres,
+    "Parte 2",
+    "Plano de implementação e retorno",
+    "Definida a ordem, esta seção responde às duas perguntas seguintes: quando cada robô entra em produção e em quanto tempo o investimento se paga. O cronograma e a curva de payback partem das mesmas premissas de esforço, custo e economia — mudar qualquer uma delas recalcula as duas."
+  );
   addScheduleSlide(pres, rankingCombinado, settings.wave1StartDate);
   // Premissas resolvidas UMA vez aqui: os slides de payback recebem números já
   // decididos (empresa > global > padrão) em vez de decidirem por conta
@@ -315,7 +325,12 @@ export async function buildDiagnosticDeck(companyId: string, actingUserId: strin
   // Divisória só quando existe conteúdo depois dela — uma seção anunciada e
   // vazia é pior do que não ter divisória.
   if (projects.length > 0) {
-    addSectionSlide(pres, "Parte 3", "Detalhamento por processo");
+    addSectionSlide(
+      pres,
+      "Parte 3",
+      "Detalhamento por processo",
+      "Uma página por processo mapeado: como ele funciona hoje, o volume de trabalho manual envolvido, a solução técnica proposta e a avaliação qualitativa que sustenta sua posição no ranking. É o material de referência para a validação com cada área."
+    );
   }
   // Um slide por processo, na ordem determinística já definida na query.
   for (const project of projects) {
@@ -490,11 +505,16 @@ export function addCoverSlide(
  * de tabelas; as divisórias dão ao apresentador pontos naturais de respiro e
  * ao leitor um índice implícito.
  */
-export function addSectionSlide(pres: PptxGenJS, kicker: string, title: string): void {
+export function addSectionSlide(
+  pres: PptxGenJS,
+  kicker: string,
+  title: string,
+  description?: string
+): void {
   const slide = pres.addSlide({ masterName: MASTER_FULL_BLEED });
   slide.addText(kicker.toUpperCase(), {
     x: MARGIN_X + 0.2,
-    y: 3.1,
+    y: 2.85,
     w: CONTENT_W,
     h: 0.3,
     fontSize: TYPE.eyebrow,
@@ -504,20 +524,34 @@ export function addSectionSlide(pres: PptxGenJS, kicker: string, title: string):
   });
   slide.addText(title, {
     x: MARGIN_X + 0.2,
-    y: 3.5,
+    y: 3.25,
     w: CONTENT_W,
-    h: 0.8,
+    h: 0.7,
     fontSize: TYPE.sectionTitle,
     bold: true,
     color: COLOR_PRIMARY,
   });
+  if (description) {
+    slide.addText(description, {
+      x: MARGIN_X + 0.2,
+      y: 4.1,
+      // Metade da largura: parágrafo de abertura de seção é para ser lido, não
+      // varrido — linha longa demais derruba a legibilidade.
+      w: CONTENT_W * 0.55,
+      h: 1.2,
+      fontSize: TYPE.bodyLarge,
+      color: COLOR_SECONDARY,
+      lineSpacingMultiple: 1.35,
+      valign: "top",
+    });
+  }
 }
 
 function addAreaSummarySlide(pres: PptxGenJS, areaSummary: AreaSummary): void {
   const slide = addTitledSlide(
     pres,
     "Resultados agregados por área",
-    "Oportunidades em pipeline, agrupadas pela área responsável pelo processo"
+    "Visão consolidada do potencial de automação da empresa, agrupado pela área responsável por cada processo. Mostra onde o esforço manual está concentrado hoje e quanto cada área tem a ganhar — normalmente o ponto de partida da conversa com cada gestor."
   );
 
   if (areaSummary.length === 0) {
@@ -582,10 +616,12 @@ function activeScoreOf(row: Ranking[number], sortBy: "economia" | "qualitativo" 
  * três slides quase idênticos em sequência confundem mais do que informam.
  */
 const RANKING_SUBTITLE: Record<"economia" | "qualitativo" | "combinado", string> = {
-  economia: "Ordenado pela economia anual estimada de cada processo",
+  economia:
+    "Processos ordenados exclusivamente pelo retorno financeiro: horas de trabalho manual economizadas por ano, valorizadas pelo custo/hora do profissional que executa a atividade hoje. É a leitura de quem precisa justificar o investimento.",
   qualitativo:
-    "Ordenado pelo score qualitativo (criticidade, impacto, compliance e redução de erros)",
-  combinado: "Ordenado pelo score combinado de economia, qualitativo e complexidade",
+    "Processos ordenados pelo peso estratégico, independentemente do valor economizado: criticidade para a operação, impacto interno e externo, exigência de compliance e redução de erros. Processos baratos de automatizar podem liderar aqui.",
+  combinado:
+    "Leitura recomendada para decidir a ordem de execução: combina o retorno financeiro, o peso estratégico e a complexidade de implementação num único score. Processos no topo entregam mais valor com menos esforço.",
 };
 
 function addRankingSlide(
@@ -677,7 +713,7 @@ function addScheduleSlide(pres: PptxGenJS, ranking: Ranking, wave1StartDateRaw: 
   const slide = addTitledSlide(
     pres,
     "Cronograma de implementação",
-    "Sequencial, um desenvolvedor por vez — a onda 2 começa após o fim da onda 1"
+    "Sequência de entrega proposta, dividida em duas ondas. O modelo assume um desenvolvedor dedicado trabalhando um robô por vez, sem paralelismo: cada processo começa no dia útil seguinte ao término do anterior, e a onda 2 só inicia após o fim da onda 1. As datas se ajustam automaticamente a qualquer mudança de esforço ou de prioridade."
   );
   const { wave1, wave2 } = computeWaveSchedules(ranking, wave1StartDateRaw);
 
@@ -766,7 +802,7 @@ function addPaybackSlide(
   const slide = addTitledSlide(
     pres,
     "Payback / ROI acumulado",
-    "Custo acumulado (desenvolvimento + manutenção + estrutura) contra economia acumulada, ondas 1 e 2"
+    "Duas curvas ao longo do tempo: tudo que a automação custa (desenvolvimento, sustentação mensal e estrutura) contra tudo que ela economiza. O ponto em que a curva de economia cruza a de custo é o payback — a partir dali a operação passa a gerar retorno líquido."
   );
   const { wave1, wave2, startDate } = computeWaveSchedules(ranking, settings.wave1StartDate);
 
@@ -882,7 +918,7 @@ function addPaybackCompositionSlide(
   const slide = addTitledSlide(
     pres,
     "Composição do payback",
-    "Os números que alimentam a curva, processo a processo"
+    "Abertura processo a processo dos números que formam a curva anterior. Custo de desenvolvimento = dias úteis estimados × jornada × taxa horária de desenvolvimento. Manutenção = horas de sustentação por semana × taxa horária de manutenção, recorrente a partir de um mês após a entrega."
   );
   const savingByProjectId = new Map(
     ranking.map((row) => [row.id, row.estimatedAnnualSavingBRL ?? 0])
@@ -951,7 +987,7 @@ export function addInterviewsSlide(pres: PptxGenJS, interviews: Interviews): voi
   const slide = addTitledSlide(
     pres,
     "Entrevistas",
-    "Levantamento realizado junto às áreas para mapear os processos"
+    "Base do diagnóstico: as conversas realizadas com as áreas para levantar os processos, medir o esforço manual atual e validar as oportunidades. Cada processo detalhado adiante nasceu de uma destas entrevistas."
   );
 
   const header: TableRow = [
@@ -1278,18 +1314,20 @@ export function addProjectSlide(
 // ---------------------------------------------------------------------------
 
 /**
- * Slide de conteúdo: título + régua de acento curta + subtítulo opcional.
+ * Slide de conteúdo: título + régua de acento + texto explicativo opcional.
  *
- * A régua abaixo do título é o que ancora visualmente a página — sem ela o
- * título flutuava sobre a tabela e os dois pareciam blocos desconexos. O
- * subtítulo existe para o slide poder declarar sua própria premissa (ex.: "1
- * desenvolvedor, sem paralelismo") em vez de deixar o leitor inferir da tabela.
+ * A régua abaixo do título ancora visualmente a página. O texto explicativo
+ * ("narrativa") é o parágrafo que o deck feito à mão sempre teve e o gerado
+ * não tinha: diz em uma ou duas linhas o que o slide mostra e como lê-lo, para
+ * o material se sustentar sozinho quando é enviado por e-mail sem ninguém
+ * apresentando. Texto genérico de propósito — não descreve os números da
+ * empresa, descreve o que a tabela/gráfico significa.
  */
-export function addTitledSlide(pres: PptxGenJS, title: string, subtitle?: string): Slide {
+export function addTitledSlide(pres: PptxGenJS, title: string, narrative?: string): Slide {
   const slide = pres.addSlide({ masterName: MASTER_CONTENT });
   slide.addText(title, {
     x: MARGIN_X,
-    y: 0.38,
+    y: 0.35,
     w: CONTENT_W,
     h: 0.5,
     fontSize: TYPE.slideTitle,
@@ -1298,27 +1336,31 @@ export function addTitledSlide(pres: PptxGenJS, title: string, subtitle?: string
   });
   slide.addShape("rect", {
     x: MARGIN_X,
-    y: 0.95,
+    y: 0.92,
     w: 0.9,
     h: 0.035,
     fill: { color: COLOR_ACCENT },
   });
-  if (subtitle) {
-    slide.addText(subtitle, {
+  if (narrative) {
+    slide.addText(narrative, {
       x: MARGIN_X,
-      y: 1.06,
-      w: CONTENT_W,
-      h: 0.3,
+      y: 1.04,
+      // Medida de leitura controlada: o parágrafo ocupa ~75% da largura em vez
+      // da linha inteira de 12", que ficaria longa demais para ler confortável.
+      w: CONTENT_W * 0.78,
+      h: 0.62,
       fontSize: TYPE.slideSubtitle,
-      color: COLOR_MUTED,
+      color: COLOR_SECONDARY,
+      lineSpacingMultiple: 1.25,
+      valign: "top",
     });
   }
   return slide;
 }
 
-/** Onde o conteúdo pode começar, conforme o slide tenha subtítulo ou não. */
-export const CONTENT_TOP_Y = 1.25;
-export const CONTENT_TOP_Y_WITH_SUBTITLE = 1.55;
+/** Onde o conteúdo pode começar, conforme o slide tenha texto explicativo ou não. */
+export const CONTENT_TOP_Y = 1.22;
+export const CONTENT_TOP_Y_WITH_SUBTITLE = 1.82;
 
 /**
  * Tabela padrão do deck.
