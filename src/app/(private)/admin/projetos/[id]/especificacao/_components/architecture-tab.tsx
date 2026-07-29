@@ -55,7 +55,13 @@ export function ArchitectureTab({ projectId }: ArchitectureTabProps) {
     onError: (err) => toast.error("Falha ao salvar", { description: err.message }),
   });
 
+  // Estes dois estados ficam aqui em cima, e não junto com os demais campos do
+  // formulário mais abaixo, porque `mainToolCategoryOptions`/`mainToolOptions`
+  // dependem deles: uma `const` referenciada antes da própria declaração está
+  // na temporal dead zone e o useMemo estoura ReferenceError já no primeiro
+  // render, derrubando a aba inteira.
   const [mainToolCategoryId, setMainToolCategoryId] = useState<string>("");
+  const [mainToolId, setMainToolId] = useState<string>("");
 
   const { data: mainToolCategories = [] } = trpc.taxonomy.listMainToolCategories.useQuery();
   const mainToolCategoryOptions = useMemo(() => {
@@ -146,7 +152,6 @@ export function ArchitectureTab({ projectId }: ArchitectureTabProps) {
   });
 
   const [solutionTypeIds, setSolutionTypeIds] = useState<string[]>([]);
-  const [mainToolId, setMainToolId] = useState<string>("");
   const [executionStrategy, setExecutionStrategy] = useState<string>("");
   const [architectNotes, setArchitectNotes] = useState<string>("");
   const [complexity, setComplexity] = useState<string>("");
