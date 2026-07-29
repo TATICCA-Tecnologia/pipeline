@@ -27,6 +27,7 @@ import {
 import type { WaveScheduleItem } from "@/shared/lib/wave-schedule";
 import { PaybackChart } from "@/src/shared/components/payback-chart";
 import { CompanyCostItemsCard } from "@/src/shared/components/company-cost-items-card";
+import { ToggleGroup, ToggleGroupItem } from "@/src/shared/components/ui/toggle-group";
 
 /**
  * Aba "Payback" da tela de priorização — Passo 6 do blueprint de diagnóstico,
@@ -38,13 +39,39 @@ import { CompanyCostItemsCard } from "@/src/shared/components/company-cost-items
  * das ondas, porque a aba "Cronograma" usa os mesmos — recalculá-los aqui
  * duplicaria a lógica do Passo 5. Tudo que é exclusivo do payback (curva,
  * composição, custos de estrutura) vive neste componente.
+ *
+ * Escopo: ver `PaybackScope` abaixo. A conta não é necessariamente de todos os
+ * robôs da empresa, e a tela precisa dizer isso — era exatamente essa omissão
+ * que fazia o número parecer errado.
  */
+
+/**
+ * Quais robôs entram na conta do payback.
+ *
+ * `ondas` (padrão) = só os classificados nas ondas 1 e 2 — o plano de
+ * implementação acordado. `pipeline` = também os robôs do pipeline ainda sem
+ * onda definida, agendados em sequência depois da onda 2.
+ *
+ * O escopo existe porque a conta antiga era silenciosamente a de `ondas`: um
+ * robô sem onda não somava custo nem economia e nada na tela dizia isso, o que
+ * fazia o KPI "Economia anual" ser lido como economia da empresa inteira.
+ *
+ * O deck (.pptx, src/server/deck/build-diagnostic-deck.ts) exporta sempre o
+ * escopo `ondas` — é um material de plano de implementação, não do pipeline
+ * inteiro. O toggle avisa isso ao usuário para o .pptx não parecer divergente.
+ */
+type PaybackScope = "ondas" | "pipeline";
 
 interface PaybackTabProps {
   companyId: string;
   isLoading: boolean;
   wave1Schedule: WaveScheduleItem[];
   wave2Schedule: WaveScheduleItem[];
+  /**
+   * Robôs do pipeline fora das ondas 1/2, já sequenciados após a onda 2 pela
+   * página dona. Só entram na conta no escopo `pipeline`.
+   */
+  unassignedSchedule: WaveScheduleItem[];
   /** Economia anual por projeto, vinda do ranking já carregado pela página. */
   savingByProjectId: Map<string, number>;
   /** Esforço em dias úteis por projeto (null = ainda não estimado). */
@@ -161,6 +188,7 @@ export function PaybackTab({
   isLoading,
   wave1Schedule,
   wave2Schedule,
+  unassignedSchedule,
   savingByProjectId,
   effortDaysByProjectId,
   companyDailyRateBRL,
@@ -168,6 +196,8 @@ export function PaybackTab({
   wave1StartDate,
 }: PaybackTabProps) {
   const utils = trpc.useUtils();
+
+  const [scope, setScope] = useState<PaybackScope>("ondas");
 
   const dailyRate = resolveDeveloperDailyRate(companyDailyRateBRL, globalDailyRateBRL);
 
@@ -206,15 +236,29 @@ export function PaybackTab({
     },
   });
 
+  // Lista única de robôs no escopo escolhido — a curva e a tabela de composição
+  // derivam dela, para não haver chance de o gráfico e a tabela discordarem
+  // sobre quais robôs entraram na conta.
+  const scopedItems = useMemo(() => {
+    const items = [
+      ...wave1Schedule.map((item) => ({ ...item, waveLabel: "Onda 1" })),
+      ...wave2Schedule.map((item) => ({ ...item, waveLabel: "Onda 2" })),
+    ];
+    if (scope === "pipeline") {
+      items.push(...unassignedSchedule.map((item) => ({ ...item, waveLabel: "Sem onda" })));
+    }
+    return items;
+  }, [wave1Schedule, wave2Schedule, unassignedSchedule, scope]);
+
   const paybackSchedule = useMemo(
     () =>
-      [...wave1Schedule, ...wave2Schedule].map((item) => ({
+      scopedItems.map((item) => ({
         projectId: item.projectId,
         startDate: item.startDate,
         endDate: item.endDate,
         estimatedAnnualSavingBRL: savingByProjectId.get(item.projectId) ?? 0,
       })),
-    [wave1Schedule, wave2Schedule, savingByProjectId]
+    [scopedItems, savingByProjectId]
   );
 
   const curve = useMemo(
@@ -224,9 +268,9 @@ export function PaybackTab({
 
   const paybackDate = useMemo(() => findPaybackDate(curve), [curve]);
 
-  // "Data de início do cronograma": a menor startDate entre os dois schedules
-  // combinados — usada só para expressar o payback em "N meses a partir do
-  // início", nunca como um número fixo.
+  // "Data de início do cronograma": a menor startDate entre os robôs do escopo
+  // atual — usada só para expressar o payback em "N meses a partir do início",
+  // nunca como um número fixo.
   const scheduleStartDate = useMemo(() => {
     if (paybackSchedule.length === 0) return wave1StartDate;
     return new Date(Math.min(...paybackSchedule.map((item) => item.startDate.getTime())));
@@ -241,17 +285,13 @@ export function PaybackTab({
   // Composição do payback: uma linha por robô, com os números que alimentam
   // a curva acima (facilita conferir/auditar de onde vêm custo e economia).
   const composition = useMemo(() => {
-    const withWave = [
-      ...wave1Schedule.map((item) => ({ ...item, wave: 1 as const })),
-      ...wave2Schedule.map((item) => ({ ...item, wave: 2 as const })),
-    ];
-    return withWave.map((item) => {
+    return scopedItems.map((item) => {
       const businessDays = differenceInBusinessDays(item.endDate, item.startDate) + 1;
       const annualSavingBRL = savingByProjectId.get(item.projectId) ?? 0;
       return {
         projectId: item.projectId,
         title: item.title,
-        wave: item.wave,
+        waveLabel: item.waveLabel,
         endDate: item.endDate,
         businessDays,
         developmentCostBRL: businessDays * dailyRate,
@@ -263,7 +303,7 @@ export function PaybackTab({
         effortDays: effortDaysByProjectId.get(item.projectId) ?? null,
       };
     });
-  }, [wave1Schedule, wave2Schedule, savingByProjectId, effortDaysByProjectId, dailyRate]);
+  }, [scopedItems, savingByProjectId, effortDaysByProjectId, dailyRate]);
 
   const totals = useMemo(() => {
     const developmentCost = composition.reduce((sum, i) => sum + i.developmentCostBRL, 0);
@@ -284,6 +324,18 @@ export function PaybackTab({
     () => computeStructureCostAt(structureCosts, new Date()),
     [structureCosts]
   );
+
+  const unassignedCount = unassignedSchedule.length;
+
+  // A frase precisa dizer explicitamente quantos robôs ficaram DE FORA — o
+  // ponto que confundia era o KPI mostrar só quantos entraram, sem revelar que
+  // existia um resto invisível.
+  const scopeHint =
+    scope === "pipeline"
+      ? `Inclui os ${unassignedCount} robô${unassignedCount === 1 ? "" : "s"} sem onda definida, agendado${unassignedCount === 1 ? "" : "s"} em sequência depois da onda 2, na ordem do ranking. O deck (.pptx) exporta sempre o escopo "Ondas 1 e 2".`
+      : unassignedCount > 0
+        ? `${unassignedCount} robô${unassignedCount === 1 ? "" : "s"} do pipeline ainda sem onda definida fica${unassignedCount === 1 ? "" : "m"} de fora desta conta — troque para "Pipeline completo" para incluí-${unassignedCount === 1 ? "lo" : "los"}.`
+        : "Todos os robôs do pipeline desta empresa já estão nas ondas 1 e 2.";
 
   return (
     <div className="space-y-6">
@@ -308,17 +360,58 @@ export function PaybackTab({
                 ? `Vazio = usa o padrão global de ${formatCurrency(globalDailyRateBRL ?? 0)} (Configurações).`
                 : `Valor específico desta empresa. Apague o campo para voltar ao padrão global de ${formatCurrency(globalDailyRateBRL ?? 0)}.`}
             </p>
+            {/*
+              As duas taxas do payback são fáceis de trocar: esta é o CUSTO de
+              construir o robô, e a outra (taxa horária, na aba Arquitetura de
+              cada projeto) é o custo/hora de quem faz a atividade manualmente
+              hoje, que vira a ECONOMIA. Dizer isso aqui, ao lado do campo,
+              evita que a taxa do dev acabe preenchida no lugar da outra.
+            */}
+            <p className="text-xs text-muted-foreground">
+              Só o lado do <strong>custo</strong>: quanto custa um dia de
+              desenvolvimento do robô. Não confundir com a{" "}
+              <em>taxa horária do profissional que executa a atividade</em>{" "}
+              (aba Arquitetura de cada projeto), que é o que alimenta a economia.
+            </p>
           </div>
         </CardContent>
       </Card>
 
       <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">Payback / ROI acumulado</CardTitle>
-          <p className="text-sm font-medium">
-            {paybackDate
-              ? `Payback estimado em ${paybackMonths} ${paybackMonths === 1 ? "mês" : "meses"}`
-              : "Payback não atingido no período calculado"}
+        <CardHeader className="pb-2 space-y-2">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <CardTitle className="text-base">Payback / ROI acumulado</CardTitle>
+              <p className="text-sm font-medium mt-1">
+                {paybackDate
+                  ? `Payback estimado em ${paybackMonths} ${paybackMonths === 1 ? "mês" : "meses"}`
+                  : "Payback não atingido no período calculado"}
+              </p>
+            </div>
+            <ToggleGroup
+              type="single"
+              variant="outline"
+              size="sm"
+              value={scope}
+              // O Radix devolve "" quando o item já ativo é clicado de novo; sem
+              // o guard o escopo ficaria vazio e a curva sumiria da tela.
+              onValueChange={(next) => {
+                if (next) setScope(next as PaybackScope);
+              }}
+              aria-label="Escopo do cálculo de payback"
+            >
+              <ToggleGroupItem value="ondas" className="px-3">
+                Ondas 1 e 2
+              </ToggleGroupItem>
+              <ToggleGroupItem value="pipeline" className="px-3">
+                Pipeline completo
+              </ToggleGroupItem>
+            </ToggleGroup>
+          </div>
+          <p className="text-xs text-muted-foreground">{scopeHint}</p>
+          <p className="text-xs text-muted-foreground">
+            Em qualquer escopo, a base é o pipeline desta empresa: automações já
+            existentes e projetos concluídos ou cancelados nunca entram nesta conta.
           </p>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -331,7 +424,9 @@ export function PaybackTab({
             <KpiTile
               label="Economia anual"
               value={formatCurrency(totals.annualSaving)}
-              hint={`${composition.length} robô${composition.length === 1 ? "" : "s"} nas ondas 1 e 2`}
+              hint={`${composition.length} robô${composition.length === 1 ? "" : "s"} ${
+                scope === "pipeline" ? "no pipeline (ondas 1, 2 e sem onda)" : "nas ondas 1 e 2"
+              }`}
             />
             <KpiTile
               label="Payback"
@@ -359,8 +454,10 @@ export function PaybackTab({
         <CardHeader className="pb-2">
           <CardTitle className="text-base">Composição do cálculo</CardTitle>
           <p className="text-xs text-muted-foreground">
-            Um robô por linha, com os números que alimentam a curva acima — custo de
-            desenvolvimento = dias úteis × taxa diária do desenvolvedor. Dias úteis e economia são
+            Um robô por linha, no escopo selecionado acima, com os números que alimentam a
+            curva — custo de desenvolvimento = dias úteis × taxa diária do desenvolvedor;
+            economia = horas/mês economizadas × 12 × taxa horária do profissional que executa
+            a atividade (definida por projeto, na aba Arquitetura). Dias úteis e economia são
             editáveis: a alteração é gravada no projeto e recalcula cronograma e curva. Dias úteis
             em branco = ainda não estimado; o cronograma usa o padrão mostrado em cinza no campo.
           </p>
@@ -382,7 +479,9 @@ export function PaybackTab({
               {composition.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
-                    Nenhum robô nas ondas 1/2 ainda.
+                    {scope === "pipeline"
+                      ? "Nenhum robô no pipeline desta empresa."
+                      : "Nenhum robô nas ondas 1/2 ainda."}
                   </TableCell>
                 </TableRow>
               ) : (
@@ -402,7 +501,7 @@ export function PaybackTab({
                         {item.title}
                       </Link>
                     </TableCell>
-                    <TableCell className="text-muted-foreground">Onda {item.wave}</TableCell>
+                    <TableCell className="text-muted-foreground">{item.waveLabel}</TableCell>
                     <TableCell className="text-muted-foreground">
                       {format(item.endDate, "dd/MM/yyyy")}
                     </TableCell>

@@ -730,7 +730,10 @@ export default function AdminConfiguracoesPage() {
                 <p className="text-sm font-semibold">Premissas de implementação</p>
                 <p className="text-xs text-muted-foreground">
                   Usadas para calcular a timeline e o payback de implementação dos
-                  robôs (ondas de priorização).
+                  robôs (ondas de priorização). A taxa diária abaixo é o{" "}
+                  <strong>custo de construir</strong> o robô — a taxa horária do bloco
+                  &quot;Saving estimado anual&quot; é outra coisa: o custo/hora de quem faz
+                  a atividade manualmente hoje.
                 </p>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
@@ -764,15 +767,23 @@ export default function AdminConfiguracoesPage() {
               {/* Bloco 4: taxa horária padrão usada no cálculo do saving estimado anual */}
               <div className="space-y-3">
                 <p className="text-sm font-semibold">Saving estimado anual</p>
+                {/*
+                  Esta taxa é do profissional que executa a atividade hoje (custo
+                  evitado), não do desenvolvedor do robô — que tem taxa própria no
+                  bloco "Premissas de implementação" logo acima. Os dois blocos
+                  ficam na mesma tela, então o texto precisa dizer qual é qual.
+                */}
                 <p className="text-xs text-muted-foreground">
-                  Taxa horária padrão usada para calcular o saving de cada projeto
-                  automaticamente (horas economizadas/mês × 12 × taxa). Pode ser
-                  sobrescrita por projeto na aba de Arquitetura.
+                  Taxa horária do <strong>profissional que executa a atividade manualmente
+                  hoje</strong>, usada para calcular o saving de cada projeto automaticamente
+                  (horas economizadas/mês × 12 × taxa). É o custo evitado — não é a taxa
+                  diária do desenvolvedor do bloco acima, que é o custo de construir o robô.
+                  Pode ser sobrescrita por projeto na aba de Arquitetura.
                 </p>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
                     <label className="text-sm font-medium">
-                      Taxa horária padrão (R$/h)
+                      Taxa horária padrão do profissional que executa (R$/h)
                     </label>
                     <Input
                       type="number"

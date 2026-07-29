@@ -398,7 +398,7 @@ export function ArchitectureTab({ projectId }: ArchitectureTabProps) {
             </div>
 
             <div className="space-y-2">
-              <Label>Taxa horária (R$/h)</Label>
+              <Label>Taxa horária do profissional que executa (R$/h)</Label>
               <Input
                 type="number"
                 min={0}
@@ -407,8 +407,19 @@ export function ArchitectureTab({ projectId }: ArchitectureTabProps) {
                 onChange={(e) => handleHourlyRateChange(e.target.value)}
                 placeholder={`Padrão: ${defaultHourlyRateBRL}`}
               />
+              {/*
+                Campo historicamente rotulado só como "Taxa horária", cercado de
+                campos técnicos do robô — o que levava a preencher aqui a taxa do
+                desenvolvedor e corromper o saving (e, por consequência, o
+                payback). O rótulo e o texto abaixo nomeiam de quem é a taxa.
+              */}
               <p className="text-xs text-muted-foreground">
-                Vazio = usa a taxa padrão configurada em Configurações ({formatCurrency(defaultHourlyRateBRL)}/h).
+                Custo/hora de quem faz esta atividade <strong>manualmente hoje</strong> — é o
+                que a empresa deixa de gastar quando o robô assume, e por isso alimenta a
+                economia. <strong>Não</strong> é a taxa de quem desenvolve o robô (essa é a
+                taxa diária do desenvolvedor, definida por empresa na aba Payback da
+                priorização). Vazio = usa a taxa padrão de Configurações (
+                {formatCurrency(defaultHourlyRateBRL)}/h).
               </p>
             </div>
 

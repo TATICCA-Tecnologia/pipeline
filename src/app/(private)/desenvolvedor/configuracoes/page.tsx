@@ -41,7 +41,6 @@ export default function DesenvolvedorConfiguracoesPage() {
     email: user?.email || "",
     phone: "",
     bio: "Desenvolvedor Full Stack com experiência em React, Node.js e TypeScript.",
-    hourlyRate: "150",
     availability: "full-time",
     skills: ["React", "Next.js", "TypeScript", "Node.js"],
   });
@@ -184,23 +183,14 @@ export default function DesenvolvedorConfiguracoesPage() {
                 />
               </div>
             </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Valor Hora (R$)</label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">
-                  R$
-                </span>
-                <Input
-                  value={profile.hourlyRate}
-                  onChange={(e) =>
-                    handleProfileChange("hourlyRate", e.target.value)
-                  }
-                  className="pl-10"
-                  placeholder="150"
-                  type="number"
-                />
-              </div>
-            </div>
+            {/*
+              O campo "Valor Hora (R$)" foi removido daqui: era um useState
+              local que nunca era persistido nem lido por nenhum cálculo, e ser
+              uma terceira "taxa" na UI (além da taxa horária do profissional
+              que executa a atividade e da taxa diária do desenvolvedor, ambas
+              em /admin/configuracoes) só alimentava confusão sobre qual delas
+              alimenta o payback.
+            */}
           </div>
 
           <div className="space-y-2">

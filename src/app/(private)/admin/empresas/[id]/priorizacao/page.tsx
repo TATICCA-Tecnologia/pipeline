@@ -252,6 +252,48 @@ export default function PriorizacaoPage({ params }: Props) {
     [wave2Projects, wave2StartDate]
   );
 
+  // Robôs do pipeline que não estão na onda 1 nem na 2 (`implementationWave`
+  // null — ou qualquer outro valor, já que a coluna é `Int?` e nada impede um
+  // 3). Não aparecem na aba "Cronograma", que é sobre as duas ondas
+  // planejadas; existem só para a aba Payback poder oferecer o escopo
+  // "pipeline completo" — antes eles sumiam da conta sem nenhum aviso.
+  // Agendados a partir do primeiro dia útil após o fim da onda 2, mesma regra
+  // sequencial que a onda 2 usa em relação à onda 1.
+  const unassignedProjects = useMemo(
+    () =>
+      displayRanking.filter(
+        (row) => row.implementationWave !== 1 && row.implementationWave !== 2
+      ),
+    [displayRanking]
+  );
+
+  const unassignedStartDate = useMemo(() => {
+    if (wave2Schedule.length === 0) return wave2StartDate;
+    const wave2EndDate = wave2Schedule.reduce(
+      (latest, item) => (item.endDate > latest ? item.endDate : latest),
+      wave2Schedule[0].endDate
+    );
+    return addBusinessDays(wave2EndDate, 1);
+  }, [wave2Schedule, wave2StartDate]);
+
+  const unassignedSchedule = useMemo(
+    () =>
+      computeWaveSchedule(
+        unassignedProjects.map((row, index) => ({
+          id: row.id,
+          title: row.title,
+          implementationEffortDays: row.implementationEffortDays,
+          // Tirar um projeto de uma onda limpa `waveOrder` junto, então esses
+          // projetos têm `waveOrder` null e cairiam no desempate por `id` do
+          // computeWaveSchedule — ordem arbitrária. O índice preserva a ordem
+          // de prioridade do ranking, que já vem ordenado por `sortBy`.
+          waveOrder: index,
+        })),
+        unassignedStartDate
+      ),
+    [unassignedProjects, unassignedStartDate]
+  );
+
   const wave1Gaps = useMemo(() => findScheduleGaps(wave1Schedule), [wave1Schedule]);
   const wave2Gaps = useMemo(() => findScheduleGaps(wave2Schedule), [wave2Schedule]);
 
@@ -625,6 +667,7 @@ export default function PriorizacaoPage({ params }: Props) {
             isLoading={isLoading}
             wave1Schedule={wave1Schedule}
             wave2Schedule={wave2Schedule}
+            unassignedSchedule={unassignedSchedule}
             savingByProjectId={savingByProjectId}
             effortDaysByProjectId={effortDaysByProjectId}
             companyDailyRateBRL={company?.developerDailyRateBRL ?? null}
