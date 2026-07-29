@@ -86,8 +86,17 @@ export function ArchitectureTab({ projectId }: ArchitectureTabProps) {
     if (project?.mainTool && !opts.some((o) => o.value === project.mainTool!.id)) {
       opts.push({ value: project.mainTool.id, label: project.mainTool.name });
     }
+    // A ferramenta selecionada AGORA precisa estar sempre entre as opções, ou o
+    // combobox não acha o rótulo e renderiza o placeholder — o campo "fica em
+    // branco" mesmo com um valor selecionado. Acontecia logo depois de criar
+    // uma ferramenta: `setMainToolId` já apontava para ela, mas o filtro por
+    // categoria (ou o refetch ainda em voo) a deixava fora de `opts`.
+    if (mainToolId && !opts.some((o) => o.value === mainToolId)) {
+      const known = mainTools.find((t) => t.id === mainToolId);
+      if (known) opts.push({ value: known.id, label: known.name });
+    }
     return opts;
-  }, [mainTools, mainToolCategoryId, project?.mainTool]);
+  }, [mainTools, mainToolCategoryId, mainToolId, project?.mainTool]);
   const createMainTool = trpc.taxonomy.createMainTool.useMutation({
     onSuccess: (created) => {
       utils.taxonomy.listMainTools.invalidate();

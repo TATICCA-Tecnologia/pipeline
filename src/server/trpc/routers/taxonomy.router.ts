@@ -409,8 +409,29 @@ export const taxonomyRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
+      // Idempotente por slug, em vez de CONFLICT: `listMainTools` só devolve
+      // ferramentas ativas, e a tela de Arquitetura ainda filtra por categoria
+      // — então uma ferramenta que existe mas está inativa (ou está em outra
+      // categoria) fica invisível para o usuário, que naturalmente tenta
+      // criá-la. Com CONFLICT ele entrava num beco sem saída: não conseguia
+      // nem ver nem criar. Aqui a ferramenta existente é reativada, recebe a
+      // categoria caso ainda não tenha uma, e é devolvida como se tivesse sido
+      // criada — que é exatamente o que o usuário pediu.
       const exists = await ctx.db.mainTool.findUnique({ where: { slug: input.slug } });
-      if (exists) throw new TRPCError({ code: "CONFLICT", message: "Já existe uma ferramenta com este slug" });
+      if (exists) {
+        return ctx.db.mainTool.update({
+          where: { id: exists.id },
+          data: {
+            isActive: true,
+            // Não sobrescreve uma categoria já definida: o usuário pode estar
+            // criando a partir de outra categoria sem querer remanejar a
+            // ferramenta existente.
+            ...(exists.categoryId == null && input.categoryId != null
+              ? { categoryId: input.categoryId }
+              : {}),
+          },
+        });
+      }
       return ctx.db.mainTool.create({ data: input });
     }),
 
@@ -573,8 +594,16 @@ export const taxonomyRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
+      // Mesmo motivo do createMainTool acima: uma categoria inativa some do
+      // `listMainToolCategories` e o usuário não conseguia nem selecioná-la nem
+      // recriá-la.
       const exists = await ctx.db.mainToolCategory.findUnique({ where: { slug: input.slug } });
-      if (exists) throw new TRPCError({ code: "CONFLICT", message: "Já existe uma categoria de ferramenta com este slug" });
+      if (exists) {
+        return ctx.db.mainToolCategory.update({
+          where: { id: exists.id },
+          data: { isActive: true },
+        });
+      }
       return ctx.db.mainToolCategory.create({ data: input });
     }),
 
