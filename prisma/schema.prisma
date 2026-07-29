@@ -107,6 +107,11 @@ model Company {
   zipCode   String?
   website   String?
   isActive  Boolean  @default(true)
+  /// Taxa diária do desenvolvedor usada no cálculo de payback desta empresa.
+  /// `null` = herda SystemSettings.developerDailyRateBRL (ver
+  /// resolveDeveloperDailyRate em src/shared/lib/payback.ts). Zero é um valor
+  /// legítimo e vence o global — só null herda.
+  developerDailyRateBRL Float?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

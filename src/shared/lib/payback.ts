@@ -190,3 +190,24 @@ export function findPaybackDate(curve: PaybackPoint[]): Date | null {
   const point = curve.find((p) => p.cumulativeCost > 0 && p.cumulativeSaving >= p.cumulativeCost);
   return point ? point.date : null;
 }
+
+/**
+ * Resolve a taxa diária do desenvolvedor efetiva de uma empresa.
+ *
+ * Precedência: valor da empresa > valor global de `SystemSettings` > 0.
+ *
+ * `0` na empresa é um valor legítimo e VENCE o global — só `null`/`undefined`
+ * herdam. Isso permite modelar uma empresa cujo custo de desenvolvimento não
+ * entra na conta sem que o valor global reapareça por baixo (por isso o `??`,
+ * não o `||`).
+ *
+ * Fonte única: usada pela aba Payback e pelo gerador de deck
+ * (src/server/deck/build-diagnostic-deck.ts) — se um dos dois calcular a taxa
+ * por conta própria, o .pptx passa a divergir do gráfico da tela.
+ */
+export function resolveDeveloperDailyRate(
+  companyRate: number | null | undefined,
+  globalRate: number | null | undefined
+): number {
+  return companyRate ?? globalRate ?? 0;
+}

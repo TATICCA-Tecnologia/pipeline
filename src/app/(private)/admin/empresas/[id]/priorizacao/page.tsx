@@ -3,12 +3,7 @@
 import { use, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import {
-  addBusinessDays,
-  differenceInBusinessDays,
-  differenceInCalendarDays,
-  format,
-} from "date-fns";
+import { addBusinessDays, differenceInCalendarDays } from "date-fns";
 import {
   Bar,
   ComposedChart,
@@ -48,14 +43,8 @@ import { ArrowLeft, ListOrdered } from "lucide-react";
 import { formatCurrency, formatCompactBRL } from "@/shared/utils";
 import { COMPLEXITY_LEVELS } from "@/shared/constants/project-taxonomy";
 import { computeWaveSchedule } from "@/shared/lib/wave-schedule";
-import {
-  computePaybackCurve,
-  computeStructureCostAt,
-  findPaybackDate,
-  type StructureCostItem,
-} from "@/shared/lib/payback";
 import { WaveTimeline } from "@/src/shared/components/wave-timeline";
-import { PaybackChart } from "@/src/shared/components/payback-chart";
+import { PaybackTab } from "@/src/shared/components/payback-tab";
 import { AreaSummaryChart } from "@/src/shared/components/area-summary-chart";
 import { ExistingAutomationsAreaSummaryChart } from "@/src/shared/components/existing-automations-area-summary-chart";
 import { TotalAreaSummaryChart } from "@/src/shared/components/total-area-summary-chart";
@@ -275,93 +264,17 @@ export default function PriorizacaoPage({ params }: Props) {
     [displayRanking]
   );
 
-  // Payback (Passo 6): reaproveita os dois schedules já calculados acima pelo
-  // Passo 5 (nenhuma chamada de rede adicional) e a saving anual de cada
-  // robô, já presente no ranking buscado no topo da página.
+  // Payback (Passo 6): a aba inteira vive em `PaybackTab`; a página só repassa
+  // os dois schedules já calculados acima pelo Passo 5 (nenhuma chamada de rede
+  // adicional) e os dados por projeto que já vêm do ranking buscado no topo.
   const savingByProjectId = useMemo(
     () => new Map(displayRanking.map((row) => [row.id, row.estimatedAnnualSavingBRL ?? 0])),
     [displayRanking]
   );
 
-  const paybackSchedule = useMemo(
-    () =>
-      [...wave1Schedule, ...wave2Schedule].map((item) => ({
-        projectId: item.projectId,
-        startDate: item.startDate,
-        endDate: item.endDate,
-        estimatedAnnualSavingBRL: savingByProjectId.get(item.projectId) ?? 0,
-      })),
-    [wave1Schedule, wave2Schedule, savingByProjectId]
-  );
-
-  const developerDailyRateBRL = settings?.developerDailyRateBRL ?? 0;
-
-  const { data: costItems = [] } = trpc.company.listCostItems.useQuery({ companyId });
-
-  const structureCosts: StructureCostItem[] = useMemo(
-    () =>
-      costItems.map((item) => ({
-        type: item.type as "recorrente" | "pontual",
-        amountBRL: item.amountBRL,
-        startDate: item.startDate,
-        endDate: item.endDate,
-      })),
-    [costItems]
-  );
-
-  const paybackCurve = useMemo(
-    () => computePaybackCurve(paybackSchedule, developerDailyRateBRL, structureCosts),
-    [paybackSchedule, developerDailyRateBRL, structureCosts]
-  );
-
-  const paybackDate = useMemo(() => findPaybackDate(paybackCurve), [paybackCurve]);
-
-  // Composição do payback: uma linha por robô, com os números que alimentam
-  // a curva acima (facilita conferir/auditar de onde vêm custo e economia).
-  const paybackComposition = useMemo(() => {
-    const withWave = [
-      ...wave1Schedule.map((item) => ({ ...item, wave: 1 as const })),
-      ...wave2Schedule.map((item) => ({ ...item, wave: 2 as const })),
-    ];
-    return withWave.map((item) => {
-      const businessDays = differenceInBusinessDays(item.endDate, item.startDate) + 1;
-      const developmentCostBRL = businessDays * developerDailyRateBRL;
-      const annualSavingBRL = savingByProjectId.get(item.projectId) ?? 0;
-      return {
-        projectId: item.projectId,
-        title: item.title,
-        wave: item.wave,
-        startDate: item.startDate,
-        endDate: item.endDate,
-        businessDays,
-        developmentCostBRL,
-        monthlySavingBRL: annualSavingBRL / 12,
-        annualSavingBRL,
-      };
-    });
-  }, [wave1Schedule, wave2Schedule, savingByProjectId, developerDailyRateBRL]);
-
-  // "Data de início do cronograma": a menor startDate entre os dois schedules
-  // combinados (equivale a wave1StartDate quando a onda 1 tem projetos; cai
-  // para wave2StartDate se a onda 1 estiver vazia) — usada só para expressar
-  // o payback em "N meses a partir do início", nunca como um número fixo.
-  const scheduleStartDate = useMemo(() => {
-    if (paybackSchedule.length === 0) return wave1StartDate;
-    return new Date(Math.min(...paybackSchedule.map((item) => item.startDate.getTime())));
-  }, [paybackSchedule, wave1StartDate]);
-
-  const paybackMonths = useMemo(() => {
-    if (!paybackDate) return null;
-    const days = differenceInCalendarDays(paybackDate, scheduleStartDate);
-    return Math.max(0, Math.round(days / 30.44));
-  }, [paybackDate, scheduleStartDate]);
-
-  // Total de custo de estrutura já acumulado até hoje (fora da curva
-  // projetada) — mostrado como uma linha própria na tabela de composição,
-  // separado do custo de dev por robô que já é mostrado linha a linha.
-  const structureCostToDate = useMemo(
-    () => computeStructureCostAt(structureCosts, new Date()),
-    [structureCosts]
+  const effortDaysByProjectId = useMemo(
+    () => new Map(displayRanking.map((row) => [row.id, row.implementationEffortDays])),
+    [displayRanking]
   );
 
   function handleWaveChange(row: RankingRow, value: string) {
@@ -707,102 +620,17 @@ export default function PriorizacaoPage({ params }: Props) {
         </TabsContent>
 
         <TabsContent value="payback" className="space-y-6 mt-4">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">Payback / ROI acumulado</CardTitle>
-              <p className="text-sm font-medium">
-                {paybackDate
-                  ? `Payback estimado em ${paybackMonths} ${paybackMonths === 1 ? "mês" : "meses"}`
-                  : "Payback não atingido no período calculado"}
-              </p>
-              {!settings?.developerDailyRateBRL && (
-                <p className="text-xs text-muted-foreground">
-                  Taxa diária do desenvolvedor ainda não configurada em Configurações — usando R$ 0
-                  como referência (o custo acumulado ficará zerado).
-                </p>
-              )}
-            </CardHeader>
-            <CardContent>
-              {isLoading ? (
-                <p className="text-sm text-muted-foreground py-10 text-center">Carregando...</p>
-              ) : (
-                <PaybackChart curve={paybackCurve} paybackDate={paybackDate} />
-              )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">Composição do cálculo</CardTitle>
-              <p className="text-xs text-muted-foreground">
-                Um robô por linha, com os números que alimentam a curva acima — custo de
-                desenvolvimento = dias úteis × taxa diária do desenvolvedor; economia = saving
-                estimado anual do projeto.
-              </p>
-            </CardHeader>
-            <CardContent className="p-0">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Título</TableHead>
-                    <TableHead>Onda</TableHead>
-                    <TableHead>Entrega</TableHead>
-                    <TableHead className="text-right">Dias úteis</TableHead>
-                    <TableHead className="text-right">Custo de dev.</TableHead>
-                    <TableHead className="text-right">Economia/mês</TableHead>
-                    <TableHead className="text-right">Economia/ano</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {paybackComposition.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
-                        Nenhum robô nas ondas 1/2 ainda.
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    paybackComposition.map((item) => (
-                      <TableRow
-                        key={item.projectId}
-                        className="cursor-pointer hover:bg-muted/40"
-                        onClick={() => goToProject(item.projectId)}
-                      >
-                        <TableCell className="font-medium max-w-[260px] truncate hover:text-primary hover:underline">
-                          {item.title}
-                        </TableCell>
-                        <TableCell className="text-muted-foreground">Onda {item.wave}</TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {format(item.endDate, "dd/MM/yyyy")}
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums">
-                          {item.businessDays}
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums">
-                          {formatCurrency(item.developmentCostBRL)}
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums">
-                          {formatCurrency(item.monthlySavingBRL)}
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums">
-                          {formatCurrency(item.annualSavingBRL)}
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                  {structureCostToDate > 0 && (
-                    <TableRow className="bg-muted/30">
-                      <TableCell className="font-medium" colSpan={4}>
-                        Estrutura (pessoas/licenças) acumulada até hoje
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums font-medium" colSpan={3}>
-                        {formatCurrency(structureCostToDate)}
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
+          <PaybackTab
+            companyId={companyId}
+            isLoading={isLoading}
+            wave1Schedule={wave1Schedule}
+            wave2Schedule={wave2Schedule}
+            savingByProjectId={savingByProjectId}
+            effortDaysByProjectId={effortDaysByProjectId}
+            companyDailyRateBRL={company?.developerDailyRateBRL ?? null}
+            globalDailyRateBRL={settings?.developerDailyRateBRL ?? null}
+            wave1StartDate={wave1StartDate}
+          />
         </TabsContent>
 
         <TabsContent value="resumo-area" className="space-y-6 mt-4">
