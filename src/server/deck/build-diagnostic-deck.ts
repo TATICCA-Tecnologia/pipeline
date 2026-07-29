@@ -83,6 +83,8 @@ const TYPE = {
   coverSubtitle: 20,
   sectionTitle: 30,
   slideTitle: 24,
+  /** Título de slide que pode ocupar duas linhas (nome de processo). */
+  slideTitleTall: 20,
   slideSubtitle: 13,
   metricValue: 28,
   bodyLarge: 13,
@@ -301,7 +303,7 @@ export async function buildDiagnosticDeck(companyId: string, actingUserId: strin
     pres,
     "Parte 1",
     "Priorização das oportunidades",
-    "Nem todo processo automatizável merece ser automatizado primeiro. As páginas a seguir ordenam as oportunidades por três critérios diferentes — retorno financeiro, peso estratégico e um score combinado — para que a escolha da ordem de execução seja uma decisão explícita, e não uma consequência de quem pediu primeiro."
+    "Nem todo processo automatizável merece ser automatizado primeiro. As páginas a seguir ordenam as oportunidades por três critérios diferentes — retorno financeiro, critério estratégico e um score combinado — para que a escolha da ordem de execução seja uma decisão aderente às diretrizes da empresa, e não uma consequência de quem pediu primeiro."
   );
   addPrioritizationMethodSlide(pres);
   addRankingSlide(pres, "Ranking por economia", rankingEconomia, "economia");
@@ -613,7 +615,7 @@ const QUALITATIVE_CRITERIA: { name: string; question: string }[] = [
   {
     name: "Criticidade do processo",
     question:
-      "O quanto a operação depende deste processo e qual o impacto de ele parar ou atrasar",
+      "O quanto a operação depende deste processo e qual o impacto se houver uma parada ou atraso",
   },
   {
     name: "Impacto interno",
@@ -641,7 +643,7 @@ function addPrioritizationMethodSlide(pres: PptxGenJS): void {
   const slide = addTitledSlide(
     pres,
     "Metodologia de priorização",
-    "Cada oportunidade levantada é avaliada em cinco critérios, com nota de 1 a 5. A média ponderada dessas notas forma a avaliação qualitativa, que é combinada à economia estimada e à complexidade de implementação para produzir o score de priorização usado nos rankings a seguir."
+    "Cada oportunidade levantada é avaliada em cinco critérios, com nota de 1 a 5. A média ponderada dessas notas forma a avaliação qualitativa — o critério estratégico da priorização — que depois é combinada à economia estimada e à complexidade de implementação para produzir o score usado no ranking combinado."
   );
 
   const header: TableRow = [
@@ -661,12 +663,30 @@ function addPrioritizationMethodSlide(pres: PptxGenJS): void {
     "Escala aplicada a todos os critérios:  1 — muito baixo   ·   2 — baixo   ·   3 — moderado   ·   4 — alto   ·   5 — muito alto",
     {
       x: MARGIN_X,
-      y: 6.05,
+      y: 5.75,
       w: CONTENT_W,
-      h: 0.4,
+      h: 0.35,
       fontSize: TYPE.caption,
       color: COLOR_MUTED,
       valign: "middle",
+    }
+  );
+
+  // Como as três dimensões viram um número só. Fica neste slide, e não no de
+  // ranking, porque é a definição da metodologia — no ranking o leitor já
+  // precisa do critério pronto para interpretar a coluna "Score".
+  addSectionLabel(slide, "Como o ranking combinado é calculado", MARGIN_X, 6.15, CONTENT_W);
+  slide.addText(
+    "Score combinado = economia estimada (peso 40%) + avaliação qualitativa (peso 40%) + facilidade de implementação (peso 20%). Cada dimensão é normalizada de 0 a 100 antes da ponderação: a economia de cada processo é medida em relação à maior economia do conjunto, e a complexidade entra invertida — quanto mais simples de implementar, maior a nota. Os pesos são configuráveis e podem ser ajustados conforme a diretriz da empresa.",
+    {
+      x: MARGIN_X,
+      y: 6.45,
+      w: CONTENT_W,
+      h: 0.5,
+      fontSize: TYPE.caption,
+      color: COLOR_SECONDARY,
+      lineSpacingMultiple: 1.2,
+      valign: "top",
     }
   );
 }
@@ -744,7 +764,10 @@ function addAreaSummarySlide(pres: PptxGenJS, areaSummary: AreaSummary): void {
     { text: "Área", options: TABLE_HEADER_OPTS },
     { text: "Projetos", options: TABLE_HEADER_OPTS },
     { text: "Economia estimada (ano)", options: TABLE_HEADER_OPTS },
-    { text: "Horas atuais (ano)", options: TABLE_HEADER_OPTS },
+    // "Horas atuais" sozinho era ambíguo — podia ser lido como horas do robô,
+    // horas disponíveis, horas já economizadas. O rótulo diz explicitamente que
+    // é o esforço manual gasto hoje, antes de qualquer automação.
+    { text: "Horas de trabalho manual hoje (ano)", options: TABLE_HEADER_OPTS },
   ];
 
   const rows: TableRow[] = areaSummary.map((a) => [
@@ -795,9 +818,9 @@ const RANKING_SUBTITLE: Record<"economia" | "qualitativo" | "combinado", string>
   economia:
     "Aplicando o critério financeiro isoladamente, as oportunidades são ordenadas pela economia anual estimada — resultado das horas de trabalho manual eliminadas, valorizadas pelo custo/hora do profissional que executa a atividade hoje. Esta é a leitura indicada para sustentar a aprovação do investimento junto à diretoria.",
   qualitativo:
-    "Sob a ótica estratégica, as oportunidades são reordenadas pela avaliação qualitativa apresentada anteriormente, independentemente do valor economizado. Processos de baixo retorno financeiro podem assumir as primeiras posições quando envolvem risco de compliance ou criticidade operacional elevada.",
+    "Sob o critério estratégico, as oportunidades são reordenadas pela avaliação qualitativa apresentada anteriormente, independentemente do valor economizado. Processos de baixo retorno financeiro podem assumir as primeiras posições quando envolvem risco de compliance ou criticidade operacional elevada.",
   combinado:
-    "Recomendamos esta leitura para definir a ordem de execução: ela pondera economia, avaliação qualitativa e complexidade de implementação num único indicador. As oportunidades no topo da lista são as que entregam maior valor com menor esforço, e formam a base das ondas propostas a seguir.",
+    "Recomendamos esta leitura para definir a ordem de execução. O score combinado é a média ponderada de três notas normalizadas de 0 a 100: economia estimada (relativa à maior economia do conjunto), avaliação qualitativa e facilidade de implementação — quanto menor a complexidade, maior a nota. As oportunidades no topo entregam maior valor com menor esforço e formam a base das ondas propostas a seguir.",
 };
 
 function addRankingSlide(
@@ -1354,7 +1377,7 @@ export function addProjectSlide(
   // o deck. Na linha do título (e não abaixo dela) para não esbarrar na régua
   // de acento nem empurrar as duas colunas de conteúdo, que têm altura
   // calculada.
-  const slide = addTitledSlide(pres, project.title, undefined, project.area?.name);
+  const slide = addTitledSlide(pres, project.title, undefined, project.area?.name, true);
 
   // ----- Coluna esquerda: textos (só campos já preenchidos) -----
   // Alinhadas à margem única do deck (MARGIN_X) e ao topo de conteúdo padrão,
@@ -1362,7 +1385,7 @@ export function addProjectSlide(
   // é folheado.
   const leftX = MARGIN_X;
   const leftW = 6.1;
-  let leftY = CONTENT_TOP_Y;
+  let leftY = CONTENT_TOP_Y_TALL_TITLE;
 
   if (project.description) {
     addSectionLabel(slide, "O processo hoje", leftX, leftY, leftW);
@@ -1434,7 +1457,7 @@ export function addProjectSlide(
   const rightW = 13.33 - MARGIN_X - rightX;
 
   const quantitativeLines = [...buildQuantitativeLines(project), ...extraQuantitativeLines];
-  addSectionLabel(slide, "Avaliação Quantitativa", rightX, CONTENT_TOP_Y, rightW);
+  addSectionLabel(slide, "Avaliação Quantitativa", rightX, CONTENT_TOP_Y_TALL_TITLE, rightW);
 
   if (quantitativeLines.length > 0) {
     const rows: TableRow[] = quantitativeLines.map((line) => [
@@ -1549,25 +1572,35 @@ export function addTitledSlide(
    * largura do título precisa encolher para abrir espaço — senão um título
    * longo passa por baixo do rótulo.
    */
-  tag?: string
+  tag?: string,
+  /**
+   * `true` reserva altura para um título de duas linhas e desce a régua de
+   * acento. Necessário nos slides de processo, cujo título é o nome do processo
+   * e frequentemente quebra — com a caixa de uma linha só, a segunda linha
+   * passava por cima da régua. Nesse modo o título usa um corpo menor, para a
+   * folga extra caber sem empurrar o conteúdo do slide.
+   */
+  tallTitle = false
 ): Slide {
   const slide = pres.addSlide({ masterName: MASTER_CONTENT });
   const tagW = tag ? 3.2 : 0;
+  const titleH = tallTitle ? 0.78 : 0.5;
   slide.addText(title, {
     x: MARGIN_X,
-    y: 0.35,
+    y: 0.32,
     w: CONTENT_W - tagW,
-    h: 0.5,
-    fontSize: TYPE.slideTitle,
+    h: titleH,
+    fontSize: tallTitle ? TYPE.slideTitleTall : TYPE.slideTitle,
     bold: true,
     color: COLOR_PRIMARY,
+    valign: "top",
   });
   if (tag) {
     slide.addText(tag.toUpperCase(), {
       x: MARGIN_X + CONTENT_W - tagW,
-      y: 0.35,
+      y: 0.32,
       w: tagW,
-      h: 0.5,
+      h: 0.45,
       align: "right",
       valign: "middle",
       fontSize: TYPE.eyebrow,
@@ -1578,7 +1611,7 @@ export function addTitledSlide(
   }
   slide.addShape("rect", {
     x: MARGIN_X,
-    y: 0.92,
+    y: tallTitle ? 1.14 : 0.92,
     w: 0.9,
     h: 0.035,
     fill: { color: COLOR_ACCENT },
@@ -1608,6 +1641,8 @@ export function addTitledSlide(
  */
 export const CONTENT_TOP_Y = 1.22;
 export const CONTENT_TOP_Y_WITH_SUBTITLE = 2.25;
+/** Topo de conteúdo quando o slide usa título de duas linhas (`tallTitle`). */
+export const CONTENT_TOP_Y_TALL_TITLE = 1.42;
 
 /**
  * Tabela padrão do deck.
