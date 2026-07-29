@@ -2,6 +2,21 @@ import { z } from "zod";
 import { router, publicProcedure, protectedProcedure, adminProcedure } from "../trpc";
 import { TRPCError } from "@trpc/server";
 
+/**
+ * Taxonomias que suportam mesclagem genérica (`previewMerge`/`merge`).
+ *
+ * Área e Tema ficam de fora de propósito: têm mesclagem própria
+ * (`mergeArea`/`mergeTheme`) porque precisam tratar colisão de temas entre as
+ * duas áreas, o que não existe nestas outras.
+ */
+const MERGE_TYPE = z.enum([
+  "mainTool",
+  "mainToolCategory",
+  "projectKind",
+  "costCategory",
+  "urgencyLevel",
+]);
+
 export const taxonomyRouter = router({
   // ==========================================
   // AREAS
@@ -678,5 +693,179 @@ export const taxonomyRouter = router({
     .mutation(async ({ ctx, input }) => {
       await ctx.db.urgencyLevel.delete({ where: { id: input.id } });
       return { success: true };
+    }),
+
+  /**
+   * Mescla dois registros de taxonomia: tudo que apontava para `sourceId`
+   * passa a apontar para `targetId`, e o registro de origem é apagado.
+   *
+   * Existe porque as taxonomias podem ser criadas na hora, direto do combobox
+   * de um formulário — o que é bom para não travar quem está preenchendo, mas
+   * inevitavelmente gera duplicatas ("Power Automate" e "Power-Automate",
+   * "Python" e "Python 3"). Sem uma forma de juntar, a lista degrada com o
+   * tempo e os rankings por ferramenta ficam divididos entre grafias.
+   *
+   * Tudo numa transação: repontar sem apagar deixaria duplicata viva, e apagar
+   * sem repontar perderia o vínculo dos projetos (as FKs são `onDelete:
+   * SetNull`, então a falha seria silenciosa — o projeto simplesmente ficaria
+   * sem ferramenta).
+   */
+  /**
+   * Quantos registros a mesclagem vai mover. Mesma ideia do
+   * `previewAreaMerge`: mesclagem não tem desfazer, então a confirmação precisa
+   * dizer o tamanho do estrago antes, não depois.
+   */
+  previewMerge: adminProcedure
+    .input(z.object({ type: MERGE_TYPE, sourceId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const { type, sourceId } = input;
+      switch (type) {
+        case "mainTool":
+          return {
+            projectCount: await ctx.db.project.count({ where: { mainToolId: sourceId } }),
+            extraCount: 0,
+            extraLabel: null,
+          };
+        case "mainToolCategory":
+          return {
+            projectCount: await ctx.db.project.count({
+              where: { mainToolCategoryId: sourceId },
+            }),
+            extraCount: await ctx.db.mainTool.count({ where: { categoryId: sourceId } }),
+            extraLabel: "ferramenta",
+          };
+        case "projectKind":
+          return {
+            projectCount: await ctx.db.project.count({
+              where: { solutionTypes: { some: { id: sourceId } } },
+            }),
+            extraCount: 0,
+            extraLabel: null,
+          };
+        case "costCategory":
+          return {
+            projectCount: 0,
+            extraCount: await ctx.db.companyCostItem.count({
+              where: { categoryId: sourceId },
+            }),
+            extraLabel: "item de custo",
+          };
+        case "urgencyLevel": {
+          const source = await ctx.db.urgencyLevel.findUnique({ where: { id: sourceId } });
+          return {
+            projectCount: source
+              ? await ctx.db.project.count({
+                  where: { OR: [{ urgency: source.name }, { urgency: source.slug }] },
+                })
+              : 0,
+            extraCount: 0,
+            extraLabel: null,
+          };
+        }
+      }
+    }),
+
+  merge: adminProcedure
+    .input(
+      z.object({
+        type: MERGE_TYPE,
+        sourceId: z.string(),
+        targetId: z.string(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const { type, sourceId, targetId } = input;
+      if (sourceId === targetId) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Não é possível mesclar um registro com ele mesmo.",
+        });
+      }
+
+      return ctx.db.$transaction(async (tx) => {
+        switch (type) {
+          case "mainTool": {
+            await tx.project.updateMany({
+              where: { mainToolId: sourceId },
+              data: { mainToolId: targetId },
+            });
+            await tx.mainTool.delete({ where: { id: sourceId } });
+            break;
+          }
+          case "mainToolCategory": {
+            await tx.project.updateMany({
+              where: { mainToolCategoryId: sourceId },
+              data: { mainToolCategoryId: targetId },
+            });
+            // As ferramentas da categoria de origem também precisam migrar,
+            // senão ficariam órfãs (categoryId vira null pelo SetNull) e
+            // sumiriam dos filtros por categoria.
+            await tx.mainTool.updateMany({
+              where: { categoryId: sourceId },
+              data: { categoryId: targetId },
+            });
+            await tx.mainToolCategory.delete({ where: { id: sourceId } });
+            break;
+          }
+          case "projectKind": {
+            // Relação N-N: não há coluna para atualizar. Cada projeto ligado à
+            // origem passa a se ligar ao destino; `connect` é idempotente, então
+            // projetos que já tinham os dois não viram duplicata.
+            const linked = await tx.project.findMany({
+              where: { solutionTypes: { some: { id: sourceId } } },
+              select: { id: true },
+            });
+            for (const project of linked) {
+              await tx.project.update({
+                where: { id: project.id },
+                data: {
+                  solutionTypes: {
+                    connect: { id: targetId },
+                    disconnect: { id: sourceId },
+                  },
+                },
+              });
+            }
+            await tx.projectKind.delete({ where: { id: sourceId } });
+            break;
+          }
+          case "costCategory": {
+            // FK com `onDelete: Restrict`: sem repontar antes, o delete falha.
+            await tx.companyCostItem.updateMany({
+              where: { categoryId: sourceId },
+              data: { categoryId: targetId },
+            });
+            await tx.companyCostCategory.delete({ where: { id: sourceId } });
+            break;
+          }
+          case "urgencyLevel": {
+            // `Project.urgency` é texto livre, sem FK — então além de apagar o
+            // nível de origem é preciso reescrever os projetos que guardaram o
+            // nome antigo, senão eles ficariam com um valor que não existe mais
+            // em nenhuma lista.
+            const [source, target] = await Promise.all([
+              tx.urgencyLevel.findUnique({ where: { id: sourceId } }),
+              tx.urgencyLevel.findUnique({ where: { id: targetId } }),
+            ]);
+            if (!source || !target) {
+              throw new TRPCError({
+                code: "NOT_FOUND",
+                message: "Nível de urgência não encontrado.",
+              });
+            }
+            await tx.project.updateMany({
+              where: { urgency: source.name },
+              data: { urgency: target.name },
+            });
+            await tx.project.updateMany({
+              where: { urgency: source.slug },
+              data: { urgency: target.slug },
+            });
+            await tx.urgencyLevel.delete({ where: { id: sourceId } });
+            break;
+          }
+        }
+        return { success: true };
+      });
     }),
 });

@@ -15,6 +15,7 @@ type UrgencyLevelItem = RouterOutputs["taxonomy"]["listAllUrgencyLevels"][number
 type MainToolCategoryItem = RouterOutputs["taxonomy"]["listAllMainToolCategories"][number];
 
 import { Button } from "@/src/shared/components/ui/button";
+import { MergeSuggestions } from "@/src/shared/components/merge-suggestions";
 import { Input } from "@/src/shared/components/ui/input";
 import { Card, CardContent, CardHeader } from "@/src/shared/components/ui/card";
 import {
@@ -685,6 +686,15 @@ export default function CategoriasPage() {
             Nova categoria
           </Button>
         </div>
+        <MergeSuggestions
+          records={mainToolCategories}
+          type="mainToolCategory"
+          label="categoria de ferramenta"
+          onMerged={() => {
+            utils.taxonomy.listAllMainToolCategories.invalidate();
+            utils.taxonomy.listAllMainTools.invalidate();
+          }}
+        />
         {mainToolCategories.length === 0 ? (
           <Card className="flex flex-col items-center justify-center py-10 text-center">
             <Boxes className="mb-3 h-8 w-8 text-muted-foreground/50" />
@@ -735,6 +745,12 @@ export default function CategoriasPage() {
             Nova ferramenta
           </Button>
         </div>
+        <MergeSuggestions
+          records={mainTools}
+          type="mainTool"
+          label="ferramenta"
+          onMerged={() => utils.taxonomy.listAllMainTools.invalidate()}
+        />
         {mainTools.length === 0 ? (
           <Card className="flex flex-col items-center justify-center py-10 text-center">
             <Wrench className="mb-3 h-8 w-8 text-muted-foreground/50" />
@@ -788,6 +804,12 @@ export default function CategoriasPage() {
             Novo tipo de solução
           </Button>
         </div>
+        <MergeSuggestions
+          records={projectKinds}
+          type="projectKind"
+          label="tipo de solução"
+          onMerged={() => utils.taxonomy.listAllProjectKinds.invalidate()}
+        />
         {projectKinds.length === 0 ? (
           <Card className="flex flex-col items-center justify-center py-10 text-center">
             <Layers className="mb-3 h-8 w-8 text-muted-foreground/50" />
@@ -838,6 +860,12 @@ export default function CategoriasPage() {
             Nova categoria
           </Button>
         </div>
+        <MergeSuggestions
+          records={costCategories}
+          type="costCategory"
+          label="categoria de custo"
+          onMerged={() => utils.taxonomy.listAllCostCategories.invalidate()}
+        />
         {costCategories.length === 0 ? (
           <Card className="flex flex-col items-center justify-center py-10 text-center">
             <Wallet className="mb-3 h-8 w-8 text-muted-foreground/50" />
@@ -888,6 +916,12 @@ export default function CategoriasPage() {
             Novo nível
           </Button>
         </div>
+        <MergeSuggestions
+          records={urgencyLevels}
+          type="urgencyLevel"
+          label="nível de urgência"
+          onMerged={() => utils.taxonomy.listAllUrgencyLevels.invalidate()}
+        />
         {urgencyLevels.length === 0 ? (
           <Card className="flex flex-col items-center justify-center py-10 text-center">
             <Flame className="mb-3 h-8 w-8 text-muted-foreground/50" />
