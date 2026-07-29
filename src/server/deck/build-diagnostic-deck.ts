@@ -95,8 +95,10 @@ const TYPE = {
 const MASTER_CONTENT = "CONTENT";
 /** Master sem chrome, para divisórias de seção. */
 const MASTER_FULL_BLEED = "FULL_BLEED";
-/** Master da capa: fundo navy sólido, sem rodapé. */
+/** Master da capa: fundo navy sólido com faixa branca no topo, sem rodapé. */
 const MASTER_COVER = "COVER";
+/** Altura da faixa branca da capa, onde o logo é assentado. */
+const COVER_BAND_H = 2.35;
 
 /** Margem esquerda/direita única do deck — tudo se alinha nela. */
 const MARGIN_X = 0.6;
@@ -455,6 +457,22 @@ export function defineDeckTheme(
     title: MASTER_COVER,
     background: { color: COLOR_PRIMARY },
     objects: [
+      // Faixa branca no topo: o PNG do logo tem tipografia escura e traço sem
+      // versão negativa, então ele desaparece sobre o navy. Em vez de exigir um
+      // segundo arquivo de logo (que a empresa pode não ter), a capa reserva
+      // uma faixa clara para ele — solução que também é o padrão de capa
+      // corporativa com marca no topo.
+      { rect: { x: 0, y: 0, w: 13.33, h: COVER_BAND_H, fill: { color: COLOR_SURFACE } } },
+      // Fio de acento fechando a faixa contra o navy.
+      {
+        rect: {
+          x: 0,
+          y: COVER_BAND_H,
+          w: 13.33,
+          h: 0.055,
+          fill: { color: COLOR_ACCENT },
+        },
+      },
       // Faixa de acento no rodapé da capa, fechando a composição.
       { rect: { x: 0, y: 7.32, w: 13.33, h: 0.18, fill: { color: COLOR_ACCENT } } },
     ],
@@ -472,15 +490,16 @@ export function addCoverSlide(
   const slide = pres.addSlide({ masterName: MASTER_COVER });
 
   if (LOGO_DATA_URI) {
-    // Logo bem maior e centralizado no terço superior: na capa ele é o
-    // elemento principal, não uma marca de canto.
-    const width = 4.6;
+    // Logo grande, centralizado dentro da faixa branca do master — na capa ele
+    // é o elemento principal, não uma marca de canto.
+    const width = 4.4;
+    const height = width / LOGO_ASPECT_RATIO;
     slide.addImage({
       data: LOGO_DATA_URI,
       x: (13.33 - width) / 2,
-      y: 1.15,
+      y: (COVER_BAND_H - height) / 2,
       w: width,
-      h: width / LOGO_ASPECT_RATIO,
+      h: height,
     });
   }
 
@@ -982,18 +1001,50 @@ function addPaybackSlide(
     ? `Payback estimado em ${paybackMonths} ${paybackMonths === 1 ? "mês" : "meses"}`
     : "Payback não atingido no período calculado";
 
-  // O número que o slide existe para comunicar, tratado como número — grande,
-  // em cor de acento, acima do gráfico. Antes era uma linha de 16pt indistinta
-  // da legenda do gráfico.
-  slide.addText(summaryText, {
-    x: MARGIN_X,
-    y: CONTENT_TOP_Y_WITH_SUBTITLE + 0.02,
-    w: CONTENT_W,
-    h: 0.55,
-    fontSize: TYPE.metricValue,
+  // O número que o slide existe para comunicar fica ao LADO do texto
+  // explicativo, na coluna que sobra (a narrativa ocupa 78% da largura), e não
+  // abaixo dele: empilhado, ele comia a altura do gráfico e chegou a sobrepor a
+  // área de plotagem. Aqui ele ganha destaque sem disputar espaço vertical.
+  const metricX = MARGIN_X + CONTENT_W * 0.78 + 0.2;
+  const metricW = CONTENT_W - CONTENT_W * 0.78 - 0.2;
+  slide.addText("PAYBACK ESTIMADO", {
+    x: metricX,
+    y: 1.06,
+    w: metricW,
+    h: 0.25,
+    align: "right",
+    fontSize: TYPE.eyebrow,
     bold: true,
-    color: COLOR_ACCENT,
+    charSpacing: 1.5,
+    color: COLOR_MUTED,
   });
+  slide.addText(
+    paybackDate ? `${paybackMonths}` : "—",
+    {
+      x: metricX,
+      y: 1.28,
+      w: metricW,
+      h: 0.6,
+      align: "right",
+      fontSize: TYPE.metricValue,
+      bold: true,
+      color: COLOR_ACCENT,
+    }
+  );
+  slide.addText(
+    paybackDate
+      ? `${paybackMonths === 1 ? "mês" : "meses"} · ${formatDate(paybackDate)}`
+      : "não atingido no período",
+    {
+      x: metricX,
+      y: 1.88,
+      w: metricW,
+      h: 0.3,
+      align: "right",
+      fontSize: TYPE.caption,
+      color: COLOR_MUTED,
+    }
+  );
 
   if (curve.length === 0) {
     slide.addText(
@@ -1022,11 +1073,14 @@ function addPaybackSlide(
     },
   ];
 
+  // Começa no topo de conteúdo padrão e vai até logo acima da régua de rodapé
+  // (6.92): antes a altura era fixa em 4.35 e sobrava um vazio embaixo enquanto
+  // o gráfico ficava espremido em cima.
   slide.addChart("line", chartData, {
     x: MARGIN_X,
-    y: 2.35,
+    y: CONTENT_TOP_Y_WITH_SUBTITLE,
     w: CONTENT_W,
-    h: 4.35,
+    h: 6.75 - CONTENT_TOP_Y_WITH_SUBTITLE,
     showLegend: true,
     legendPos: "b",
     legendFontSize: TYPE.caption,
@@ -1295,25 +1349,12 @@ export function addProjectSlide(
   project: ProjectDeckRow,
   extraQuantitativeLines: QuantitativeLine[] = []
 ): void {
-  const slide = addTitledSlide(pres, project.title);
-
-  // Área como subtítulo curto ao lado da régua: com dezenas de slides de
-  // processo em sequência, só o título não deixa localizar de quem é o
-  // processo ao folhear o deck. Fica no lugar do texto explicativo (que estes
-  // slides não usam), então não desloca o conteúdo abaixo.
-  if (project.area?.name) {
-    slide.addText(project.area.name.toUpperCase(), {
-      x: MARGIN_X + 1.05,
-      y: 0.86,
-      w: CONTENT_W - 1.05,
-      h: 0.26,
-      fontSize: TYPE.eyebrow,
-      bold: true,
-      charSpacing: 1.5,
-      color: COLOR_MUTED,
-      valign: "middle",
-    });
-  }
+  // Área alinhada à direita do título: com dezenas de slides de processo em
+  // sequência, só o título não deixa localizar de quem é o processo ao folhear
+  // o deck. Na linha do título (e não abaixo dela) para não esbarrar na régua
+  // de acento nem empurrar as duas colunas de conteúdo, que têm altura
+  // calculada.
+  const slide = addTitledSlide(pres, project.title, undefined, project.area?.name);
 
   // ----- Coluna esquerda: textos (só campos já preenchidos) -----
   // Alinhadas à margem única do deck (MARGIN_X) e ao topo de conteúdo padrão,
@@ -1498,17 +1539,43 @@ export function addProjectSlide(
  * apresentando. Texto genérico de propósito — não descreve os números da
  * empresa, descreve o que a tabela/gráfico significa.
  */
-export function addTitledSlide(pres: PptxGenJS, title: string, narrative?: string): Slide {
+export function addTitledSlide(
+  pres: PptxGenJS,
+  title: string,
+  narrative?: string,
+  /**
+   * Rótulo curto alinhado à direita, na mesma linha do título (usado pela área
+   * do processo). Fica aqui, e não como um texto solto no slide, porque a
+   * largura do título precisa encolher para abrir espaço — senão um título
+   * longo passa por baixo do rótulo.
+   */
+  tag?: string
+): Slide {
   const slide = pres.addSlide({ masterName: MASTER_CONTENT });
+  const tagW = tag ? 3.2 : 0;
   slide.addText(title, {
     x: MARGIN_X,
     y: 0.35,
-    w: CONTENT_W,
+    w: CONTENT_W - tagW,
     h: 0.5,
     fontSize: TYPE.slideTitle,
     bold: true,
     color: COLOR_PRIMARY,
   });
+  if (tag) {
+    slide.addText(tag.toUpperCase(), {
+      x: MARGIN_X + CONTENT_W - tagW,
+      y: 0.35,
+      w: tagW,
+      h: 0.5,
+      align: "right",
+      valign: "middle",
+      fontSize: TYPE.eyebrow,
+      bold: true,
+      charSpacing: 1.5,
+      color: COLOR_MUTED,
+    });
+  }
   slide.addShape("rect", {
     x: MARGIN_X,
     y: 0.92,
