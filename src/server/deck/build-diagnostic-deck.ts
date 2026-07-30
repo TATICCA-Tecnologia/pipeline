@@ -219,6 +219,28 @@ export async function buildDiagnosticDeck(companyId: string, actingUserId: strin
     endDate: item.endDate,
   }));
 
+  // Premissas resolvidas UMA vez aqui: os slides de payback recebem números já
+  // decididos (empresa > global > padrão) em vez de decidirem por conta
+  // própria, que é o que mantém o .pptx idêntico à aba Payback da tela de
+  // priorização.
+  const paybackSettings = {
+    developerDailyRateBRL: developerDailyRateFrom(
+      resolveDeveloperHourlyRate(
+        company.developerHourlyRateBRL,
+        settings.developerHourlyRateBRL
+      )
+    ),
+    maintenanceHourlyRateBRL: resolveMaintenanceHourlyRate(
+      company.maintenanceHourlyRateBRL,
+      settings.maintenanceHourlyRateBRL
+    ),
+    defaultMaintenanceHoursPerWeek: settings.defaultMaintenanceHoursPerWeek,
+    wave1StartDate: settings.wave1StartDate,
+  };
+  // Calculado antes do primeiro slide porque o KPI do resumo executivo, na
+  // abertura do deck, mostra o mesmo número do slide de payback lá na Parte 2.
+  const payback = computeDeckPayback(rankingCombinado, paybackSettings, structureCosts);
+
   const pres = new PptxGenJS();
   pres.layout = "LAYOUT_WIDE";
   pres.author = "TATICCA";
@@ -245,26 +267,8 @@ export async function buildDiagnosticDeck(companyId: string, actingUserId: strin
     "Definida a ordem, esta seção responde às duas perguntas seguintes: quando cada robô entra em produção e em quanto tempo o investimento se paga. O cronograma e a curva de payback partem das mesmas premissas de esforço, custo e economia — mudar qualquer uma delas recalcula as duas."
   );
   addScheduleSlide(pres, rankingCombinado, settings.wave1StartDate);
-  // Premissas resolvidas UMA vez aqui: os slides de payback recebem números já
-  // decididos (empresa > global > padrão) em vez de decidirem por conta
-  // própria, que é o que mantém o .pptx idêntico à aba Payback da tela de
-  // priorização.
-  const paybackSettings = {
-    developerDailyRateBRL: developerDailyRateFrom(
-      resolveDeveloperHourlyRate(
-        company.developerHourlyRateBRL,
-        settings.developerHourlyRateBRL
-      )
-    ),
-    maintenanceHourlyRateBRL: resolveMaintenanceHourlyRate(
-      company.maintenanceHourlyRateBRL,
-      settings.maintenanceHourlyRateBRL
-    ),
-    defaultMaintenanceHoursPerWeek: settings.defaultMaintenanceHoursPerWeek,
-    wave1StartDate: settings.wave1StartDate,
-  };
   addPaybackMethodSlide(pres);
-  addPaybackSlide(pres, rankingCombinado, paybackSettings, structureCosts);
+  addPaybackSlide(pres, payback);
   addPaybackCompositionSlide(pres, rankingCombinado, paybackSettings);
   // Entrevistas: se não houver nenhuma, o slide é pulado inteiramente (não
   // criamos um slide vazio nem lançamos erro — decisão explícita do Passo 8a).
@@ -726,27 +730,34 @@ function toDeckPaybackItems(
   });
 }
 
-function addPaybackSlide(
-  pres: PptxGenJS,
+/**
+ * Curva de payback + data + meses, calculados UMA vez por deck.
+ *
+ * Existe como função separada porque dois slides mostram o mesmo número (o KPI
+ * do resumo executivo e o slide de payback). Calculado em dois lugares, um
+ * arredondamento diferente já bastaria para o deck se contradizer.
+ */
+type DeckPayback = {
+  curve: PaybackPoint[];
+  paybackDate: Date | null;
+  /** Meses entre o início do cronograma e o payback; null se não atingido. */
+  paybackMonths: number | null;
+  /** Nº de oportunidades com onda atribuída — a base do cálculo. */
+  scheduledCount: number;
+};
+
+function computeDeckPayback(
   ranking: Ranking,
   settings: PaybackDeckSettings,
   structureCosts: StructureCostItem[]
-): void {
-  const slide = addTitledSlide(
-    pres,
-    "Payback / ROI acumulado",
-    "Duas curvas ao longo do tempo: tudo que a automação custa (desenvolvimento, sustentação mensal e estrutura) contra tudo que ela economiza. O ponto em que a curva de economia cruza a de custo é o payback — a partir dali a operação passa a gerar retorno líquido.",
-    undefined,
-    false,
-    // Reduzida para abrir a coluna do bloco de métrica à direita.
-    0.76
-  );
+): DeckPayback {
   const { wave1, wave2, startDate } = computeWaveSchedules(ranking, settings.wave1StartDate);
-
   const paybackSchedule = toDeckPaybackItems([...wave1, ...wave2], ranking, settings);
-
-  const dailyRate = settings.developerDailyRateBRL;
-  const curve = computePaybackCurve(paybackSchedule, dailyRate, structureCosts);
+  const curve = computePaybackCurve(
+    paybackSchedule,
+    settings.developerDailyRateBRL,
+    structureCosts
+  );
   const paybackDate = findPaybackDate(curve);
 
   const scheduleStartDate =
@@ -758,9 +769,20 @@ function addPaybackSlide(
     ? Math.max(0, Math.round(differenceInCalendarDays(paybackDate, scheduleStartDate) / 30.44))
     : null;
 
-  const summaryText = paybackDate
-    ? `Payback estimado em ${paybackMonths} ${paybackMonths === 1 ? "mês" : "meses"}`
-    : "Payback não atingido no período calculado";
+  return { curve, paybackDate, paybackMonths, scheduledCount: paybackSchedule.length };
+}
+
+function addPaybackSlide(pres: PptxGenJS, payback: DeckPayback): void {
+  const slide = addTitledSlide(
+    pres,
+    "Payback / ROI acumulado",
+    "Duas curvas ao longo do tempo: tudo que a automação custa (desenvolvimento, sustentação mensal e estrutura) contra tudo que ela economiza. O ponto em que a curva de economia cruza a de custo é o payback — a partir dali a operação passa a gerar retorno líquido.",
+    undefined,
+    false,
+    // Reduzida para abrir a coluna do bloco de métrica à direita.
+    0.76
+  );
+  const { curve, paybackDate, paybackMonths } = payback;
 
   // O número que o slide existe para comunicar fica ao LADO do texto
   // explicativo, na coluna que sobra (a narrativa ocupa 78% da largura), e não
