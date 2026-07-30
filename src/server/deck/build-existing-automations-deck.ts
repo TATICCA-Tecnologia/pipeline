@@ -14,12 +14,14 @@ import {
   addTitledSlide,
   addSlideTable,
   defineDeckTheme,
-  addInterviewsSlide,
-  addProjectSlide,
   COLOR_MUTED,
   TABLE_HEADER_OPTS,
   type Slide,
   type TableRow,
+} from "./deck-theme";
+import {
+  addInterviewsSlide,
+  addProjectSlide,
   type Interviews,
   type QuantitativeLine,
 } from "./build-diagnostic-deck";
