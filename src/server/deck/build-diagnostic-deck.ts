@@ -45,6 +45,10 @@ import {
   type Slide,
   type TableRow,
 } from "./deck-theme";
+import {
+  addExecutiveScopeSlide,
+  buildExecutiveSummaryData,
+} from "./executive-summary-slides";
 
 /**
  * Geração server-side do deck consolidado de diagnóstico de robotização em
@@ -241,6 +245,13 @@ export async function buildDiagnosticDeck(companyId: string, actingUserId: strin
   // abertura do deck, mostra o mesmo número do slide de payback lá na Parte 2.
   const payback = computeDeckPayback(rankingCombinado, paybackSettings, structureCosts);
 
+  const executiveData = buildExecutiveSummaryData({
+    ranking: rankingCombinado,
+    areaCount: areaSummary.length,
+    projects,
+    interviews,
+  });
+
   const pres = new PptxGenJS();
   pres.layout = "LAYOUT_WIDE";
   pres.author = "TATICCA";
@@ -249,6 +260,7 @@ export async function buildDiagnosticDeck(companyId: string, actingUserId: strin
   defineDeckTheme(pres, company.name);
 
   addCoverSlide(pres, company.name);
+  addExecutiveScopeSlide(pres, executiveData);
   addAreaSummarySlide(pres, areaSummary);
   addSectionSlide(
     pres,
