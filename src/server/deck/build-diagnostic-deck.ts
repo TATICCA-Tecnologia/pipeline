@@ -46,6 +46,7 @@ import {
   type TableRow,
 } from "./deck-theme";
 import {
+  addExecutiveNumbersSlide,
   addExecutiveScopeSlide,
   buildExecutiveSummaryData,
 } from "./executive-summary-slides";
@@ -261,6 +262,7 @@ export async function buildDiagnosticDeck(companyId: string, actingUserId: strin
 
   addCoverSlide(pres, company.name);
   addExecutiveScopeSlide(pres, executiveData);
+  addExecutiveNumbersSlide(pres, executiveData, payback);
   addAreaSummarySlide(pres, areaSummary);
   addSectionSlide(
     pres,

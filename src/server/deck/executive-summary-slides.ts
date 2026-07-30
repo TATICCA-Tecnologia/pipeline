@@ -1,10 +1,12 @@
 import PptxGenJS from "pptxgenjs";
-import { formatCompactBRL } from "@/shared/utils";
+import { formatCompactBRL, formatDate } from "@/shared/utils";
 import {
   COLOR_ACCENT,
   COLOR_MUTED,
   COLOR_PRIMARY,
   COLOR_SECONDARY,
+  COLOR_SURFACE,
+  COLOR_TABLE_BORDER,
   COLOR_ZEBRA,
   CONTENT_TOP_Y_WITH_SUBTITLE,
   CONTENT_W,
@@ -188,5 +190,133 @@ export function addExecutiveScopeSlide(pres: PptxGenJS, data: ExecutiveSummaryDa
       color: COLOR_MUTED,
       valign: "top",
     });
+  }
+}
+
+const NUMBERS_NARRATIVE =
+  "Resultado consolidado das oportunidades mapeadas, considerando o cronograma de implementação proposto e os custos de desenvolvimento, sustentação e estrutura.";
+
+export function addExecutiveNumbersSlide(
+  pres: PptxGenJS,
+  data: ExecutiveSummaryData,
+  payback: PaybackSummary
+): void {
+  const slide = addTitledSlide(pres, "Os números do diagnóstico", NUMBERS_NARRATIVE);
+
+  const kpis: { value: string; label: string; accent: boolean }[] = [
+    { value: String(data.opportunityCount), label: "Oportunidades", accent: false },
+    { value: String(data.areaCount), label: "Áreas", accent: false },
+    { value: formatHours(data.manualHoursPerYear), label: "Trabalho manual/ano", accent: false },
+    { value: formatCompactBRL(data.totalAnnualSavingBRL), label: "Economia anual", accent: true },
+    {
+      value:
+        payback.paybackMonths != null
+          ? `${payback.paybackMonths} ${payback.paybackMonths === 1 ? "mês" : "meses"}`
+          : NO_DATA,
+      label: payback.paybackMonths != null ? "Payback" : "Payback não atingido",
+      accent: true,
+    },
+  ];
+
+  const top = CONTENT_TOP_Y_WITH_SUBTITLE;
+  const kpiW = CONTENT_W / kpis.length;
+  kpis.forEach((kpi, index) => {
+    const x = MARGIN_X + index * kpiW;
+    // Régua superior em vez de caixa: o número precisa ser a única coisa pesada
+    // da faixa, e cinco caixas seguidas leem como tabela.
+    slide.addShape("rect", { x, y: top, w: kpiW - 0.3, h: 0.028, fill: { color: COLOR_ACCENT } });
+    slide.addText(kpi.value, {
+      x,
+      y: top + 0.14,
+      w: kpiW - 0.3,
+      h: 0.62,
+      fontSize: TYPE.metricValue,
+      bold: true,
+      color: kpi.accent ? COLOR_ACCENT : COLOR_PRIMARY,
+      valign: "top",
+    });
+    slide.addText(kpi.label.toUpperCase(), {
+      x,
+      y: top + 0.8,
+      w: kpiW - 0.3,
+      h: 0.4,
+      fontSize: TYPE.eyebrow,
+      bold: true,
+      charSpacing: 1,
+      color: COLOR_MUTED,
+      valign: "top",
+    });
+  });
+
+  // Nota só quando os dois escopos divergem: economia soma tudo que foi
+  // mapeado, payback só o que já tem onda. Sem a nota, o leitor cruza os dois
+  // números e conclui que um deles está errado.
+  const hasScopeNote = payback.scheduledCount < data.opportunityCount;
+  const chartTop = top + 1.35;
+  const chartBottom = hasScopeNote ? 6.4 : 6.8;
+
+  if (payback.curve.length === 0) {
+    slide.addText("Cronograma ainda não definido — nenhuma oportunidade alocada em onda.", {
+      x: MARGIN_X,
+      y: chartTop,
+      w: CONTENT_W,
+      h: 0.5,
+      fontSize: TYPE.bodyLarge,
+      color: COLOR_MUTED,
+    });
+  } else {
+    const labels = payback.curve.map((point) => formatDate(point.date));
+    slide.addChart(
+      "line",
+      [
+        {
+          name: "Custo acumulado",
+          labels,
+          values: payback.curve.map((point) => Math.round(point.cumulativeCost)),
+        },
+        {
+          name: "Economia acumulada",
+          labels,
+          values: payback.curve.map((point) => Math.round(point.cumulativeSaving)),
+        },
+      ],
+      {
+        x: MARGIN_X,
+        y: chartTop,
+        w: CONTENT_W,
+        h: chartBottom - chartTop,
+        showLegend: true,
+        legendPos: "b",
+        legendFontSize: TYPE.caption,
+        lineDataSymbol: "none",
+        lineSize: 2.5,
+        chartColors: [COLOR_MUTED, COLOR_ACCENT],
+        // Aqui a curva é ilustrativa — o slide com as datas legíveis vem depois,
+        // na Parte 2. Esconder o eixo de categoria evita a faixa preta de ~261
+        // rótulos semanais num gráfico que só precisa mostrar o cruzamento.
+        catAxisHidden: true,
+        valAxisLabelFontSize: TYPE.caption - 1,
+        valAxisLabelColor: COLOR_MUTED,
+        valAxisLabelFormatCode: "R$ #,##0",
+        valGridLine: { style: "solid", size: 0.5, color: COLOR_TABLE_BORDER },
+        catGridLine: { style: "none" },
+        border: { pt: 0, color: COLOR_SURFACE },
+      }
+    );
+  }
+
+  if (hasScopeNote) {
+    slide.addText(
+      `Economia anual considera as ${data.opportunityCount} oportunidades mapeadas; o payback é calculado sobre as ${payback.scheduledCount} já alocadas nas ondas 1 e 2.`,
+      {
+        x: MARGIN_X,
+        y: 6.48,
+        w: CONTENT_W,
+        h: 0.35,
+        fontSize: TYPE.caption,
+        color: COLOR_MUTED,
+        valign: "top",
+      }
+    );
   }
 }
