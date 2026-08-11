@@ -10,7 +10,18 @@
 
 **Spec:** `docs/superpowers/specs/2026-08-11-catalogo-qualidade-automacoes-design.md`
 
-**Verificação:** o projeto não tem framework de teste. As verificações são scripts `tsx` em `scripts/`, no molde de `scripts/preview-executive-slides.ts`, mais `pnpm lint` e `pnpm build`. Migrations são arquivos SQL escritos à mão; **não rode `prisma migrate dev`** — o deploy aplica a migration automaticamente no push para `main`.
+**Verificação:** o projeto não tem framework de teste. As verificações são scripts `tsx` em `scripts/`, no molde de `scripts/preview-executive-slides.ts`.
+
+Duas armadilhas confirmadas na Task 1, que valem para **todas** as tasks:
+
+- **`pnpm lint` não funciona.** O script chama `eslint`, que não está nas dependências. Pré-existente.
+- **`pnpm build` não checa tipos.** `next.config.mjs` tem `typescript: { ignoreBuildErrors: true }`, então o build passa verde com erro de tipo. Onde este plano diz "Run: `pnpm build`", rode **também** `npx tsc --noEmit`.
+
+Baseline do `npx tsc --noEmit` antes da Task 1: **10 erros em 4 arquivos**, todos em `src/shared/components/ui/` (`chart.tsx`, `input-otp.tsx`, `sidebar.tsx`, `toaster.tsx`) — boilerplate shadcn pré-existente. Qualquer erro fora desses quatro arquivos é regressão sua.
+
+Migrations são arquivos SQL escritos à mão; **não rode `prisma migrate dev` nem `prisma db push`** — não existe `.env`/`DATABASE_URL` nesta máquina, e o deploy aplica a migration no push para `main`.
+
+**Não rode `npx prisma format`** — ele reformata o schema inteiro e polui o diff com arquivos fora do escopo da task.
 
 ---
 
@@ -331,28 +342,39 @@ export const AUTOMATION_ACCOUNT_USERNAME_MAX_LENGTH = 120;
 
 Ao lado de `resolveCurrentApplicationHostingLabel` (linha ~289):
 
+`resolveLabel` devolve `string | undefined` — `undefined` só quando o valor é vazio;
+caso contrário, o label, ou o valor cru quando o slug não está na lista. Os
+resolvedores novos herdam esse tipo, como `resolveCurrentApplicationHostingLabel`
+já faz. **Quem consome (ficha, deck) precisa tratar o `undefined`** — em geral com
+`?? "Não informado"`.
+
 ```ts
-export function resolveDataEndpointLabel(value: string | null | undefined): string {
+export function resolveDataEndpointLabel(value: string | null | undefined): string | undefined {
   return resolveLabel(value, CURRENT_APPLICATION_DATA_ENDPOINT_OPTIONS);
 }
 
-export function resolveAccountTypeLabel(value: string | null | undefined): string {
+export function resolveAccountTypeLabel(value: string | null | undefined): string | undefined {
   return resolveLabel(value, AUTOMATION_ACCOUNT_TYPE_OPTIONS);
 }
 
-export function resolveSensitiveDataAnswerLabel(value: string | null | undefined): string {
+export function resolveSensitiveDataAnswerLabel(value: string | null | undefined): string | undefined {
   return resolveLabel(value, SENSITIVE_DATA_ANSWER_OPTIONS);
 }
 
-/** Traduz um array de chaves (Json) para labels, ignorando chaves desconhecidas. */
+/**
+ * Traduz um array de chaves (vindo de coluna Json?) para labels. Chave
+ * desconhecida vira a própria chave crua, NÃO some: é o idioma já usado em
+ * quatro lugares para BENEFIT_OPTIONS, e o mesmo de resolveLabel. Descartar
+ * faria um item renomeado na taxonomia desaparecer da tela sem rastro.
+ */
 export function resolveKeyLabels(
   keys: unknown,
-  options: { key: string; label: string }[]
+  options: readonly { key: string; label: string }[]
 ): string[] {
   if (!Array.isArray(keys)) return [];
   return keys
-    .map((k) => options.find((o) => o.key === k)?.label)
-    .filter((l): l is string => !!l);
+    .filter((k): k is string => typeof k === "string")
+    .map((k) => options.find((o) => o.key === k)?.label ?? k);
 }
 ```
 
@@ -410,35 +432,50 @@ export interface ProjectAutomationAccountView {
 
 - [ ] **Step 2: Estender a interface `Project`**
 
-Ao lado de `solutionTypes` (linha 95):
+Ao lado de `solutionTypes` (linha 95).
+
+**Sem `| null`**, apesar de as colunas Prisma serem nuláveis. `mapProject` normaliza
+`null → undefined` em todos os ~35 campos que já existem, e `Project` não tem
+`| null` em lugar nenhum. Duas convenções na mesma interface obrigariam cada
+consumidor a lembrar qual campo é de qual época. O `| null` fica onde pertence: no
+tipo do **parâmetro** de `mapProject`, que é a forma crua vinda do Prisma.
 
 ```ts
-  currentApplicationAssetId?: string | null;
-  currentApplicationOwnerRole?: string | null;
-  currentApplicationOwnerAreaId?: string | null;
-  currentApplicationOwnerAreaName?: string | null;
-  currentApplicationDataInput?: string | null;
-  currentApplicationDataInputDetails?: string | null;
-  currentApplicationDataOutput?: string | null;
-  currentApplicationDataOutputDetails?: string | null;
-  currentApplicationContingencyActions?: string[] | null;
-  currentApplicationContingencyDetails?: string | null;
-  currentApplicationBackupOwner?: string | null;
-  handlesSensitiveData?: string | null;
-  sensitiveDataCategories?: string[] | null;
-  sensitiveDataDetails?: string | null;
+  currentApplicationAssetId?: string;
+  currentApplicationOwnerRole?: string;
+  // Achatado de propósito, ao contrário de `area`, que é objeto aninhado com
+  // slug: aqui o setor é só exibido como texto, nunca navegado.
+  currentApplicationOwnerAreaId?: string;
+  currentApplicationOwnerAreaName?: string;
+  currentApplicationDataInput?: string;
+  currentApplicationDataInputDetails?: string;
+  currentApplicationDataOutput?: string;
+  currentApplicationDataOutputDetails?: string;
+  currentApplicationContingencyActions?: string[];
+  currentApplicationContingencyDetails?: string;
+  currentApplicationBackupOwner?: string;
+  handlesSensitiveData?: string;
+  sensitiveDataCategories?: string[];
+  sensitiveDataDetails?: string;
   targetSystems?: ProjectTargetSystemView[];
   automationAccounts?: ProjectAutomationAccountView[];
 ```
 
-- [ ] **Step 3: Espelhar no contexto**
+**Convenção de nome:** o sufixo `View` é precedente novo no repositório, adotado
+porque `ProjectTargetSystem` e `ProjectAutomationAccount` já são nomes de model do
+Prisma. Tipos de leitura análogos nas tasks seguintes usam o mesmo sufixo — não
+invente `Row`, `Item` ou `Dto`.
 
-Em `src/shared/context/projects-context.tsx`, acrescentar os mesmos campos ao tipo local e ao mapeamento que converte a saída do tRPC — seguindo exatamente como `currentApplicationHosting` já é tratado ali.
+- [ ] **Step 3: Declarar os campos no tipo do contexto — sem mapear ainda**
+
+Em `src/shared/context/projects-context.tsx`, acrescentar os campos **apenas ao tipo local** (junto de `currentApplicationHosting`, linhas ~60-67), todos opcionais.
+
+**Não toque nos dois mapeamentos** (linhas ~111-118 e ~220+). Eles leem da saída do tRPC, e o router só passa a devolver esses campos na Task 6 — mapear agora daria "Property does not exist" no tipo inferido. O mapeamento é Step da Task 6.
 
 - [ ] **Step 4: Verificar**
 
-Run: `pnpm build`
-Expected: compila. Erros de "property does not exist" em telas ainda não tocadas significam que o mapeamento do Step 3 ficou incompleto.
+Run: `npx tsc --noEmit`
+Expected: os 10 erros de baseline em `src/shared/components/ui/` e nada além. Campos opcionais recém-declarados não quebram nenhum consumidor.
 
 - [ ] **Step 5: Commit**
 
@@ -486,7 +523,10 @@ const TARGET_SYSTEM_CATEGORIES = [
   "Banco ou instituição financeira",
   "E-mail e mensageria",
   "Office e planilhas",
-  "Armazenamento de arquivos",
+  // Com exemplos no nome: sem eles, "SharePoint" cai tanto aqui quanto em
+  // "Office e planilhas". Quando "Portal governamental" e "Site externo de
+  // terceiros" se aplicarem aos dois, o governamental tem precedência.
+  "Armazenamento de arquivos (SharePoint, rede, Drive)",
   "Banco de dados",
   "CRM",
   "RH e folha",
@@ -712,6 +752,21 @@ Nas queries que devolvem projeto (`byId` e as listagens que alimentam a ficha), 
 ```
 
 E achatar para os tipos da Task 3, resolvendo `name` como `targetSystem?.name ?? customName ?? ""`.
+
+- [ ] **Step 5b: Mapear no contexto (adiado da Task 3)**
+
+Só agora, com o router devolvendo os campos, acrescentar os dois mapeamentos em
+`src/shared/context/projects-context.tsx` (linhas ~111-118 e ~220+), no padrão
+`p.campo ?? undefined` que `currentApplicationHosting` já usa — é esse `?? undefined`
+que sustenta a ausência de `| null` na interface `Project`. Os tipos já foram
+declarados na Task 3.
+
+`ProjectTargetSystemView.name` promete `string` não-vazia. O fallback
+`targetSystem?.name ?? customName ?? ""` satisfaz o TypeScript e trai a promessa:
+string vazia aqui é bug de backend, não valor legítimo. O Zod de entrada já rejeita
+linha sem `targetSystemId` e sem `customName`, então o `?? ""` só dispara se um dado
+inconsistente entrou por outro caminho — vale um filtro que descarte a linha em vez
+de renderizar um nome vazio na ficha e no deck.
 
 - [ ] **Step 6: Rotular para o ActivityLog**
 
