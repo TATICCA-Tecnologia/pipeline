@@ -12,8 +12,6 @@ import type {
   Priority,
   ProjectRequest,
   ActivityLog,
-  ProjectTargetSystemView,
-  ProjectAutomationAccountView,
 } from "@/shared/types";
 import { trpc } from "@/shared/trpc/client";
 import { useAuth } from "@/shared/context/auth-context";
@@ -70,7 +68,6 @@ function mapProject(p: {
   currentApplicationAssetId?: string | null;
   currentApplicationOwnerRole?: string | null;
   currentApplicationOwnerAreaId?: string | null;
-  currentApplicationOwnerAreaName?: string | null;
   currentApplicationDataInput?: string | null;
   currentApplicationDataInputDetails?: string | null;
   currentApplicationDataOutput?: string | null;
@@ -81,8 +78,6 @@ function mapProject(p: {
   handlesSensitiveData?: string | null;
   sensitiveDataCategories?: string[] | null;
   sensitiveDataDetails?: string | null;
-  targetSystems?: ProjectTargetSystemView[] | null;
-  automationAccounts?: ProjectAutomationAccountView[] | null;
   projectNarrative?: string | null;
   benefits?: string[] | null;
   benefitsDetails?: string | null;
@@ -137,7 +132,6 @@ function mapProject(p: {
     currentApplicationAssetId: p.currentApplicationAssetId ?? undefined,
     currentApplicationOwnerRole: p.currentApplicationOwnerRole ?? undefined,
     currentApplicationOwnerAreaId: p.currentApplicationOwnerAreaId ?? undefined,
-    currentApplicationOwnerAreaName: p.currentApplicationOwnerAreaName ?? undefined,
     currentApplicationDataInput: p.currentApplicationDataInput ?? undefined,
     currentApplicationDataInputDetails: p.currentApplicationDataInputDetails ?? undefined,
     currentApplicationDataOutput: p.currentApplicationDataOutput ?? undefined,
@@ -148,8 +142,6 @@ function mapProject(p: {
     handlesSensitiveData: p.handlesSensitiveData ?? undefined,
     sensitiveDataCategories: p.sensitiveDataCategories ?? undefined,
     sensitiveDataDetails: p.sensitiveDataDetails ?? undefined,
-    targetSystems: p.targetSystems ?? undefined,
-    automationAccounts: p.automationAccounts ?? undefined,
     projectNarrative: p.projectNarrative ?? undefined,
     benefits: p.benefits ?? undefined,
     benefitsDetails: p.benefitsDetails ?? undefined,

@@ -303,17 +303,23 @@ type TargetSystemRow = {
 // (ver targetSystemInputSchema), nunca deve acontecer via formulário. Uma
 // linha só com customName (sistema fora do catálogo) É válida e fica.
 function mapTargetSystemsForView(systems: TargetSystemRow[]): ProjectTargetSystemView[] {
-  return systems
-    .filter((s) => !!(s.targetSystem?.name || s.customName))
-    .map((s) => ({
-      id: s.id,
-      targetSystemId: s.targetSystemId,
-      name: (s.targetSystem?.name || s.customName) as string,
-      categoryName: s.targetSystem?.category?.name ?? null,
-      accessPoint: s.accessPoint,
-      accessNotes: s.accessNotes,
-      order: s.order,
-    }));
+  return systems.flatMap((s) => {
+    const name = s.targetSystem?.name || s.customName;
+    // Sem nome resolvível (nem catálogo, nem customName): descarta. Não
+    // acontece por uso legítimo do formulário, só por dado inconsistente.
+    if (!name) return [];
+    return [
+      {
+        id: s.id,
+        targetSystemId: s.targetSystemId,
+        name,
+        categoryName: s.targetSystem?.category?.name ?? null,
+        accessPoint: s.accessPoint,
+        accessNotes: s.accessNotes,
+        order: s.order,
+      },
+    ];
+  });
 }
 
 // Formato cru devolvido pelo `select`/`include` de automationAccounts.
@@ -382,34 +388,6 @@ export const projectRouter = router({
           solutionTypes: { select: { id: true, name: true, slug: true } },
           features: true,
           peopleOfInterest: { include: { person: true } },
-          ownerArea: { select: { id: true, name: true } },
-          targetSystems: {
-            orderBy: { order: "asc" },
-            select: {
-              id: true,
-              targetSystemId: true,
-              customName: true,
-              accessPoint: true,
-              accessNotes: true,
-              order: true,
-              targetSystem: { select: { name: true, category: { select: { name: true } } } },
-            },
-          },
-          automationAccounts: {
-            orderBy: { order: "asc" },
-            select: {
-              id: true,
-              username: true,
-              projectTargetSystemId: true,
-              accountType: true,
-              ownerName: true,
-              notes: true,
-              order: true,
-              projectTargetSystem: {
-                select: { customName: true, targetSystem: { select: { name: true } } },
-              },
-            },
-          },
         },
         orderBy: { updatedAt: "desc" },
       });
@@ -454,7 +432,6 @@ export const projectRouter = router({
         currentApplicationAssetId: p.currentApplicationAssetId ?? undefined,
         currentApplicationOwnerRole: p.currentApplicationOwnerRole ?? undefined,
         currentApplicationOwnerAreaId: p.currentApplicationOwnerAreaId ?? undefined,
-        currentApplicationOwnerAreaName: p.ownerArea?.name ?? undefined,
         currentApplicationDataInput: p.currentApplicationDataInput ?? undefined,
         currentApplicationDataInputDetails: p.currentApplicationDataInputDetails ?? undefined,
         currentApplicationDataOutput: p.currentApplicationDataOutput ?? undefined,
@@ -467,8 +444,6 @@ export const projectRouter = router({
         handlesSensitiveData: p.handlesSensitiveData ?? undefined,
         sensitiveDataCategories: (p.sensitiveDataCategories as string[] | null) ?? undefined,
         sensitiveDataDetails: p.sensitiveDataDetails ?? undefined,
-        targetSystems: mapTargetSystemsForView(p.targetSystems),
-        automationAccounts: mapAutomationAccountsForView(p.automationAccounts),
         additionalInfo: p.additionalInfo ?? undefined,
         projectNarrative: p.projectNarrative ?? undefined,
         benefits: (p.benefits as string[] | null) ?? undefined,
