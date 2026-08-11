@@ -177,6 +177,24 @@ model Project {
   currentApplicationAccessReference String?
   currentApplicationLiveSince       DateTime? // em produção desde
 
+  // Complemento dos critérios mínimos de catálogo (Glauber). Ver
+  // docs/superpowers/specs/2026-08-11-catalogo-qualidade-automacoes-design.md
+  currentApplicationAssetId            String? // hostname, IP ou nº de patrimônio
+  currentApplicationOwnerRole          String? // cargo do responsável
+  currentApplicationDataInput          String? // slug de CURRENT_APPLICATION_DATA_ENDPOINT_OPTIONS
+  currentApplicationDataInputDetails   String?
+  currentApplicationDataOutput         String? // mesma lista de opções
+  currentApplicationDataOutputDetails  String?
+  currentApplicationContingencyActions Json? // array de chaves de CURRENT_APPLICATION_CONTINGENCY_OPTIONS
+  currentApplicationContingencyDetails String?
+  currentApplicationBackupOwner        String? // quem assume se o responsável sair
+
+  // Sigilo dos dados — vale para TODO projeto, novo ou de melhoria, por isso
+  // sem o prefixo currentApplication*.
+  handlesSensitiveData    String? // slug de SENSITIVE_DATA_ANSWER_OPTIONS
+  sensitiveDataCategories Json? // array de chaves de SENSITIVE_DATA_CATEGORY_OPTIONS
+  sensitiveDataDetails    String?
+
   // Beneficios e impacto esperado
   benefits          Json? // array de chaves selecionadas
   benefitsDetails   String?
@@ -228,8 +246,12 @@ model Project {
   companyId        String?
   developer        User?                     @relation("ProjectDeveloper", fields: [developerId], references: [id])
   developerId      String?
-  area             ProjectArea?              @relation(fields: [areaId], references: [id], onDelete: SetNull)
+  area             ProjectArea?              @relation("ProjectProcessArea", fields: [areaId], references: [id], onDelete: SetNull)
   areaId           String?
+  // Setor do responsável pela automação. Deliberadamente separado de areaId
+  // (a área DO PROCESSO): quem sustenta costuma ser o TI, não a área dona.
+  ownerArea                     ProjectArea? @relation("ProjectOwnerArea", fields: [currentApplicationOwnerAreaId], references: [id], onDelete: SetNull)
+  currentApplicationOwnerAreaId String?
   theme            ProjectTheme?             @relation(fields: [themeId], references: [id], onDelete: SetNull)
   themeId          String?
   mainTool           MainTool?               @relation(fields: [mainToolId], references: [id], onDelete: SetNull)
@@ -245,6 +267,8 @@ model Project {
   activityLogs     ActivityLog[]
   projectLock      ProjectLock?
   peopleOfInterest ProjectPersonOfInterest[]
+  targetSystems      ProjectTargetSystem[]
+  automationAccounts ProjectAutomationAccount[]
 
   @@map("projects")
 }
@@ -524,8 +548,9 @@ model ProjectArea {
   slug       String         @unique
   isActive   Boolean        @default(true)
   order      Int            @default(0)
-  themes     ProjectTheme[]
-  projects   Project[]
+  themes            ProjectTheme[]
+  projects          Project[]   @relation("ProjectProcessArea")
+  sustainedProjects Project[]   @relation("ProjectOwnerArea")
   interviews Interview[]
   createdAt  DateTime       @default(now())
   updatedAt  DateTime       @updatedAt
@@ -580,6 +605,78 @@ model MainTool {
   updatedAt  DateTime          @updatedAt
 
   @@map("main_tools")
+}
+
+// ==========================================
+// SISTEMAS SOBRE OS QUAIS A AUTOMACAO ATUA
+// ==========================================
+// Eixo distinto de ProjectKind ("tipo de solução": Power Automate, RPA) e de
+// MainToolCategory/MainTool ("categoria de ferramenta"/"produto"): aqueles dois
+// descrevem COMO a solução é construída, este descreve SOBRE O QUE ela age.
+
+model TargetSystemCategory {
+  id        String         @id @default(cuid())
+  name      String
+  slug      String         @unique
+  isActive  Boolean        @default(true)
+  order     Int            @default(0)
+  systems   TargetSystem[]
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  @@map("target_system_categories")
+}
+
+model TargetSystem {
+  id           String                @id @default(cuid())
+  name         String
+  slug         String                @unique
+  isActive     Boolean               @default(true)
+  order        Int                   @default(0)
+  category     TargetSystemCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  categoryId   String?
+  projectLinks ProjectTargetSystem[]
+  createdAt    DateTime              @default(now())
+  updatedAt    DateTime              @updatedAt
+
+  @@map("target_systems")
+}
+
+model ProjectTargetSystem {
+  id             String        @id @default(cuid())
+  project        Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectId      String
+  targetSystem   TargetSystem? @relation(fields: [targetSystemId], references: [id], onDelete: SetNull)
+  targetSystemId String?
+  /// Preenchido quando a tecnologia não está no catálogo. Uma linha precisa de
+  /// targetSystemId OU customName — as duas vazias é linha sem sentido.
+  customName     String?
+  accessPoint    String? // URL, servidor ou instância — onde ele é acessado
+  /// COMO acessar: ponteiro para onde o acesso mora, NUNCA a credencial.
+  accessNotes    String?
+  order          Int           @default(0)
+  accounts       ProjectAutomationAccount[]
+
+  @@index([projectId])
+  @@map("project_target_systems")
+}
+
+model ProjectAutomationAccount {
+  id                    String               @id @default(cuid())
+  project               Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectId             String
+  /// O login em si. NÃO existe campo par de senha/token em lugar nenhum do
+  /// modelo, e isso é deliberado: a plataforma é inventário, não cofre.
+  username              String
+  projectTargetSystem   ProjectTargetSystem? @relation(fields: [projectTargetSystemId], references: [id], onDelete: SetNull)
+  projectTargetSystemId String?
+  accountType           String? // slug de AUTOMATION_ACCOUNT_TYPE_OPTIONS
+  ownerName             String?
+  notes                 String?
+  order                 Int                  @default(0)
+
+  @@index([projectId])
+  @@map("project_automation_accounts")
 }
 
 // ==========================================
