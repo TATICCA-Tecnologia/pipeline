@@ -97,7 +97,13 @@ const automationAccountInputSchema = z.object({
  * abriu a seção de sistemas/contas apagaria dados sem querer — o campo
  * precisa ficar de fora do payload quando a intenção é "não mexer nisso".
  */
-const automationInventoryInputSchema = z.object({
+// Exportado para que scripts/verify-xml-roundtrip.ts possa validar, com
+// `.safeParse()`, que o objeto `{ systems, accounts }` montado a partir do
+// XML (toAutomationInventoryInput, em shared/xml/parse-projeto-completo-xml.ts)
+// bate de fato com o schema que este router aceita — sem essa checagem os
+// dois formatos podem divergir em silêncio, exatamente como aconteceu com
+// `importXml` na Task 11 original.
+export const automationInventoryInputSchema = z.object({
   systems: z.array(targetSystemInputSchema),
   accounts: z.array(automationAccountInputSchema),
 });
@@ -1686,6 +1692,23 @@ export const projectRouter = router({
           .max(CURRENT_APPLICATION_ACCESS_REFERENCE_MAX_LENGTH)
           .optional(),
         currentApplicationLiveSince: z.coerce.date().optional(),
+        currentApplicationAssetId: z.string().optional(),
+        currentApplicationOwnerRole: z.string().optional(),
+        // Nome, não id: igual a areaName/themeName logo abaixo, resolvido via
+        // findOrCreateProjectArea (mesma tabela ProjectArea de `area`, relação
+        // diferente). O id não sobrevive a um XML gerado por outra base.
+        currentApplicationOwnerAreaName: z.string().optional(),
+        currentApplicationDataInput: z.string().optional(),
+        currentApplicationDataInputDetails: z.string().optional(),
+        currentApplicationDataOutput: z.string().optional(),
+        currentApplicationDataOutputDetails: z.string().optional(),
+        currentApplicationContingencyActions: z.array(z.string()).optional(),
+        currentApplicationContingencyDetails: z.string().optional(),
+        currentApplicationBackupOwner: z.string().optional(),
+        handlesSensitiveData: z.string().optional(),
+        sensitiveDataCategories: z.array(z.string()).optional(),
+        sensitiveDataDetails: z.string().optional(),
+        automationInventory: automationInventoryInputSchema.optional(),
         peopleInvolved: z.number().int().optional(),
         taskDurationHours: z.number().optional(),
         processFrequency: z.string().optional(),
@@ -1765,6 +1788,30 @@ export const projectRouter = router({
         data.currentApplicationAccessReference = input.currentApplicationAccessReference;
       if (input.currentApplicationLiveSince !== undefined)
         data.currentApplicationLiveSince = input.currentApplicationLiveSince;
+      if (input.currentApplicationAssetId !== undefined)
+        data.currentApplicationAssetId = input.currentApplicationAssetId;
+      if (input.currentApplicationOwnerRole !== undefined)
+        data.currentApplicationOwnerRole = input.currentApplicationOwnerRole;
+      if (input.currentApplicationDataInput !== undefined)
+        data.currentApplicationDataInput = input.currentApplicationDataInput;
+      if (input.currentApplicationDataInputDetails !== undefined)
+        data.currentApplicationDataInputDetails = input.currentApplicationDataInputDetails;
+      if (input.currentApplicationDataOutput !== undefined)
+        data.currentApplicationDataOutput = input.currentApplicationDataOutput;
+      if (input.currentApplicationDataOutputDetails !== undefined)
+        data.currentApplicationDataOutputDetails = input.currentApplicationDataOutputDetails;
+      if (input.currentApplicationContingencyActions !== undefined)
+        data.currentApplicationContingencyActions = input.currentApplicationContingencyActions;
+      if (input.currentApplicationContingencyDetails !== undefined)
+        data.currentApplicationContingencyDetails = input.currentApplicationContingencyDetails;
+      if (input.currentApplicationBackupOwner !== undefined)
+        data.currentApplicationBackupOwner = input.currentApplicationBackupOwner;
+      if (input.handlesSensitiveData !== undefined)
+        data.handlesSensitiveData = input.handlesSensitiveData;
+      if (input.sensitiveDataCategories !== undefined)
+        data.sensitiveDataCategories = input.sensitiveDataCategories;
+      if (input.sensitiveDataDetails !== undefined)
+        data.sensitiveDataDetails = input.sensitiveDataDetails;
       if (input.peopleInvolved !== undefined) data.peopleInvolved = input.peopleInvolved;
       if (input.taskDurationHours !== undefined || input.processFrequency !== undefined) {
         const nextDuration = input.taskDurationHours ?? current.taskDurationHours;
@@ -1834,8 +1881,29 @@ export const projectRouter = router({
         }
         data.solutionTypes = { set: resolvedKinds.map((k) => ({ id: k.id })) };
       }
+      // Mesma tabela ProjectArea de `area`/`areaName` acima, relação diferente
+      // (currentApplicationOwnerAreaId = "setor do responsável", não a área do
+      // processo) — reaproveita o mesmo find-or-create por nome.
+      if (input.currentApplicationOwnerAreaName !== undefined) {
+        const ownerArea = await findOrCreateProjectArea(
+          ctx.db,
+          input.currentApplicationOwnerAreaName,
+          warnings
+        );
+        if (ownerArea) data.currentApplicationOwnerAreaId = ownerArea.id;
+      }
 
-      await ctx.db.project.update({ where: { id: input.projectId }, data });
+      // Mesmo padrão de create/update: sistemas/contas viajam com o projeto
+      // dentro da MESMA transação. `input.automationInventory` só existe
+      // quando o consumidor (project-xml-import-export.tsx, via
+      // toAutomationInventoryInput) decidiu enviá-lo — omitido, PRESERVA o
+      // inventário atual; ver a regra omitir-vs-apagar documentada ali.
+      await ctx.db.$transaction(async (tx) => {
+        await tx.project.update({ where: { id: input.projectId }, data });
+        if (input.automationInventory) {
+          await replaceAutomationInventory(tx, input.projectId, input.automationInventory);
+        }
+      });
 
       if (input.features !== undefined) {
         const existingFeatures = await ctx.db.projectFeature.findMany({

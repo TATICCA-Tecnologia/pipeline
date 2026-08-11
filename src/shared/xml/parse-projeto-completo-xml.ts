@@ -473,3 +473,62 @@ export function parseProjetoCompletoXml(
 
   return { ok: true, data, warnings };
 }
+
+// Formato aceito por `automationInventoryInputSchema` (project.router.ts —
+// systems/accounts de project.create, project.update E project.importXml).
+export interface AutomationInventoryInput {
+  systems: { targetSystemId?: string; customName?: string; accessPoint?: string; accessNotes?: string }[];
+  accounts: {
+    username: string;
+    systemIndex?: number;
+    accountType?: string;
+    ownerName?: string;
+    notes?: string;
+  }[];
+}
+
+/**
+ * Converte as duas listas soltas de ParsedProjetoCompleto (targetSystems/
+ * automationAccounts) para o formato `{ systems, accounts }` que
+ * `automationInventoryInputSchema` espera. É a ÚNICA função que deve fazer
+ * essa conversão — o consumidor (project-xml-import-export.tsx) e o
+ * verify-xml-roundtrip.ts chamam esta mesma função, em vez de cada um
+ * reimplementar o mapeamento, para que os dois nunca divirjam em silêncio
+ * (foi exatamente essa divergência, entre o que o parser produzia e o que
+ * `project.importXml` aceitava, que fez a Task 11 original perder os 13
+ * campos novos e as duas listas na importação de verdade, mesmo com o
+ * round-trip build→parse passando).
+ *
+ * Regra omitir-vs-apagar: devolve `undefined` quando o XML não tem NENHUM
+ * `<sistema>` nem `<conta>`. `automationInventory` é uma chave opcional no
+ * payload de update/importXml — OMITI-LA preserva o inventário já salvo no
+ * projeto; enviar `{ systems: [], accounts: [] }` APAGA as duas listas (ver
+ * o comentário em automationInventoryInputSchema, em project.router.ts). Um
+ * XML antigo (sem as tags novas) ou um XML que genuinamente não fala de
+ * sistemas/contas NUNCA deve apagar o que o projeto já tinha — por isso o
+ * `undefined` aqui, e nunca `{ systems: [], accounts: [] }`. Isso também
+ * cobre "grupo `<sistemas>` presente mas vazio": parseProjetoCompletoXml já
+ * colapsa esse caso no mesmo `undefined` em `targetSystems`/
+ * `automationAccounts` (mesmo critério de `features`/`benefícios` etc. no
+ * resto deste arquivo), então esta função nunca tem como distinguir os dois
+ * e, por segurança, trata ambos como "XML não fala disso".
+ */
+export function toAutomationInventoryInput(
+  parsed: Pick<ParsedProjetoCompleto, "targetSystems" | "automationAccounts">
+): AutomationInventoryInput | undefined {
+  if (!parsed.targetSystems && !parsed.automationAccounts) return undefined;
+  return {
+    systems: (parsed.targetSystems ?? []).map((s) => ({
+      customName: s.customName,
+      accessPoint: s.accessPoint,
+      accessNotes: s.accessNotes,
+    })),
+    accounts: (parsed.automationAccounts ?? []).map((a) => ({
+      username: a.username,
+      systemIndex: a.systemIndex,
+      accountType: a.accountType,
+      ownerName: a.ownerName,
+      notes: a.notes,
+    })),
+  };
+}

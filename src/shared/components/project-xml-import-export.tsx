@@ -7,7 +7,10 @@ import { trpc } from "@/shared/trpc/client";
 import { Button } from "@/src/shared/components/ui/button";
 import type { Project } from "@/shared/types";
 import { buildProjetoCompletoXml } from "@/shared/xml/build-projeto-completo-xml";
-import { parseProjetoCompletoXml } from "@/shared/xml/parse-projeto-completo-xml";
+import {
+  parseProjetoCompletoXml,
+  toAutomationInventoryInput,
+} from "@/shared/xml/parse-projeto-completo-xml";
 
 function toUrgencyOptions(levels: { name: string; slug: string }[]) {
   return levels.map((l) => ({ value: l.slug, label: l.name }));
@@ -95,11 +98,21 @@ export function ProjectXmlImportExport({ project }: { project: Project }) {
       projetoId: _projetoId,
       estimatedDeadline,
       currentApplicationLiveSince,
+      targetSystems,
+      automationAccounts,
       ...rest
     } = parsed.data;
+    // targetSystems/automationAccounts não são campos do payload de
+    // project.importXml — precisam virar `automationInventory: {systems,
+    // accounts}` via toAutomationInventoryInput (ver doc ali para a regra
+    // omitir-vs-apagar: `undefined` quando o XML não tem nenhum <sistema>/
+    // <conta>, para nunca apagar o inventário existente de um projeto por
+    // causa de um XML antigo ou que não fala do assunto).
+    const automationInventory = toAutomationInventoryInput({ targetSystems, automationAccounts });
     importMutation.mutate({
       projectId: project.id,
       ...rest,
+      ...(automationInventory ? { automationInventory } : {}),
       ...(estimatedDeadline ? { estimatedDeadline: parseLocalDateInputValue(estimatedDeadline) } : {}),
       ...(currentApplicationLiveSince
         ? { currentApplicationLiveSince: parseLocalDateInputValue(currentApplicationLiveSince) }

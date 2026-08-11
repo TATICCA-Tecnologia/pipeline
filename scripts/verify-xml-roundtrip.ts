@@ -2,7 +2,11 @@ import {
   buildProjetoCompletoXml,
   type ProjetoCompletoXmlData,
 } from "@/shared/xml/build-projeto-completo-xml";
-import { parseProjetoCompletoXml } from "@/shared/xml/parse-projeto-completo-xml";
+import {
+  parseProjetoCompletoXml,
+  toAutomationInventoryInput,
+} from "@/shared/xml/parse-projeto-completo-xml";
+import { automationInventoryInputSchema } from "@/server/trpc/routers/project.router";
 
 /**
  * Verificação de round-trip dos campos de catálogo (Task 11) no XML de
@@ -22,6 +26,20 @@ import { parseProjetoCompletoXml } from "@/shared/xml/parse-projeto-completo-xml
  *    nenhum <sistema> da lista entra com systemIndex AUSENTE (nunca
  *    descartada, nunca um índice chutado — replaceAutomationInventory, em
  *    project.router.ts, estoura BAD_REQUEST para índice fora do intervalo).
+ *  - O objeto `{ systems, accounts }` que o CONSUMIDOR de verdade
+ *    (project-xml-import-export.tsx, via toAutomationInventoryInput) monta a
+ *    partir do parse bate com `automationInventoryInputSchema` — o schema Zod
+ *    REAL de project.router.ts, importado daqui, não uma cópia. Isto existe
+ *    porque a primeira versão desta task passava neste script inteiro e
+ *    ainda assim perdia os 13 campos e as duas listas na importação de
+ *    verdade: `parse` funcionava, mas o consumidor (`project.importXml`)
+ *    tinha um input Zod separado de `create`/`update` que nunca foi
+ *    estendido, e `z.object` descarta chave desconhecida sem erro. Round-trip
+ *    build→parse não bastava — precisava exercitar o formato que o terceiro
+ *    elo da corrente (o schema do servidor) realmente aceita.
+ *  - `automationInventory` nunca é enviado como apagamento explícito
+ *    ({ systems: [], accounts: [] }) a partir de um XML sem <sistemas>/
+ *    <contas> — ver toAutomationInventoryInput.
  *
  * Funções puras — build/parse não tocam banco nem rede — então este script
  * roda de verdade nesta máquina, sem DATABASE_URL. Roda com:
@@ -35,6 +53,20 @@ import { parseProjetoCompletoXml } from "@/shared/xml/parse-projeto-completo-xml
  * parseProjetoCompletoXml — cobre só o subconjunto do DOM que o parser usa
  * (tagName, children, textContent, querySelector), suficiente para os XMLs
  * bem-formados e sem namespace/CDATA/comentário que este projeto gera.
+ *
+ * ATENÇÃO — limite desta abordagem: o polyfill (MiniDOMParser, abaixo) é um
+ * parser XML escrito à mão para este script, e ele NÃO é o DOMParser que
+ * roda em produção (o do browser, chamado de dentro de
+ * project-xml-import-export.tsx). Ele cobre escape de entidades, espaço em
+ * branco e tag vazia da forma que PARECE correta, mas não foi validado
+ * contra a implementação real de nenhum motor de browser — se o MiniDOMParser
+ * for mais tolerante que o DOMParser de verdade (por exemplo, aceitando algo
+ * que o browser rejeitaria como XML malformado, ou tratando um caso de
+ * escape/espaço em branco de um jeito sutilmente diferente), este script
+ * pode passar verde num caso em que a importação real, no navegador, falha.
+ * "Round-trip passou" aqui é evidência forte de que build/parse/consumidor
+ * estão consistentes ENTRE SI — não é prova de que a importação funciona no
+ * navegador. Isso só se confirma testando de verdade num browser.
  */
 
 // ---------------------------------------------------------------------------
@@ -158,6 +190,16 @@ function assertTrue(condition: boolean, label: string): void {
 }
 
 const URGENCY_LEVELS = [{ value: "alta", label: "Alta — próximo mês" }];
+
+// Reutilizado pelos cenários 2 (legado importa sem erro) e 6 (legado não gera
+// apagamento de inventário) — é o mesmo XML nos dois, então uma string só.
+const LEGACY_XML = `<?xml version="1.0" encoding="UTF-8"?>
+<projetoCompleto>
+  <projetoId>proj-legado-1</projetoId>
+  <titulo>Projeto Legado</titulo>
+  <descricao>Exportado antes da Task 11 — nenhuma tag nova presente.</descricao>
+  <plataforma>Desktop (Windows / macOS)</plataforma>
+</projetoCompleto>`;
 
 // ---------------------------------------------------------------------------
 // Cenário 1: round-trip completo — todos os 13 escalares novos + as duas
@@ -394,15 +436,7 @@ function scenario1FullRoundTrip(): void {
 // ---------------------------------------------------------------------------
 
 function scenario2LegacyXmlWithoutNewTags(): void {
-  const legacyXml = `<?xml version="1.0" encoding="UTF-8"?>
-<projetoCompleto>
-  <projetoId>proj-legado-1</projetoId>
-  <titulo>Projeto Legado</titulo>
-  <descricao>Exportado antes da Task 11 — nenhuma tag nova presente.</descricao>
-  <plataforma>Desktop (Windows / macOS)</plataforma>
-</projetoCompleto>`;
-
-  const result = parseProjetoCompletoXml(legacyXml, URGENCY_LEVELS);
+  const result = parseProjetoCompletoXml(LEGACY_XML, URGENCY_LEVELS);
   if (!result.ok) {
     throw new Error(`Cenário 2: XML antigo deveria importar sem erro, falhou: ${result.error}`);
   }
@@ -543,6 +577,70 @@ function scenario4MalformedRowsAndTruncation(): void {
   );
 }
 
+// ---------------------------------------------------------------------------
+// Cenário 5: o formato que o CONSUMIDOR de verdade monta (toAutomationInventoryInput,
+// chamado por project-xml-import-export.tsx) bate com automationInventoryInputSchema —
+// o schema Zod real de project.router.ts (project.create/update/importXml),
+// importado daqui, não uma cópia. É este cenário que teria pego a lacuna
+// original: parse→build passava, mas o consumidor mandava um formato que o
+// servidor descartava em silêncio.
+// ---------------------------------------------------------------------------
+
+function scenario5ConsumerShapeMatchesServerSchema(): void {
+  const project = buildFixtureProject();
+  const xml = buildProjetoCompletoXml(project, URGENCY_LEVELS);
+  const result = parseProjetoCompletoXml(xml, URGENCY_LEVELS);
+  if (!result.ok) throw new Error(`Cenário 5: falhou ao importar: ${result.error}`);
+
+  const inventory = toAutomationInventoryInput(result.data);
+  assertTrue(
+    inventory !== undefined,
+    "Cenário 5: XML com sistemas/contas deveria gerar um automationInventory"
+  );
+
+  const parsedBySchema = automationInventoryInputSchema.safeParse(inventory);
+  if (!parsedBySchema.success) {
+    throw new Error(
+      `Cenário 5: o objeto que o consumidor monta NÃO bate com automationInventoryInputSchema (o schema real do servidor): ${JSON.stringify(parsedBySchema.error.issues)}`
+    );
+  }
+  assertEqual(parsedBySchema.data.systems.length, 2, "Cenário 5: 2 sistemas aceitos pelo schema do servidor");
+  assertEqual(parsedBySchema.data.accounts.length, 2, "Cenário 5: 2 contas aceitas pelo schema do servidor");
+  assertEqual(
+    parsedBySchema.data.accounts[1]?.systemIndex,
+    1,
+    "Cenário 5: systemIndex da segunda conta sobrevive à validação do schema do servidor"
+  );
+
+  console.log(
+    "OK: cenário 5 — o objeto {systems, accounts} que o consumidor monta a partir do parse é aceito por automationInventoryInputSchema (o schema Zod real do servidor, não uma cópia)"
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Cenário 6: XML legado (sem <sistemas>/<contas>) nunca vira um apagamento
+// explícito — toAutomationInventoryInput devolve `undefined`, que o
+// consumidor usa para OMITIR `automationInventory` do payload. Omitir
+// preserva o inventário já salvo no projeto; um XML sem as tags novas jamais
+// pode apagar sistemas/contas que o projeto já tinha.
+// ---------------------------------------------------------------------------
+
+function scenario6LegacyXmlNeverProducesAnExplicitWipe(): void {
+  const result = parseProjetoCompletoXml(LEGACY_XML, URGENCY_LEVELS);
+  if (!result.ok) throw new Error(`Cenário 6: falhou ao importar: ${result.error}`);
+
+  const inventory = toAutomationInventoryInput(result.data);
+  assertEqual(
+    inventory,
+    undefined,
+    "Cenário 6: XML sem <sistemas>/<contas> deveria gerar automationInventory=undefined (nunca { systems: [], accounts: [] })"
+  );
+
+  console.log(
+    "OK: cenário 6 — XML legado gera automationInventory=undefined; o consumidor OMITE a chave do payload, preservando o inventário já existente no projeto (nunca um apagamento explícito)"
+  );
+}
+
 function describeError(err: unknown): string {
   if (err instanceof Error) return err.message;
   return String(err);
@@ -553,6 +651,8 @@ function main(): void {
   scenario2LegacyXmlWithoutNewTags();
   scenario3CaseInsensitiveSystemLink();
   scenario4MalformedRowsAndTruncation();
+  scenario5ConsumerShapeMatchesServerSchema();
+  scenario6LegacyXmlNeverProducesAnExplicitWipe();
   console.log("\nTodos os cenários do round-trip de XML de catálogo passaram.");
 }
 
