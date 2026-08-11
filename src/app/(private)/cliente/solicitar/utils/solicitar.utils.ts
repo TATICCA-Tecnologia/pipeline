@@ -1,3 +1,17 @@
+// Compartilhado por `page.tsx` (área/tema) e pelos `_components/` que
+// cadastram taxonomia inline (ex.: `target-systems-list.tsx`). Antes desta
+// função existia em três cópias idênticas; uma só, aqui, onde os outros
+// compartilhamentos deste diretório já moram.
+export function slugify(text: string): string {
+  return text
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .replace(/[^a-z0-9\s-]/g, "")
+    .trim()
+    .replace(/\s+/g, "-");
+}
+
 export {
   DEFAULT_PLATFORM_VALUE,
   PROJECT_AREAS,

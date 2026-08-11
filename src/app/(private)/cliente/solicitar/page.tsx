@@ -64,6 +64,7 @@ import {
   HAS_EXISTING_SYSTEM_OPTIONS,
   HAS_CURRENT_APPLICATION_OPTIONS,
   BENEFIT_OPTIONS,
+  slugify,
 } from "./utils/solicitar.utils";
 import { useTaxonomy } from "./utils/use-taxonomy";
 import { buildProjectPayload } from "./utils/build-project-payload";
@@ -74,16 +75,6 @@ import { RatingRow } from "@/shared/components/rating-row";
 import { SensitiveDataBlock } from "./_components/sensitive-data-block";
 import { TargetSystemsList } from "./_components/target-systems-list";
 import { SustentacaoBlock } from "./_components/sustentacao-block";
-
-function slugify(text: string): string {
-  return text
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/\p{Diacritic}/gu, "")
-    .replace(/[^a-z0-9\s-]/g, "")
-    .trim()
-    .replace(/\s+/g, "-");
-}
 
 const QUALITATIVE_RATINGS = [
   { name: "ratingErrorReduction" as const, label: "Redução de Erros" },
@@ -167,6 +158,7 @@ const STEPS: StepDef[] = [
     fieldsToValidate: [
       "targetSystems",
       "automationAccounts",
+      "currentApplicationDetails",
       "currentApplicationHosting",
       "currentApplicationHostingCustom",
       "currentApplicationAssetId",
@@ -1286,6 +1278,7 @@ export default function SolicitarProjetoPage() {
                   register={register}
                   getValues={getValues}
                   setValue={setValue}
+                  canRegisterTaxonomy={canRegisterTaxonomy}
                 />
 
                 {hasCurrentApplication === "sim" && (

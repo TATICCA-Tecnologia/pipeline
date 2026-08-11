@@ -52,13 +52,16 @@ export function AutomationAccountsList({ control, register }: AutomationAccounts
   );
 
   const watchedSystems = useWatch({ control, name: "targetSystems" }) ?? [];
-  const systemOptions = watchedSystems.map((system, index) => ({
-    index,
-    label:
-      (system.targetSystemId && catalogNameById.get(system.targetSystemId)) ||
-      system.customName ||
-      `Sistema ${index + 1} (sem nome)`,
-  }));
+  // Linhas de sistema ainda sem nome resolvível (nem catálogo, nem texto
+  // livre) ficam de fora das opções: vincular uma conta a um sistema que
+  // ainda não existe de verdade só confunde, mesmo que o payload descarte
+  // essa linha de sistema depois por estar vazia.
+  const systemOptions = watchedSystems
+    .map((system, index) => ({
+      index,
+      label: (system.targetSystemId && catalogNameById.get(system.targetSystemId)) || system.customName,
+    }))
+    .filter((option): option is { index: number; label: string } => Boolean(option.label));
 
   function handleAdd() {
     append({ username: "", systemIndex: null, accountType: "", ownerName: "", notes: "" });
@@ -71,7 +74,7 @@ export function AutomationAccountsList({ control, register }: AutomationAccounts
           Contas que a automação utiliza
         </Label>
         <p className="text-xs text-muted-foreground">
-          Só o login de cada conta — nunca a senha.
+          Tudo opcional. Só o login de cada conta — nunca a senha.
         </p>
       </div>
 

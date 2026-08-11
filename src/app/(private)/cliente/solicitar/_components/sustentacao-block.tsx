@@ -8,7 +8,6 @@ import {
   type UseFormSetValue,
   type UseFormWatch,
 } from "react-hook-form";
-import { trpc } from "@/shared/trpc/client";
 import { Input } from "@/src/shared/components/ui/input";
 import { Textarea } from "@/src/shared/components/ui/textarea";
 import { Label } from "@/src/shared/components/ui/label";
@@ -20,8 +19,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/src/shared/components/ui/select";
-import { CreatableCombobox } from "@/src/shared/components/ui/creatable-combobox";
-import { useToast } from "@/src/shared/hooks/use-toast";
 import type { SolicitarProjetoFormData } from "@/shared/schema/solicitar-projeto";
 import {
   CURRENT_APPLICATION_HOSTING_OPTIONS,
@@ -31,16 +28,6 @@ import {
   CURRENT_APPLICATION_CONTINGENCY_OPTIONS,
 } from "../utils/solicitar.utils";
 import { AutomationAccountsList } from "./automation-accounts-list";
-
-function slugify(text: string): string {
-  return text
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/\p{Diacritic}/gu, "")
-    .replace(/[^a-z0-9\s-]/g, "")
-    .trim()
-    .replace(/\s+/g, "-");
-}
 
 interface SustentacaoBlockProps {
   control: Control<SolicitarProjetoFormData>;
@@ -67,26 +54,15 @@ export function SustentacaoBlock({
   errors,
   areas,
 }: SustentacaoBlockProps) {
-  const { toast } = useToast();
-  const utils = trpc.useUtils();
-
   const currentApplicationHosting = watch("currentApplicationHosting");
   const contingencyActions = watch("currentApplicationContingencyActions") ?? [];
 
+  // `currentApplicationOwnerAreaId` não tem um irmão de texto livre no schema
+  // (ao contrário de `projectArea`/`customProjectArea`), então não há como
+  // replicar aqui o padrão "digite e cadastre depois" sem mexer no banco —
+  // isso está sendo decidido à parte. Por ora, só as áreas já cadastradas
+  // (com id real) são selecionáveis; nada de criar pela tela.
   const areaOptions = areas.filter((a) => a.id).map((a) => ({ value: a.id as string, label: a.label }));
-
-  const createArea = trpc.taxonomy.createArea.useMutation({
-    onSuccess: (created) => {
-      utils.taxonomy.listAreas.invalidate();
-      toast({ title: `Área "${created.name}" criada` });
-    },
-    onError: (error) =>
-      toast({
-        title: "Não foi possível cadastrar a área",
-        description: error.message,
-        variant: "destructive",
-      }),
-  });
 
   function toggleContingency(key: string, checked: boolean | "indeterminate") {
     const isChecked = checked === true;
@@ -194,19 +170,18 @@ export function SustentacaoBlock({
             control={control}
             name="currentApplicationOwnerAreaId"
             render={({ field }) => (
-              <CreatableCombobox
-                options={areaOptions}
-                value={field.value ?? ""}
-                onChange={field.onChange}
-                onCreate={(label) =>
-                  createArea.mutate(
-                    { name: label, slug: slugify(label), order: areas.length },
-                    { onSuccess: (created) => field.onChange(created.id) }
-                  )
-                }
-                placeholder="Selecione ou crie"
-                disabled={createArea.isPending}
-              />
+              <Select value={field.value || undefined} onValueChange={field.onChange}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione, se souber" />
+                </SelectTrigger>
+                <SelectContent>
+                  {areaOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             )}
           />
         </div>
