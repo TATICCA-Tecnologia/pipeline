@@ -27,7 +27,10 @@ import {
   CURRENT_APPLICATION_DATA_ENDPOINT_OPTIONS,
   CURRENT_APPLICATION_CONTINGENCY_OPTIONS,
 } from "../utils/solicitar.utils";
-import { AutomationAccountsList } from "./automation-accounts-list";
+import {
+  AutomationInventoryFields,
+  type AutomationInventoryValue,
+} from "@/shared/components/automation-inventory-fields";
 
 interface SustentacaoBlockProps {
   control: Control<SolicitarProjetoFormData>;
@@ -36,6 +39,9 @@ interface SustentacaoBlockProps {
   setValue: UseFormSetValue<SolicitarProjetoFormData>;
   errors: FieldErrors<SolicitarProjetoFormData>;
   areas: { value: string; label: string; id?: string }[];
+  /** Repassados de `page.tsx` — a fronteira RHF <-> componente controlado vive lá. */
+  automationInventoryValue: AutomationInventoryValue;
+  onAutomationInventoryChange: (value: AutomationInventoryValue) => void;
 }
 
 /**
@@ -53,6 +59,8 @@ export function SustentacaoBlock({
   setValue,
   errors,
   areas,
+  automationInventoryValue,
+  onAutomationInventoryChange,
 }: SustentacaoBlockProps) {
   const currentApplicationHosting = watch("currentApplicationHosting");
   const contingencyActions = watch("currentApplicationContingencyActions") ?? [];
@@ -341,7 +349,11 @@ export function SustentacaoBlock({
       </div>
 
       <div className="border-t border-border pt-5">
-        <AutomationAccountsList control={control} register={register} />
+        <AutomationInventoryFields
+          section="accounts"
+          value={automationInventoryValue}
+          onChange={onAutomationInventoryChange}
+        />
       </div>
     </div>
   );

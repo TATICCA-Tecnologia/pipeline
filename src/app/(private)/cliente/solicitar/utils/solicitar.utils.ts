@@ -1,7 +1,8 @@
 // Compartilhado por `page.tsx` (área/tema) e pelos `_components/` que
-// cadastram taxonomia inline (ex.: `target-systems-list.tsx`). Antes desta
-// função existia em três cópias idênticas; uma só, aqui, onde os outros
-// compartilhamentos deste diretório já moram.
+// cadastram taxonomia inline. Antes desta função existia em três cópias
+// idênticas; uma só, aqui, onde os outros compartilhamentos deste diretório
+// já moram. (`AutomationInventoryFields`, em shared/components/, tem sua
+// própria cópia local — shared/ não pode depender de app/.)
 export function slugify(text: string): string {
   return text
     .toLowerCase()

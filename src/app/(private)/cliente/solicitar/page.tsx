@@ -73,8 +73,11 @@ import { extractXmlEntriesFromZip } from "./utils/zip-import";
 import { cn } from "@/shared/utils";
 import { RatingRow } from "@/shared/components/rating-row";
 import { SensitiveDataBlock } from "./_components/sensitive-data-block";
-import { TargetSystemsList } from "./_components/target-systems-list";
 import { SustentacaoBlock } from "./_components/sustentacao-block";
+import {
+  AutomationInventoryFields,
+  type AutomationInventoryValue,
+} from "@/shared/components/automation-inventory-fields";
 
 const QUALITATIVE_RATINGS = [
   { name: "ratingErrorReduction" as const, label: "Redução de Erros" },
@@ -304,7 +307,6 @@ export default function SolicitarProjetoPage() {
     handleSubmit,
     watch,
     setValue,
-    getValues,
     trigger,
     formState: { errors },
   } = form;
@@ -317,6 +319,21 @@ export default function SolicitarProjetoPage() {
   const hasCurrentApplication = watch("hasCurrentApplication");
   const taskDurationHours = watch("taskDurationHours");
   const processFrequency = watch("processFrequency");
+  const targetSystems = watch("targetSystems");
+  const automationAccounts = watch("automationAccounts");
+  // Fronteira entre o RHF do wizard e o componente controlado clássico
+  // (`AutomationInventoryFields`, em shared/components/ — usado também pela
+  // ficha e por "Especificação"). Sempre grava as duas listas juntas, mesmo
+  // quando só uma mudou: é o mesmo contrato que o servidor espera em
+  // `project.update({ automationInventory })`.
+  const automationInventoryValue: AutomationInventoryValue = {
+    systems: targetSystems ?? [],
+    accounts: automationAccounts ?? [],
+  };
+  function handleAutomationInventoryChange(next: AutomationInventoryValue) {
+    setValue("targetSystems", next.systems, { shouldDirty: true });
+    setValue("automationAccounts", next.accounts, { shouldDirty: true });
+  }
 
   const previewAnnualHours = useMemo(() => {
     const duration = Number(taskDurationHours);
@@ -1273,11 +1290,10 @@ export default function SolicitarProjetoPage() {
 
             {currentStep.key === "sistemas" && (
               <div className="space-y-8">
-                <TargetSystemsList
-                  control={control}
-                  register={register}
-                  getValues={getValues}
-                  setValue={setValue}
+                <AutomationInventoryFields
+                  section="systems"
+                  value={automationInventoryValue}
+                  onChange={handleAutomationInventoryChange}
                   canRegisterTaxonomy={canRegisterTaxonomy}
                 />
 
@@ -1289,6 +1305,8 @@ export default function SolicitarProjetoPage() {
                     setValue={setValue}
                     errors={errors}
                     areas={PROJECT_AREAS}
+                    automationInventoryValue={automationInventoryValue}
+                    onAutomationInventoryChange={handleAutomationInventoryChange}
                   />
                 )}
               </div>
