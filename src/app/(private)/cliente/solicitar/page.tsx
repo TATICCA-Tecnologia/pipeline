@@ -63,9 +63,6 @@ import {
   PROCESS_FREQUENCY_MULTIPLIERS,
   HAS_EXISTING_SYSTEM_OPTIONS,
   HAS_CURRENT_APPLICATION_OPTIONS,
-  CURRENT_APPLICATION_HOSTING_OPTIONS,
-  CURRENT_APPLICATION_ACCESS_LOCATION_OPTIONS,
-  CURRENT_APPLICATION_ACCESS_REFERENCE_MAX_LENGTH,
   BENEFIT_OPTIONS,
 } from "./utils/solicitar.utils";
 import { useTaxonomy } from "./utils/use-taxonomy";
@@ -74,6 +71,9 @@ import { parseSolicitacaoXml } from "./utils/xml-import";
 import { extractXmlEntriesFromZip } from "./utils/zip-import";
 import { cn } from "@/shared/utils";
 import { RatingRow } from "@/shared/components/rating-row";
+import { SensitiveDataBlock } from "./_components/sensitive-data-block";
+import { TargetSystemsList } from "./_components/target-systems-list";
+import { SustentacaoBlock } from "./_components/sustentacao-block";
 
 function slugify(text: string): string {
   return text
@@ -110,7 +110,13 @@ type BatchImportResult = {
   hasWarnings?: boolean;
 };
 
-type StepKey = "basico" | "envolvidos" | "funcionalidades" | "beneficios" | "prazo";
+type StepKey =
+  | "basico"
+  | "envolvidos"
+  | "sistemas"
+  | "funcionalidades"
+  | "beneficios"
+  | "prazo";
 
 type StepDef = {
   key: StepKey;
@@ -133,6 +139,9 @@ const STEPS: StepDef[] = [
       "platform",
       "customPlatform",
       "description",
+      "handlesSensitiveData",
+      "sensitiveDataCategories",
+      "sensitiveDataDetails",
     ],
   },
   {
@@ -148,15 +157,33 @@ const STEPS: StepDef[] = [
       "existingSystemDetails",
       "hasCurrentApplication",
       "customHasCurrentApplication",
-      "currentApplicationDetails",
+      "peopleInvolvedDetails",
+    ],
+  },
+  {
+    key: "sistemas",
+    label: "Sistemas",
+    description: "Sobre o que a automação atua e como ela se sustenta",
+    fieldsToValidate: [
+      "targetSystems",
+      "automationAccounts",
       "currentApplicationHosting",
       "currentApplicationHostingCustom",
+      "currentApplicationAssetId",
       "currentApplicationAuthor",
       "currentApplicationOwner",
+      "currentApplicationOwnerRole",
+      "currentApplicationOwnerAreaId",
       "currentApplicationAccessLocation",
       "currentApplicationAccessReference",
       "currentApplicationLiveSince",
-      "peopleInvolvedDetails",
+      "currentApplicationDataInput",
+      "currentApplicationDataInputDetails",
+      "currentApplicationDataOutput",
+      "currentApplicationDataOutputDetails",
+      "currentApplicationContingencyActions",
+      "currentApplicationContingencyDetails",
+      "currentApplicationBackupOwner",
     ],
   },
   {
@@ -243,6 +270,23 @@ export default function SolicitarProjetoPage() {
       currentApplicationAccessLocation: "",
       currentApplicationAccessReference: "",
       currentApplicationLiveSince: "",
+      currentApplicationAssetId: "",
+      currentApplicationOwnerRole: "",
+      currentApplicationOwnerAreaId: "",
+      currentApplicationDataInput: "",
+      currentApplicationDataInputDetails: "",
+      currentApplicationDataOutput: "",
+      currentApplicationDataOutputDetails: "",
+      currentApplicationContingencyActions: [],
+      currentApplicationContingencyDetails: "",
+      currentApplicationBackupOwner: "",
+      handlesSensitiveData: "",
+      sensitiveDataCategories: [],
+      sensitiveDataDetails: "",
+      targetSystems: [{ targetSystemId: "", customName: "", accessPoint: "", accessNotes: "" }],
+      automationAccounts: [
+        { username: "", systemIndex: null, accountType: "", ownerName: "", notes: "" },
+      ],
       peopleInvolved: "",
       peopleInvolvedDetails: "",
       taskDurationHours: "",
@@ -268,6 +312,7 @@ export default function SolicitarProjetoPage() {
     handleSubmit,
     watch,
     setValue,
+    getValues,
     trigger,
     formState: { errors },
   } = form;
@@ -278,7 +323,6 @@ export default function SolicitarProjetoPage() {
   const targetAudience = watch("targetAudience");
   const hasExistingSystem = watch("hasExistingSystem");
   const hasCurrentApplication = watch("hasCurrentApplication");
-  const currentApplicationHosting = watch("currentApplicationHosting");
   const taskDurationHours = watch("taskDurationHours");
   const processFrequency = watch("processFrequency");
 
@@ -916,6 +960,14 @@ export default function SolicitarProjetoPage() {
                   )}
                 </div>
 
+                <SensitiveDataBlock
+                  control={control}
+                  register={register}
+                  watch={watch}
+                  setValue={setValue}
+                  errors={errors}
+                />
+
                 <div className="space-y-2">
                   <Label>Anexos iniciais (opcional)</Label>
                   <Input
@@ -1116,149 +1168,6 @@ export default function SolicitarProjetoPage() {
                   )}
                 </div>
 
-                {hasCurrentApplication === "sim" && (
-                  <div className="space-y-5 rounded-lg border border-border p-4">
-                    <div className="space-y-1">
-                      <Label className="text-xs uppercase tracking-wider text-muted-foreground">
-                        Ficha da automação existente
-                      </Label>
-                      <p className="text-xs text-muted-foreground">
-                        Tudo opcional — ajuda o TI a saber onde a automação vive e quem
-                        cuida dela. O que você não souber, deixe em branco.
-                      </p>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label>Onde essa automação roda hoje?</Label>
-                      <div className="flex gap-2">
-                        <Controller
-                          control={control}
-                          name="currentApplicationHosting"
-                          render={({ field }) => (
-                            <Select
-                              value={field.value}
-                              onValueChange={(value) => {
-                                field.onChange(value);
-                                if (value !== "outro")
-                                  setValue("currentApplicationHostingCustom", "");
-                              }}
-                            >
-                              <SelectTrigger
-                                className={
-                                  currentApplicationHosting === "outro"
-                                    ? "w-40 shrink-0"
-                                    : "w-full"
-                                }
-                              >
-                                <SelectValue placeholder="Selecione" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {CURRENT_APPLICATION_HOSTING_OPTIONS.map((option) => (
-                                  <SelectItem key={option.value} value={option.value}>
-                                    {option.label}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          )}
-                        />
-                        {currentApplicationHosting === "outro" && (
-                          <Input
-                            id="currentApplicationHostingCustom"
-                            {...register("currentApplicationHostingCustom")}
-                            placeholder="Descreva onde roda"
-                            className="flex-1"
-                          />
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="grid gap-5 sm:grid-cols-2">
-                      <div className="space-y-2">
-                        <Label htmlFor="currentApplicationAuthor">Quem desenvolveu?</Label>
-                        <Input
-                          id="currentApplicationAuthor"
-                          {...register("currentApplicationAuthor")}
-                          placeholder="Pessoa, equipe interna ou fornecedor"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="currentApplicationOwner">Quem cuida dela hoje?</Label>
-                        <Input
-                          id="currentApplicationOwner"
-                          {...register("currentApplicationOwner")}
-                          placeholder="Quem chamar quando para de funcionar"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label>Onde ficam guardados os acessos que ela usa?</Label>
-                      <Controller
-                        control={control}
-                        name="currentApplicationAccessLocation"
-                        render={({ field }) => (
-                          <Select value={field.value} onValueChange={field.onChange}>
-                            <SelectTrigger className="w-full">
-                              <SelectValue placeholder="Selecione" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {CURRENT_APPLICATION_ACCESS_LOCATION_OPTIONS.map((option) => (
-                                <SelectItem key={option.value} value={option.value}>
-                                  {option.label}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        )}
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="currentApplicationAccessReference">
-                        Onde encontrar
-                      </Label>
-                      <Input
-                        id="currentApplicationAccessReference"
-                        {...register("currentApplicationAccessReference")}
-                        maxLength={CURRENT_APPLICATION_ACCESS_REFERENCE_MAX_LENGTH}
-                        placeholder="Ex.: cofre TI — pasta Automações; ou: com o João do Financeiro"
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        Só a referência de onde procurar. Nunca escreva senhas, tokens ou
-                        chaves aqui.
-                      </p>
-                      {errors.currentApplicationAccessReference && (
-                        <p className="text-xs text-destructive">
-                          {errors.currentApplicationAccessReference.message}
-                        </p>
-                      )}
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="currentApplicationLiveSince">Em produção desde</Label>
-                      <Input
-                        id="currentApplicationLiveSince"
-                        type="date"
-                        {...register("currentApplicationLiveSince")}
-                        className="sm:w-48"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="currentApplicationDetails">
-                        Outras observações sobre a aplicação existente
-                      </Label>
-                      <Textarea
-                        id="currentApplicationDetails"
-                        {...register("currentApplicationDetails")}
-                        placeholder="Limitações conhecidas, o que costuma quebrar, integrações..."
-                        rows={4}
-                      />
-                    </div>
-                  </div>
-                )}
-
                 <div className="space-y-2 border-t border-border pt-5">
                   <Label className="text-xs uppercase tracking-wider text-muted-foreground">
                     Como esse processo funciona hoje (opcional)
@@ -1367,6 +1276,28 @@ export default function SolicitarProjetoPage() {
                     </p>
                   )}
                 </div>
+              </div>
+            )}
+
+            {currentStep.key === "sistemas" && (
+              <div className="space-y-8">
+                <TargetSystemsList
+                  control={control}
+                  register={register}
+                  getValues={getValues}
+                  setValue={setValue}
+                />
+
+                {hasCurrentApplication === "sim" && (
+                  <SustentacaoBlock
+                    control={control}
+                    register={register}
+                    watch={watch}
+                    setValue={setValue}
+                    errors={errors}
+                    areas={PROJECT_AREAS}
+                  />
+                )}
               </div>
             )}
 
