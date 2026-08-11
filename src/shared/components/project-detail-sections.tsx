@@ -20,9 +20,23 @@ import {
   COMPLEXITY_LEVELS,
   resolveCurrentApplicationHostingLabel,
   CURRENT_APPLICATION_ACCESS_LOCATION_OPTIONS,
+  CURRENT_APPLICATION_CONTINGENCY_OPTIONS,
+  SENSITIVE_DATA_CATEGORY_OPTIONS,
   resolveLabel,
+  resolveKeyLabels,
+  resolveDataEndpointLabel,
+  resolveAccountTypeLabel,
+  resolveSensitiveDataAnswerLabel,
 } from "@/shared/constants/project-taxonomy";
 import { EXECUTION_STRATEGIES } from "@/src/app/(private)/admin/projetos/[id]/especificacao/_constants/architecture";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/src/shared/components/ui/table";
 
 function formatRating(value: number | null | undefined): string | undefined {
   return value != null ? `${value}/5` : undefined;
@@ -84,7 +98,33 @@ export function ProjectDetailSections({
       project.currentApplicationOwner ||
       project.currentApplicationAccessLocation ||
       project.currentApplicationAccessReference ||
-      project.currentApplicationLiveSince
+      project.currentApplicationLiveSince ||
+      project.currentApplicationAssetId ||
+      project.currentApplicationOwnerRole ||
+      project.currentApplicationOwnerAreaName ||
+      project.currentApplicationBackupOwner ||
+      (project.currentApplicationContingencyActions?.length ?? 0) > 0 ||
+      project.currentApplicationContingencyDetails
+  );
+  const contingencyLabels = resolveKeyLabels(
+    project.currentApplicationContingencyActions,
+    CURRENT_APPLICATION_CONTINGENCY_OPTIONS
+  );
+  const sensitiveDataCategoryLabels = resolveKeyLabels(
+    project.sensitiveDataCategories,
+    SENSITIVE_DATA_CATEGORY_OPTIONS
+  );
+  // A seção só aparece quando há algo preenchido — mesmo critério das demais
+  // seções deste arquivo (ver hasSustentacaoData acima).
+  const hasSistemasEDadosData = Boolean(
+    (project.targetSystems?.length ?? 0) > 0 ||
+      project.handlesSensitiveData ||
+      sensitiveDataCategoryLabels.length > 0 ||
+      project.sensitiveDataDetails ||
+      project.currentApplicationDataInput ||
+      project.currentApplicationDataInputDetails ||
+      project.currentApplicationDataOutput ||
+      project.currentApplicationDataOutputDetails
   );
 
   return (
@@ -136,6 +176,10 @@ export function ProjectDetailSections({
       {hasSustentacaoData && (
         <DetailSection title="Sustentação & acessos">
           <FieldRow
+            label="Identificação do ativo"
+            value={maskFreeText(project.currentApplicationAssetId)}
+          />
+          <FieldRow
             label="Onde a automação roda"
             value={resolveCurrentApplicationHostingLabel(
               project.currentApplicationHosting,
@@ -149,6 +193,18 @@ export function ProjectDetailSections({
           <FieldRow
             label="Responsável hoje"
             value={maskFreeText(project.currentApplicationOwner)}
+          />
+          <FieldRow
+            label="Cargo do responsável"
+            value={maskFreeText(project.currentApplicationOwnerRole)}
+          />
+          <FieldRow
+            label="Setor do responsável"
+            value={maskFreeText(project.currentApplicationOwnerAreaName)}
+          />
+          <FieldRow
+            label="Responsável substituto"
+            value={maskFreeText(project.currentApplicationBackupOwner)}
           />
           <FieldRow
             label="Onde ficam os acessos"
@@ -168,6 +224,96 @@ export function ProjectDetailSections({
                 ? formatDate(new Date(project.currentApplicationLiveSince))
                 : undefined
             }
+          />
+          <FieldRow label="Ações de contingência" value={contingencyLabels} />
+          <FieldRow
+            label="Detalhes da contingência"
+            value={maskFreeText(project.currentApplicationContingencyDetails)}
+          />
+
+          {(canSeeTechnical || isOwner) && (project.automationAccounts?.length ?? 0) > 0 && (
+            <div className="sm:col-span-2 space-y-1.5">
+              <p className="text-xs text-muted-foreground">Contas utilizadas pela automação</p>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Usuário</TableHead>
+                    <TableHead>Tipo</TableHead>
+                    <TableHead>Sistema</TableHead>
+                    <TableHead>Responsável</TableHead>
+                    <TableHead>Observações</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {(project.automationAccounts ?? []).map((account) => (
+                    <TableRow key={account.id}>
+                      <TableCell>{maskFreeText(account.username) || "-"}</TableCell>
+                      <TableCell>{resolveAccountTypeLabel(account.accountType) ?? "-"}</TableCell>
+                      <TableCell>{account.systemName ?? "-"}</TableCell>
+                      <TableCell>{maskFreeText(account.ownerName) || "-"}</TableCell>
+                      <TableCell>{maskFreeText(account.notes) || "-"}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </DetailSection>
+      )}
+
+      {hasSistemasEDadosData && (
+        <DetailSection title="Sistemas e dados">
+          {(project.targetSystems?.length ?? 0) > 0 && (
+            <div className="sm:col-span-2 space-y-1.5">
+              <p className="text-xs text-muted-foreground">
+                Sistemas sobre os quais a automação atua
+              </p>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Sistema</TableHead>
+                    <TableHead>Categoria</TableHead>
+                    <TableHead>Onde é acessado</TableHead>
+                    <TableHead>Como acessar</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {(project.targetSystems ?? []).map((system) => (
+                    <TableRow key={system.id}>
+                      <TableCell>{system.name}</TableCell>
+                      <TableCell>{system.categoryName ?? "-"}</TableCell>
+                      <TableCell>{maskFreeText(system.accessPoint) || "-"}</TableCell>
+                      <TableCell>{maskFreeText(system.accessNotes) || "-"}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+          <FieldRow
+            label="Lida com dados sigilosos"
+            value={resolveSensitiveDataAnswerLabel(project.handlesSensitiveData)}
+          />
+          <FieldRow label="Categorias de dados sigilosos" value={sensitiveDataCategoryLabels} />
+          <FieldRow
+            label="Detalhes dos dados sigilosos"
+            value={maskFreeText(project.sensitiveDataDetails)}
+          />
+          <FieldRow
+            label="Entrada de dados"
+            value={resolveDataEndpointLabel(project.currentApplicationDataInput)}
+          />
+          <FieldRow
+            label="Detalhes da entrada de dados"
+            value={maskFreeText(project.currentApplicationDataInputDetails)}
+          />
+          <FieldRow
+            label="Saída de dados"
+            value={resolveDataEndpointLabel(project.currentApplicationDataOutput)}
+          />
+          <FieldRow
+            label="Detalhes da saída de dados"
+            value={maskFreeText(project.currentApplicationDataOutputDetails)}
           />
         </DetailSection>
       )}
