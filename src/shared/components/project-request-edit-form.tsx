@@ -30,10 +30,20 @@ import {
   CURRENT_APPLICATION_HOSTING_OPTIONS,
   CURRENT_APPLICATION_ACCESS_LOCATION_OPTIONS,
   CURRENT_APPLICATION_ACCESS_REFERENCE_MAX_LENGTH,
+  CURRENT_APPLICATION_CONTINGENCY_OPTIONS,
+  CURRENT_APPLICATION_DATA_ENDPOINT_OPTIONS,
+  SENSITIVE_DATA_ANSWER_OPTIONS,
+  SENSITIVE_DATA_CATEGORY_OPTIONS,
   resolveLabel,
 } from "@/shared/constants/project-taxonomy";
 import { EXECUTION_STRATEGIES } from "@/src/app/(private)/admin/projetos/[id]/especificacao/_constants/architecture";
 import { useTaxonomy } from "@/src/app/(private)/cliente/solicitar/utils/use-taxonomy";
+import {
+  AutomationInventoryFields,
+  buildAutomationInventoryValue,
+  toAutomationInventoryInput,
+  type AutomationInventoryValue,
+} from "@/shared/components/automation-inventory-fields";
 
 function slugify(text: string) {
   return text
@@ -77,6 +87,19 @@ interface EditFormState {
   currentApplicationAccessLocation: string;
   currentApplicationAccessReference: string;
   currentApplicationLiveSince: string;
+  currentApplicationAssetId: string;
+  currentApplicationOwnerRole: string;
+  currentApplicationOwnerAreaId: string;
+  currentApplicationDataInput: string;
+  currentApplicationDataInputDetails: string;
+  currentApplicationDataOutput: string;
+  currentApplicationDataOutputDetails: string;
+  currentApplicationContingencyActions: string[];
+  currentApplicationContingencyDetails: string;
+  currentApplicationBackupOwner: string;
+  handlesSensitiveData: string;
+  sensitiveDataCategories: string[];
+  sensitiveDataDetails: string;
   peopleInvolved: string;
   peopleInvolvedDetails: string;
   taskDurationHours: string;
@@ -106,6 +129,10 @@ export function ProjectRequestEditForm({
   const { data: dbUrgencyLevels = [] } = trpc.taxonomy.listUrgencyLevels.useQuery();
   const canSeeTechnical =
     viewerRole === "admin" || viewerRole === "developer" || viewerRole === "super_admin";
+  // Só quem passa por `adminProcedure` no servidor (taxonomy.createTargetSystem)
+  // pode cadastrar um sistema digitado como entrada permanente do catálogo —
+  // mesma regra do wizard (`canRegisterTaxonomy` em cliente/solicitar/page.tsx).
+  const isArchitect = viewerRole === "admin" || viewerRole === "super_admin";
 
   const initialAreaSlug = areas.find((a) => a.id === project.areaId)?.value ?? "";
   const initialThemeSlug =
@@ -129,6 +156,19 @@ export function ProjectRequestEditForm({
     currentApplicationAccessLocation: project.currentApplicationAccessLocation ?? "",
     currentApplicationAccessReference: project.currentApplicationAccessReference ?? "",
     currentApplicationLiveSince: toDateInputValue(project.currentApplicationLiveSince),
+    currentApplicationAssetId: project.currentApplicationAssetId ?? "",
+    currentApplicationOwnerRole: project.currentApplicationOwnerRole ?? "",
+    currentApplicationOwnerAreaId: project.currentApplicationOwnerAreaId ?? "",
+    currentApplicationDataInput: project.currentApplicationDataInput ?? "",
+    currentApplicationDataInputDetails: project.currentApplicationDataInputDetails ?? "",
+    currentApplicationDataOutput: project.currentApplicationDataOutput ?? "",
+    currentApplicationDataOutputDetails: project.currentApplicationDataOutputDetails ?? "",
+    currentApplicationContingencyActions: project.currentApplicationContingencyActions ?? [],
+    currentApplicationContingencyDetails: project.currentApplicationContingencyDetails ?? "",
+    currentApplicationBackupOwner: project.currentApplicationBackupOwner ?? "",
+    handlesSensitiveData: project.handlesSensitiveData ?? "",
+    sensitiveDataCategories: project.sensitiveDataCategories ?? [],
+    sensitiveDataDetails: project.sensitiveDataDetails ?? "",
     peopleInvolved: project.peopleInvolved?.toString() ?? "",
     peopleInvolvedDetails: project.peopleInvolvedDetails ?? "",
     taskDurationHours: project.taskDurationHours?.toString() ?? "",
@@ -146,6 +186,18 @@ export function ProjectRequestEditForm({
     estimatedDeadline: toDateInputValue(project.estimatedDeadline),
     additionalInfo: project.additionalInfo ?? "",
   });
+
+  // Hidratada uma única vez, via função nomeada (`buildAutomationInventoryValue`
+  // em automation-inventory-fields.tsx) que faz a conversão leitura -> formulário:
+  // resolve `projectTargetSystemId` (id estável) para `systemIndex` (posição),
+  // usando um Map construído a partir da MESMA lista `project.targetSystems`
+  // que alimenta as linhas do formulário. Não precisa de useEffect de
+  // ressincronização (ao contrário de área/tema, que dependem de uma query
+  // assíncrona): `project` já chega hidratado de `project.byId`, e este
+  // formulário é remontado do zero a cada vez que "Editar" é clicado.
+  const [automationInventory, setAutomationInventory] = useState<AutomationInventoryValue>(() =>
+    buildAutomationInventoryValue(project.targetSystems, project.automationAccounts)
+  );
 
   // Área/Tema são carregados via useTaxonomy(), que começa em isLoading=true e usa
   // dados de fallback (com id: undefined) até o banco responder. O useState acima só
@@ -194,6 +246,24 @@ export function ProjectRequestEditForm({
     }));
   }
 
+  function toggleContingencyAction(key: string) {
+    setForm((prev) => ({
+      ...prev,
+      currentApplicationContingencyActions: prev.currentApplicationContingencyActions.includes(key)
+        ? prev.currentApplicationContingencyActions.filter((c) => c !== key)
+        : [...prev.currentApplicationContingencyActions, key],
+    }));
+  }
+
+  function toggleSensitiveDataCategory(key: string) {
+    setForm((prev) => ({
+      ...prev,
+      sensitiveDataCategories: prev.sensitiveDataCategories.includes(key)
+        ? prev.sensitiveDataCategories.filter((c) => c !== key)
+        : [...prev.sensitiveDataCategories, key],
+    }));
+  }
+
   const updateMutation = trpc.project.update.useMutation({
     onSuccess: () => {
       utils.project.byId.invalidate({ id: project.id });
@@ -234,6 +304,20 @@ export function ProjectRequestEditForm({
       currentApplicationLiveSince: form.currentApplicationLiveSince
         ? new Date(form.currentApplicationLiveSince)
         : null,
+      currentApplicationAssetId: form.currentApplicationAssetId,
+      currentApplicationOwnerRole: form.currentApplicationOwnerRole,
+      currentApplicationOwnerAreaId: form.currentApplicationOwnerAreaId,
+      currentApplicationDataInput: form.currentApplicationDataInput,
+      currentApplicationDataInputDetails: form.currentApplicationDataInputDetails,
+      currentApplicationDataOutput: form.currentApplicationDataOutput,
+      currentApplicationDataOutputDetails: form.currentApplicationDataOutputDetails,
+      currentApplicationContingencyActions: form.currentApplicationContingencyActions,
+      currentApplicationContingencyDetails: form.currentApplicationContingencyDetails,
+      currentApplicationBackupOwner: form.currentApplicationBackupOwner,
+      handlesSensitiveData: form.handlesSensitiveData,
+      sensitiveDataCategories: form.sensitiveDataCategories,
+      sensitiveDataDetails: form.sensitiveDataDetails,
+      automationInventory: toAutomationInventoryInput(automationInventory),
       peopleInvolved: form.peopleInvolved ? parseInt(form.peopleInvolved, 10) : null,
       peopleInvolvedDetails: form.peopleInvolvedDetails || null,
       taskDurationHours: form.taskDurationHours ? parseFloat(form.taskDurationHours) : null,
@@ -408,6 +492,15 @@ export function ProjectRequestEditForm({
 
       <DetailSection title="Sustentação & acessos">
         <div className="space-y-1.5">
+          <Label htmlFor="edit-currentApplicationAssetId">Identificação do ativo</Label>
+          <Input
+            id="edit-currentApplicationAssetId"
+            value={form.currentApplicationAssetId}
+            onChange={(e) => set("currentApplicationAssetId", e.target.value)}
+            placeholder="Hostname, IP ou nº de patrimônio"
+          />
+        </div>
+        <div className="space-y-1.5">
           <Label>Onde a automação roda</Label>
           <Select
             value={form.currentApplicationHosting}
@@ -455,6 +548,44 @@ export function ProjectRequestEditForm({
           />
         </div>
         <div className="space-y-1.5">
+          <Label htmlFor="edit-currentApplicationOwnerRole">Cargo do responsável</Label>
+          <Input
+            id="edit-currentApplicationOwnerRole"
+            value={form.currentApplicationOwnerRole}
+            onChange={(e) => set("currentApplicationOwnerRole", e.target.value)}
+            placeholder="Ex.: Analista de Processos"
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label>Setor do responsável</Label>
+          <Select
+            value={form.currentApplicationOwnerAreaId || undefined}
+            onValueChange={(v) => set("currentApplicationOwnerAreaId", v)}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Selecione, se souber" />
+            </SelectTrigger>
+            <SelectContent>
+              {areas
+                .filter((a) => a.id)
+                .map((a) => (
+                  <SelectItem key={a.id} value={a.id as string}>
+                    {a.label}
+                  </SelectItem>
+                ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="edit-currentApplicationBackupOwner">Responsável substituto</Label>
+          <Input
+            id="edit-currentApplicationBackupOwner"
+            value={form.currentApplicationBackupOwner}
+            onChange={(e) => set("currentApplicationBackupOwner", e.target.value)}
+            placeholder="Se o responsável sair, quem assume"
+          />
+        </div>
+        <div className="space-y-1.5">
           <Label>Onde ficam os acessos</Label>
           <Select
             value={form.currentApplicationAccessLocation}
@@ -491,6 +622,150 @@ export function ProjectRequestEditForm({
             type="date"
             value={form.currentApplicationLiveSince}
             onChange={(e) => set("currentApplicationLiveSince", e.target.value)}
+          />
+        </div>
+
+        <div className="space-y-2 sm:col-span-2">
+          <Label className="text-xs uppercase tracking-wider text-muted-foreground">
+            O que fazer se a automação parar de funcionar?
+          </Label>
+          {CURRENT_APPLICATION_CONTINGENCY_OPTIONS.map((option) => (
+            <label key={option.key} className="flex items-start gap-3 cursor-pointer">
+              <Checkbox
+                checked={form.currentApplicationContingencyActions.includes(option.key)}
+                onCheckedChange={() => toggleContingencyAction(option.key)}
+              />
+              <span className="text-sm">{option.label}</span>
+            </label>
+          ))}
+        </div>
+        <div className="space-y-1.5 sm:col-span-2">
+          <Label htmlFor="edit-currentApplicationContingencyDetails">Detalhes da contingência</Label>
+          <Textarea
+            id="edit-currentApplicationContingencyDetails"
+            rows={2}
+            value={form.currentApplicationContingencyDetails}
+            onChange={(e) => set("currentApplicationContingencyDetails", e.target.value)}
+            placeholder="Detalhe o passo a passo, se houver"
+          />
+        </div>
+
+        <div className="sm:col-span-2">
+          <AutomationInventoryFields
+            section="accounts"
+            value={automationInventory}
+            onChange={setAutomationInventory}
+          />
+        </div>
+      </DetailSection>
+
+      <DetailSection title="Sistemas e dados">
+        <div className="sm:col-span-2">
+          <AutomationInventoryFields
+            section="systems"
+            value={automationInventory}
+            onChange={setAutomationInventory}
+            canRegisterTaxonomy={isArchitect}
+          />
+        </div>
+
+        <div className="space-y-1.5">
+          <Label>Lida com dados sigilosos</Label>
+          <Select
+            value={form.handlesSensitiveData}
+            onValueChange={(v) => set("handlesSensitiveData", v)}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Selecione" />
+            </SelectTrigger>
+            <SelectContent>
+              {SENSITIVE_DATA_ANSWER_OPTIONS.map((opt) => (
+                <SelectItem key={opt.value} value={opt.value}>
+                  {opt.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1.5 sm:col-span-2">
+          <Label className="text-xs uppercase tracking-wider text-muted-foreground">
+            Categorias de dados sigilosos
+          </Label>
+          <div className="space-y-2">
+            {SENSITIVE_DATA_CATEGORY_OPTIONS.map((option) => (
+              <label key={option.key} className="flex items-start gap-3 cursor-pointer">
+                <Checkbox
+                  checked={form.sensitiveDataCategories.includes(option.key)}
+                  onCheckedChange={() => toggleSensitiveDataCategory(option.key)}
+                />
+                <span className="text-sm">{option.label}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+        <div className="space-y-1.5 sm:col-span-2">
+          <Label htmlFor="edit-sensitiveDataDetails">Detalhes dos dados sigilosos</Label>
+          <Textarea
+            id="edit-sensitiveDataDetails"
+            rows={2}
+            value={form.sensitiveDataDetails}
+            onChange={(e) => set("sensitiveDataDetails", e.target.value)}
+          />
+        </div>
+
+        <div className="space-y-1.5">
+          <Label>Entrada de dados</Label>
+          <Select
+            value={form.currentApplicationDataInput}
+            onValueChange={(v) => set("currentApplicationDataInput", v)}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Selecione" />
+            </SelectTrigger>
+            <SelectContent>
+              {CURRENT_APPLICATION_DATA_ENDPOINT_OPTIONS.map((opt) => (
+                <SelectItem key={opt.value} value={opt.value}>
+                  {opt.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="edit-currentApplicationDataInputDetails">Detalhes da entrada de dados</Label>
+          <Textarea
+            id="edit-currentApplicationDataInputDetails"
+            rows={2}
+            value={form.currentApplicationDataInputDetails}
+            onChange={(e) => set("currentApplicationDataInputDetails", e.target.value)}
+          />
+        </div>
+
+        <div className="space-y-1.5">
+          <Label>Saída de dados</Label>
+          <Select
+            value={form.currentApplicationDataOutput}
+            onValueChange={(v) => set("currentApplicationDataOutput", v)}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Selecione" />
+            </SelectTrigger>
+            <SelectContent>
+              {CURRENT_APPLICATION_DATA_ENDPOINT_OPTIONS.map((opt) => (
+                <SelectItem key={opt.value} value={opt.value}>
+                  {opt.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="edit-currentApplicationDataOutputDetails">Detalhes da saída de dados</Label>
+          <Textarea
+            id="edit-currentApplicationDataOutputDetails"
+            rows={2}
+            value={form.currentApplicationDataOutputDetails}
+            onChange={(e) => set("currentApplicationDataOutputDetails", e.target.value)}
           />
         </div>
       </DetailSection>

@@ -15,13 +15,25 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/src/shared/components/ui/select";
-import { Loader2, Plus, Save, Trash2, Wrench, ListChecks } from "lucide-react";
+import { Loader2, Plus, Save, Trash2, Wrench, ListChecks, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { EXECUTION_STRATEGIES } from "../_constants/architecture";
 import { CreatableCombobox } from "@/src/shared/components/ui/creatable-combobox";
-import { COMPLEXITY_LEVELS } from "@/shared/constants/project-taxonomy";
+import {
+  COMPLEXITY_LEVELS,
+  CURRENT_APPLICATION_CONTINGENCY_OPTIONS,
+  CURRENT_APPLICATION_DATA_ENDPOINT_OPTIONS,
+  SENSITIVE_DATA_ANSWER_OPTIONS,
+  SENSITIVE_DATA_CATEGORY_OPTIONS,
+} from "@/shared/constants/project-taxonomy";
 import { computeAnnualSavingBRL } from "@/shared/lib/savings";
 import { formatCurrency } from "@/shared/utils";
+import {
+  AutomationInventoryFields,
+  buildAutomationInventoryValue,
+  toAutomationInventoryInput,
+  type AutomationInventoryValue,
+} from "@/shared/components/automation-inventory-fields";
 
 const UNASSIGNED = "__unassigned__";
 
@@ -45,6 +57,10 @@ export function ArchitectureTab({ projectId }: ArchitectureTabProps) {
   const { data: phases = [] } = trpc.specification.getByProject.useQuery({ projectId });
   const { data: developers = [] } = trpc.user.listDevelopers.useQuery();
   const { data: settings } = trpc.settings.getSettings.useQuery();
+  // Mesma tabela `ProjectArea` que `project.areaId`/`themeId` — aqui usada
+  // para o setor do RESPONSÁVEL pela automação existente (`ownerArea`
+  // relation), não para a classificação do projeto em si.
+  const { data: ownerAreas = [] } = trpc.taxonomy.listAreas.useQuery();
   const defaultHourlyRateBRL = settings?.defaultHourlyRateBRL ?? 90;
 
   const updateProject = trpc.project.update.useMutation({
@@ -168,6 +184,35 @@ export function ArchitectureTab({ projectId }: ArchitectureTabProps) {
   const [implementationWave, setImplementationWave] = useState<string>("");
   const [waveOrder, setWaveOrder] = useState<string>("");
 
+  // Ficha de sustentação/sistemas/dados preenchida pelo cliente no wizard —
+  // o arquiteto refina aqui os mesmos campos, sem precisar sair de
+  // "Especificação". Não são campos ARCHITECT_ONLY (ver project.router.ts):
+  // o dono do projeto também os edita, pela ficha.
+  const [currentApplicationAssetId, setCurrentApplicationAssetId] = useState("");
+  const [currentApplicationOwnerRole, setCurrentApplicationOwnerRole] = useState("");
+  const [currentApplicationOwnerAreaId, setCurrentApplicationOwnerAreaId] = useState("");
+  const [currentApplicationDataInput, setCurrentApplicationDataInput] = useState("");
+  const [currentApplicationDataInputDetails, setCurrentApplicationDataInputDetails] = useState("");
+  const [currentApplicationDataOutput, setCurrentApplicationDataOutput] = useState("");
+  const [currentApplicationDataOutputDetails, setCurrentApplicationDataOutputDetails] = useState("");
+  const [currentApplicationContingencyActions, setCurrentApplicationContingencyActions] = useState<
+    string[]
+  >([]);
+  const [currentApplicationContingencyDetails, setCurrentApplicationContingencyDetails] = useState("");
+  const [currentApplicationBackupOwner, setCurrentApplicationBackupOwner] = useState("");
+  const [handlesSensitiveData, setHandlesSensitiveData] = useState("");
+  const [sensitiveDataCategories, setSensitiveDataCategories] = useState<string[]>([]);
+  const [sensitiveDataDetails, setSensitiveDataDetails] = useState("");
+  // Hidratado no mesmo useEffect que os demais campos abaixo, via
+  // `buildAutomationInventoryValue` — a função nomeada que resolve
+  // `projectTargetSystemId` (id estável) para `systemIndex` (posição), usando
+  // um Map construído a partir da MESMA lista `project.targetSystems` que
+  // alimenta as linhas do formulário. Ver automation-inventory-fields.tsx.
+  const [automationInventory, setAutomationInventory] = useState<AutomationInventoryValue>({
+    systems: [],
+    accounts: [],
+  });
+
   useEffect(() => {
     if (project) {
       setSolutionTypeIds((project.solutionTypes ?? []).map((k) => k.id));
@@ -198,6 +243,22 @@ export function ArchitectureTab({ projectId }: ArchitectureTabProps) {
         project.implementationWave != null ? String(project.implementationWave) : ""
       );
       setWaveOrder(project.waveOrder != null ? String(project.waveOrder) : "");
+      setCurrentApplicationAssetId(project.currentApplicationAssetId ?? "");
+      setCurrentApplicationOwnerRole(project.currentApplicationOwnerRole ?? "");
+      setCurrentApplicationOwnerAreaId(project.currentApplicationOwnerAreaId ?? "");
+      setCurrentApplicationDataInput(project.currentApplicationDataInput ?? "");
+      setCurrentApplicationDataInputDetails(project.currentApplicationDataInputDetails ?? "");
+      setCurrentApplicationDataOutput(project.currentApplicationDataOutput ?? "");
+      setCurrentApplicationDataOutputDetails(project.currentApplicationDataOutputDetails ?? "");
+      setCurrentApplicationContingencyActions(project.currentApplicationContingencyActions ?? []);
+      setCurrentApplicationContingencyDetails(project.currentApplicationContingencyDetails ?? "");
+      setCurrentApplicationBackupOwner(project.currentApplicationBackupOwner ?? "");
+      setHandlesSensitiveData(project.handlesSensitiveData ?? "");
+      setSensitiveDataCategories(project.sensitiveDataCategories ?? []);
+      setSensitiveDataDetails(project.sensitiveDataDetails ?? "");
+      setAutomationInventory(
+        buildAutomationInventoryValue(project.targetSystems, project.automationAccounts)
+      );
     }
     // defaultHourlyRateBRL só é usado no fallback (saving ainda não salvo) —
     // recalcula esse fallback quando a taxa padrão chega da query de settings.
@@ -233,6 +294,20 @@ export function ArchitectureTab({ projectId }: ArchitectureTabProps) {
     );
   };
 
+  const toggleContingencyAction = (key: string, checked: boolean | "indeterminate") => {
+    const isChecked = checked === true;
+    setCurrentApplicationContingencyActions((prev) =>
+      isChecked ? [...prev, key] : prev.filter((k) => k !== key)
+    );
+  };
+
+  const toggleSensitiveDataCategory = (key: string, checked: boolean | "indeterminate") => {
+    const isChecked = checked === true;
+    setSensitiveDataCategories((prev) =>
+      isChecked ? [...prev, key] : prev.filter((k) => k !== key)
+    );
+  };
+
   const handleSaveArchitecture = () => {
     const normalizedSaving = estimatedAnnualSavingBRL
       .trim()
@@ -262,6 +337,20 @@ export function ArchitectureTab({ projectId }: ArchitectureTabProps) {
         !Number.isNaN(parsedWave) && parsedWave >= 0 ? parsedWave : null,
       waveOrder:
         !Number.isNaN(parsedWaveOrder) && parsedWaveOrder >= 0 ? parsedWaveOrder : null,
+      currentApplicationAssetId,
+      currentApplicationOwnerRole,
+      currentApplicationOwnerAreaId,
+      currentApplicationDataInput,
+      currentApplicationDataInputDetails,
+      currentApplicationDataOutput,
+      currentApplicationDataOutputDetails,
+      currentApplicationContingencyActions,
+      currentApplicationContingencyDetails,
+      currentApplicationBackupOwner,
+      handlesSensitiveData,
+      sensitiveDataCategories,
+      sensitiveDataDetails,
+      automationInventory: toAutomationInventoryInput(automationInventory),
     });
   };
 
@@ -529,6 +618,202 @@ export function ArchitectureTab({ projectId }: ArchitectureTabProps) {
                 updateProject.isPending || createMainTool.isPending || createMainToolCategory.isPending
               }
             >
+              {updateProject.isPending ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Save className="h-4 w-4 mr-2" />
+              )}
+              Salvar arquitetura
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Sustentação, sistemas e dados — mesma ficha que o cliente preenche no
+          wizard de solicitação; o arquiteto refina aqui sem sair de "Especificação". */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <ShieldCheck className="h-4 w-4" />
+            Sustentação, sistemas e dados
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="space-y-2">
+              <Label>Identificação do ativo</Label>
+              <Input
+                value={currentApplicationAssetId}
+                onChange={(e) => setCurrentApplicationAssetId(e.target.value)}
+                placeholder="Hostname, IP ou nº de patrimônio"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Cargo do responsável</Label>
+              <Input
+                value={currentApplicationOwnerRole}
+                onChange={(e) => setCurrentApplicationOwnerRole(e.target.value)}
+                placeholder="Ex.: Analista de Processos"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Setor do responsável</Label>
+              <Select
+                value={currentApplicationOwnerAreaId || undefined}
+                onValueChange={setCurrentApplicationOwnerAreaId}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione, se souber" />
+                </SelectTrigger>
+                <SelectContent>
+                  {ownerAreas.map((area) => (
+                    <SelectItem key={area.id} value={area.id}>
+                      {area.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Responsável substituto</Label>
+              <Input
+                value={currentApplicationBackupOwner}
+                onChange={(e) => setCurrentApplicationBackupOwner(e.target.value)}
+                placeholder="Se o responsável sair, quem assume"
+              />
+            </div>
+          </div>
+
+          <div className="space-y-3 border-t border-border pt-5">
+            <Label className="text-xs uppercase tracking-wider text-muted-foreground">
+              O que fazer se a automação parar de funcionar?
+            </Label>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {CURRENT_APPLICATION_CONTINGENCY_OPTIONS.map((option) => (
+                <label key={option.key} className="flex items-start gap-3 cursor-pointer">
+                  <Checkbox
+                    checked={currentApplicationContingencyActions.includes(option.key)}
+                    onCheckedChange={(v) => toggleContingencyAction(option.key, v)}
+                  />
+                  <span className="text-sm">{option.label}</span>
+                </label>
+              ))}
+            </div>
+            <Textarea
+              value={currentApplicationContingencyDetails}
+              onChange={(e) => setCurrentApplicationContingencyDetails(e.target.value)}
+              placeholder="Detalhe o passo a passo, se houver"
+              rows={2}
+            />
+          </div>
+
+          <div className="border-t border-border pt-5">
+            <AutomationInventoryFields
+              section="accounts"
+              value={automationInventory}
+              onChange={setAutomationInventory}
+            />
+          </div>
+
+          <div className="border-t border-border pt-5">
+            <AutomationInventoryFields
+              section="systems"
+              value={automationInventory}
+              onChange={setAutomationInventory}
+              canRegisterTaxonomy
+            />
+          </div>
+
+          <div className="grid gap-5 border-t border-border pt-5 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label>Lida com dados sigilosos</Label>
+              <Select value={handlesSensitiveData} onValueChange={setHandlesSensitiveData}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione" />
+                </SelectTrigger>
+                <SelectContent>
+                  {SENSITIVE_DATA_ANSWER_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="sensitiveDataDetails">Detalhes dos dados sigilosos</Label>
+              <Textarea
+                id="sensitiveDataDetails"
+                value={sensitiveDataDetails}
+                onChange={(e) => setSensitiveDataDetails(e.target.value)}
+                rows={2}
+              />
+            </div>
+            <div className="space-y-2 sm:col-span-2">
+              <Label className="text-xs uppercase tracking-wider text-muted-foreground">
+                Categorias de dados sigilosos
+              </Label>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {SENSITIVE_DATA_CATEGORY_OPTIONS.map((option) => (
+                  <label key={option.key} className="flex items-start gap-3 cursor-pointer">
+                    <Checkbox
+                      checked={sensitiveDataCategories.includes(option.key)}
+                      onCheckedChange={(v) => toggleSensitiveDataCategory(option.key, v)}
+                    />
+                    <span className="text-sm">{option.label}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="grid gap-5 border-t border-border pt-5 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label>Entrada de dados</Label>
+              <Select value={currentApplicationDataInput} onValueChange={setCurrentApplicationDataInput}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione" />
+                </SelectTrigger>
+                <SelectContent>
+                  {CURRENT_APPLICATION_DATA_ENDPOINT_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Textarea
+                value={currentApplicationDataInputDetails}
+                onChange={(e) => setCurrentApplicationDataInputDetails(e.target.value)}
+                placeholder="Qual sistema, qual caminho, com que frequência..."
+                rows={2}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Saída de dados</Label>
+              <Select value={currentApplicationDataOutput} onValueChange={setCurrentApplicationDataOutput}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione" />
+                </SelectTrigger>
+                <SelectContent>
+                  {CURRENT_APPLICATION_DATA_ENDPOINT_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Textarea
+                value={currentApplicationDataOutputDetails}
+                onChange={(e) => setCurrentApplicationDataOutputDetails(e.target.value)}
+                placeholder="Qual sistema, qual caminho, com que frequência..."
+                rows={2}
+              />
+            </div>
+          </div>
+
+          <div className="flex justify-end pt-2">
+            <Button onClick={handleSaveArchitecture} disabled={updateProject.isPending}>
               {updateProject.isPending ? (
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
               ) : (
