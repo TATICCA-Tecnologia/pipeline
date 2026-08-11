@@ -177,7 +177,7 @@ model Project {
   currentApplicationAccessReference String?
   currentApplicationLiveSince       DateTime? // em produção desde
 
-  // Complemento dos critérios mínimos de catálogo (Glauber). Ver
+  // Complemento dos critérios mínimos de catálogo exigidos pelo cliente. Ver
   // docs/superpowers/specs/2026-08-11-catalogo-qualidade-automacoes-design.md
   currentApplicationAssetId            String? // hostname, IP ou nº de patrimônio
   currentApplicationOwnerRole          String? // cargo do responsável
@@ -250,7 +250,7 @@ model Project {
   areaId           String?
   // Setor do responsável pela automação. Deliberadamente separado de areaId
   // (a área DO PROCESSO): quem sustenta costuma ser o TI, não a área dona.
-  ownerArea                     ProjectArea? @relation("ProjectOwnerArea", fields: [currentApplicationOwnerAreaId], references: [id], onDelete: SetNull)
+  ownerArea        ProjectArea?              @relation("ProjectOwnerArea", fields: [currentApplicationOwnerAreaId], references: [id], onDelete: SetNull)
   currentApplicationOwnerAreaId String?
   theme            ProjectTheme?             @relation(fields: [themeId], references: [id], onDelete: SetNull)
   themeId          String?
@@ -267,7 +267,7 @@ model Project {
   activityLogs     ActivityLog[]
   projectLock      ProjectLock?
   peopleOfInterest ProjectPersonOfInterest[]
-  targetSystems      ProjectTargetSystem[]
+  targetSystems    ProjectTargetSystem[]
   automationAccounts ProjectAutomationAccount[]
 
   @@map("projects")
@@ -548,9 +548,9 @@ model ProjectArea {
   slug       String         @unique
   isActive   Boolean        @default(true)
   order      Int            @default(0)
-  themes            ProjectTheme[]
-  projects          Project[]   @relation("ProjectProcessArea")
-  sustainedProjects Project[]   @relation("ProjectOwnerArea")
+  themes     ProjectTheme[]
+  projects   Project[] @relation("ProjectProcessArea")
+  sustainedProjects Project[] @relation("ProjectOwnerArea")
   interviews Interview[]
   createdAt  DateTime       @default(now())
   updatedAt  DateTime       @updatedAt
@@ -633,15 +633,19 @@ model TargetSystem {
   slug         String                @unique
   isActive     Boolean               @default(true)
   order        Int                   @default(0)
+  projectLinks ProjectTargetSystem[]
   category     TargetSystemCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   categoryId   String?
-  projectLinks ProjectTargetSystem[]
   createdAt    DateTime              @default(now())
   updatedAt    DateTime              @updatedAt
 
   @@map("target_systems")
 }
 
+// Sem createdAt/updatedAt, ao contrário dos models vizinhos: de propósito, não
+// esquecimento. A gravação desta lista (e da de ProjectAutomationAccount) é
+// apaga-tudo-e-recria a cada save do projeto, então um "createdAt" registraria
+// a data do último save, não a da criação real — seria um dado que mente.
 model ProjectTargetSystem {
   id             String        @id @default(cuid())
   project        Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
@@ -668,6 +672,13 @@ model ProjectAutomationAccount {
   /// O login em si. NÃO existe campo par de senha/token em lugar nenhum do
   /// modelo, e isso é deliberado: a plataforma é inventário, não cofre.
   username              String
+  /// Invariante não garantido por constraint: a linha referenciada aqui
+  /// precisa ter o MESMO projectId desta conta. Nada no banco impede uma
+  /// conta do projeto A apontar para um sistema-alvo do projeto B — quem
+  /// garante isso é a camada de aplicação, que grava as duas listas do
+  /// projeto (target systems e accounts) juntas, numa única transação por
+  /// projeto, vinculando por índice. Escrita fora desse padrão quebra o
+  /// invariante silenciosamente.
   projectTargetSystem   ProjectTargetSystem? @relation(fields: [projectTargetSystemId], references: [id], onDelete: SetNull)
   projectTargetSystemId String?
   accountType           String? // slug de AUTOMATION_ACCOUNT_TYPE_OPTIONS
