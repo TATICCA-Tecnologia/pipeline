@@ -156,6 +156,66 @@ export const CURRENT_APPLICATION_ACCESS_LOCATION_OPTIONS = [
 // de credenciais num campo que é para dizer ONDE procurar, não O QUE usar.
 export const CURRENT_APPLICATION_ACCESS_REFERENCE_MAX_LENGTH = 200;
 
+// ATENÇÃO: como nas listas acima, os LABELS abaixo estão duplicados como texto
+// literal em docs/prompt-geracao-xml.md e em src/server/ai/xml-generation-prompt.ts,
+// e a importação de XML casa por label. Mexeu no label, mexa nos três lugares.
+
+/** Serve aos dois selects do critério 5 — entrada e saída têm a mesma natureza. */
+export const CURRENT_APPLICATION_DATA_ENDPOINT_OPTIONS = [
+  { value: "sistema", label: "Sistema (ERP, CRM, portal)" },
+  { value: "planilha", label: "Planilha" },
+  { value: "email", label: "E-mail" },
+  { value: "api", label: "API" },
+  { value: "banco-dados", label: "Banco de dados" },
+  { value: "pasta-rede", label: "Pasta de rede ou SharePoint" },
+  { value: "portal-web", label: "Site ou portal web" },
+  { value: "manual", label: "Entrada manual de uma pessoa" },
+  { value: "outro", label: "Outro" },
+];
+
+export const CURRENT_APPLICATION_CONTINGENCY_OPTIONS = [
+  { key: "reexecutar", label: "Reexecutar ou reiniciar a automação" },
+  { key: "verificar-log", label: "Verificar log ou relatório de erro" },
+  { key: "verificar-acessos", label: "Verificar credenciais e acessos expirados" },
+  { key: "acionar-ti-interno", label: "Acionar o TI interno" },
+  { key: "acionar-fornecedor", label: "Acionar o fornecedor ou desenvolvedor externo" },
+  { key: "executar-manual", label: "Executar o processo manualmente enquanto isso" },
+  { key: "acionar-negocio", label: "Acionar o responsável da área de negócio" },
+  // Marcada de propósito: campo vazio não distingue "ninguém preencheu" de
+  // "não existe caminho". Esta opção torna o risco um dado, não uma ausência.
+  { key: "sem-caminho-definido", label: "Não existe caminho definido hoje" },
+];
+
+export const AUTOMATION_ACCOUNT_TYPE_OPTIONS = [
+  { value: "servico", label: "Usuário de serviço" },
+  { value: "nominal", label: "Usuário nominal" },
+  { value: "email", label: "Conta de e-mail" },
+  { value: "api-key", label: "Chave de API" },
+  { value: "certificado", label: "Certificado digital" },
+  { value: "outro", label: "Outro" },
+];
+
+export const SENSITIVE_DATA_ANSWER_OPTIONS = [
+  { value: "sim", label: "Sim" },
+  { value: "nao", label: "Não" },
+  { value: "nao-sei", label: "Não sei" },
+];
+
+export const SENSITIVE_DATA_CATEGORY_OPTIONS = [
+  { key: "pessoais-clientes", label: "Dados pessoais de clientes (LGPD)" },
+  { key: "pessoais-colaboradores", label: "Dados pessoais de colaboradores" },
+  { key: "folha-remuneracao", label: "Folha de pagamento e remuneração" },
+  { key: "bancarios-financeiros", label: "Dados bancários e financeiros" },
+  { key: "saude", label: "Dados de saúde" },
+  { key: "fiscais-contabeis", label: "Dados fiscais e contábeis" },
+  { key: "contratos-juridico", label: "Contratos e jurídico" },
+  { key: "propriedade-intelectual", label: "Propriedade intelectual" },
+  { key: "credenciais-acessos", label: "Credenciais e acessos" },
+];
+
+/** Curto de propósito: username é identificador, não bloco de credenciais. */
+export const AUTOMATION_ACCOUNT_USERNAME_MAX_LENGTH = 120;
+
 export const BENEFIT_OPTIONS = [
   {
     key: "reducao-trabalho-operacional",
@@ -287,4 +347,33 @@ export function resolveCurrentApplicationHostingLabel(
 ): string | undefined {
   if (hosting === "outro") return hostingCustom?.trim() || "Outro";
   return resolveLabel(hosting, CURRENT_APPLICATION_HOSTING_OPTIONS);
+}
+
+export function resolveDataEndpointLabel(
+  value: string | null | undefined
+): string | undefined {
+  return resolveLabel(value, CURRENT_APPLICATION_DATA_ENDPOINT_OPTIONS);
+}
+
+export function resolveAccountTypeLabel(
+  value: string | null | undefined
+): string | undefined {
+  return resolveLabel(value, AUTOMATION_ACCOUNT_TYPE_OPTIONS);
+}
+
+export function resolveSensitiveDataAnswerLabel(
+  value: string | null | undefined
+): string | undefined {
+  return resolveLabel(value, SENSITIVE_DATA_ANSWER_OPTIONS);
+}
+
+/** Traduz um array de chaves (Json) para labels, ignorando chaves desconhecidas. */
+export function resolveKeyLabels(
+  keys: unknown,
+  options: { key: string; label: string }[]
+): string[] {
+  if (!Array.isArray(keys)) return [];
+  return keys
+    .map((k) => options.find((o) => o.key === k)?.label)
+    .filter((l): l is string => !!l);
 }
