@@ -6,7 +6,17 @@ import { PLATFORMS } from "./solicitar.utils";
 // arrays de leitura já resolvidos pelo servidor; o payload de escrita usa o
 // formato de entrada da mutation (`automationInventory`, contas por índice de
 // sistema), por isso é preciso estender aqui em vez de reaproveitar o tipo de leitura.
-export type ProjectPayload = Omit<Project, "id" | "createdAt" | "updatedAt"> & {
+// `targetSystems`/`automationAccounts` são removidos de propósito, não por
+// descuido: eles existem em `Project` como visão de LEITURA (já resolvida, com
+// id e sistema como objeto), e o input da mutation só conhece
+// `automationInventory` (contas por índice). Se continuassem aqui, escrever
+// `targetSystems: project.targetSystems` no payload compilaria — e o `z.object`
+// do servidor descartaria o campo em silêncio, gravando nada. Removê-los
+// transforma esse engano em erro de compilação.
+export type ProjectPayload = Omit<
+  Project,
+  "id" | "createdAt" | "updatedAt" | "targetSystems" | "automationAccounts"
+> & {
   automationInventory?: ReturnType<typeof buildAutomationInventory>;
 };
 
