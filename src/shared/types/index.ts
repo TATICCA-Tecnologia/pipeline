@@ -37,7 +37,11 @@ export interface PersonOfInterest {
 export interface ProjectTargetSystemView {
   id: string;
   targetSystemId: string | null;
-  /** Nome já resolvido: do catálogo, ou o customName quando fora dele. */
+  /**
+   * Nome já resolvido: do catálogo, ou o customName quando fora dele. Nunca
+   * deve chegar vazio — string vazia aqui é bug de backend, não valor
+   * legítimo, e não deve ser renderizada na ficha nem no deck.
+   */
   name: string;
   categoryName: string | null;
   accessPoint: string | null;
@@ -120,20 +124,22 @@ export interface Project {
   mainToolId?: string;
   mainToolCategory?: { id: string; name: string; slug: string };
   mainToolCategoryId?: string;
-  currentApplicationAssetId?: string | null;
-  currentApplicationOwnerRole?: string | null;
-  currentApplicationOwnerAreaId?: string | null;
-  currentApplicationOwnerAreaName?: string | null;
-  currentApplicationDataInput?: string | null;
-  currentApplicationDataInputDetails?: string | null;
-  currentApplicationDataOutput?: string | null;
-  currentApplicationDataOutputDetails?: string | null;
-  currentApplicationContingencyActions?: string[] | null;
-  currentApplicationContingencyDetails?: string | null;
-  currentApplicationBackupOwner?: string | null;
-  handlesSensitiveData?: string | null;
-  sensitiveDataCategories?: string[] | null;
-  sensitiveDataDetails?: string | null;
+  currentApplicationAssetId?: string;
+  currentApplicationOwnerRole?: string;
+  // Achatado de propósito, ao contrário de `area`, que é objeto aninhado com
+  // slug: aqui o setor é só exibido como texto, nunca navegado.
+  currentApplicationOwnerAreaId?: string;
+  currentApplicationOwnerAreaName?: string;
+  currentApplicationDataInput?: string;
+  currentApplicationDataInputDetails?: string;
+  currentApplicationDataOutput?: string;
+  currentApplicationDataOutputDetails?: string;
+  currentApplicationContingencyActions?: string[];
+  currentApplicationContingencyDetails?: string;
+  currentApplicationBackupOwner?: string;
+  handlesSensitiveData?: string;
+  sensitiveDataCategories?: string[];
+  sensitiveDataDetails?: string;
   targetSystems?: ProjectTargetSystemView[];
   automationAccounts?: ProjectAutomationAccountView[];
   executionStrategy?: string;
