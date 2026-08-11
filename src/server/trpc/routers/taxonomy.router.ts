@@ -473,6 +473,82 @@ export const taxonomyRouter = router({
     }),
 
   // ==========================================
+  // SISTEMA-ALVO
+  // ==========================================
+
+  listTargetSystems: publicProcedure.query(async ({ ctx }) => {
+    return ctx.db.targetSystem.findMany({
+      where: { isActive: true },
+      orderBy: { order: "asc" },
+    });
+  }),
+
+  listAllTargetSystems: protectedProcedure.query(async ({ ctx }) => {
+    return ctx.db.targetSystem.findMany({
+      include: { category: { select: { id: true, name: true, slug: true } } },
+      orderBy: { order: "asc" },
+    });
+  }),
+
+  createTargetSystem: adminProcedure
+    .input(
+      z.object({
+        name: z.string().min(1),
+        slug: z.string().min(1).regex(/^[a-z0-9-]+$/, "Slug deve ter apenas letras minúsculas, números e hífens"),
+        order: z.number().int().default(0),
+        categoryId: z.string().nullable().optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      // Idempotente por slug, em vez de CONFLICT: `listTargetSystems` só devolve
+      // sistemas ativos, e a tela de Arquitetura ainda filtra por categoria
+      // — então um sistema que existe mas está inativo (ou está em outra
+      // categoria) fica invisível para o usuário, que naturalmente tenta
+      // criá-lo. Com CONFLICT ele entrava num beco sem saída: não conseguia
+      // nem ver nem criar. Aqui o sistema existente é reativado, recebe a
+      // categoria caso ainda não tenha uma, e é devolvido como se tivesse sido
+      // criado — que é exatamente o que o usuário pediu.
+      const exists = await ctx.db.targetSystem.findUnique({ where: { slug: input.slug } });
+      if (exists) {
+        return ctx.db.targetSystem.update({
+          where: { id: exists.id },
+          data: {
+            isActive: true,
+            // Não sobrescreve uma categoria já definida: o usuário pode estar
+            // criando a partir de outra categoria sem querer remanejar o
+            // sistema existente.
+            ...(exists.categoryId == null && input.categoryId != null
+              ? { categoryId: input.categoryId }
+              : {}),
+          },
+        });
+      }
+      return ctx.db.targetSystem.create({ data: input });
+    }),
+
+  updateTargetSystem: adminProcedure
+    .input(
+      z.object({
+        id: z.string(),
+        name: z.string().min(1).optional(),
+        isActive: z.boolean().optional(),
+        order: z.number().int().optional(),
+        categoryId: z.string().nullable().optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const { id, ...data } = input;
+      return ctx.db.targetSystem.update({ where: { id }, data });
+    }),
+
+  deleteTargetSystem: adminProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      await ctx.db.targetSystem.delete({ where: { id: input.id } });
+      return { success: true };
+    }),
+
+  // ==========================================
   // TIPO DE PROJETO
   // ==========================================
 
@@ -640,6 +716,66 @@ export const taxonomyRouter = router({
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
       await ctx.db.mainToolCategory.delete({ where: { id: input.id } });
+      return { success: true };
+    }),
+
+  // ==========================================
+  // CATEGORIA DE SISTEMA-ALVO
+  // ==========================================
+
+  listTargetSystemCategories: publicProcedure.query(async ({ ctx }) => {
+    return ctx.db.targetSystemCategory.findMany({
+      where: { isActive: true },
+      orderBy: { order: "asc" },
+    });
+  }),
+
+  listAllTargetSystemCategories: protectedProcedure.query(async ({ ctx }) => {
+    return ctx.db.targetSystemCategory.findMany({
+      orderBy: { order: "asc" },
+    });
+  }),
+
+  createTargetSystemCategory: adminProcedure
+    .input(
+      z.object({
+        name: z.string().min(1),
+        slug: z.string().min(1).regex(/^[a-z0-9-]+$/, "Slug deve ter apenas letras minúsculas, números e hífens"),
+        order: z.number().int().default(0),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      // Mesmo motivo do createTargetSystem acima: uma categoria inativa some do
+      // `listTargetSystemCategories` e o usuário não conseguia nem selecioná-la nem
+      // recriá-la.
+      const exists = await ctx.db.targetSystemCategory.findUnique({ where: { slug: input.slug } });
+      if (exists) {
+        return ctx.db.targetSystemCategory.update({
+          where: { id: exists.id },
+          data: { isActive: true },
+        });
+      }
+      return ctx.db.targetSystemCategory.create({ data: input });
+    }),
+
+  updateTargetSystemCategory: adminProcedure
+    .input(
+      z.object({
+        id: z.string(),
+        name: z.string().min(1).optional(),
+        isActive: z.boolean().optional(),
+        order: z.number().int().optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const { id, ...data } = input;
+      return ctx.db.targetSystemCategory.update({ where: { id }, data });
+    }),
+
+  deleteTargetSystemCategory: adminProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      await ctx.db.targetSystemCategory.delete({ where: { id: input.id } });
       return { success: true };
     }),
 

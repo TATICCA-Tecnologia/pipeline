@@ -33,6 +33,36 @@ async function main() {
       role: "ADMIN",
     },
   });
+
+  const TARGET_SYSTEM_CATEGORIES = [
+    "ERP",
+    "Sistema fiscal/contábil",
+    "Portal governamental",
+    "Banco ou instituição financeira",
+    "E-mail e mensageria",
+    "Office e planilhas",
+    "Armazenamento de arquivos",
+    "Banco de dados",
+    "CRM",
+    "RH e folha",
+    "Sistema interno próprio",
+    "Site externo de terceiros",
+    "Outro",
+  ];
+
+  for (const [index, name] of TARGET_SYSTEM_CATEGORIES.entries()) {
+    const slug = name
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[̀-ͯ]/g, "")
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "");
+    await prisma.targetSystemCategory.upsert({
+      where: { slug },
+      update: {},
+      create: { name, slug, order: index },
+    });
+  }
 }
 
 main()
