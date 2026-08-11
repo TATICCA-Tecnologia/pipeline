@@ -25,6 +25,52 @@
   <localAcessosAplicacaoExistente></localAcessosAplicacaoExistente>
   <referenciaAcessosAplicacaoExistente></referenciaAcessosAplicacaoExistente>
   <producaoDesdeAplicacaoExistente></producaoDesdeAplicacaoExistente>
+  <!-- Identificador técnico do ativo (hostname, IP ou nº de patrimônio), ex.: SRV-RPA-01. Só preencha se citado literalmente na transcrição — nunca invente um identificador. -->
+  <ativoAplicacaoExistente></ativoAplicacaoExistente>
+  <cargoResponsavelAplicacaoExistente></cargoResponsavelAplicacaoExistente>
+  <!-- Nome do setor/área do responsável (ex.: Financeiro, TI). Precisa bater com uma área já cadastrada para ser reconhecido; se não bater, a tag é ignorada na importação (sem erro). -->
+  <setorResponsavelAplicacaoExistente></setorResponsavelAplicacaoExistente>
+  <responsavelSubstitutoAplicacaoExistente></responsavelSubstitutoAplicacaoExistente>
+  <!-- Cada <acao> deve corresponder exatamente a um destes rótulos (item que não bater é descartado da lista, sem bloquear a importação): Reexecutar ou reiniciar a automação | Verificar log ou relatório de erro | Verificar credenciais e acessos expirados | Acionar o TI interno | Acionar o fornecedor ou desenvolvedor externo | Executar o processo manualmente enquanto isso | Acionar o responsável da área de negócio | Não existe caminho definido hoje -->
+  <acoesContingencia>
+    <!-- <acao>Acionar o TI interno</acao> -->
+  </acoesContingencia>
+  <detalhesContingencia></detalhesContingencia>
+  <!-- CAMPO RESTRITO: use exatamente um destes valores, sem texto adicional. Valores: Sistema (ERP, CRM, portal) | Planilha | E-mail | API | Banco de dados | Pasta de rede ou SharePoint | Site ou portal web | Entrada manual de uma pessoa | Outro -->
+  <origemDadosEntrada></origemDadosEntrada>
+  <detalhesDadosEntrada></detalhesDadosEntrada>
+  <!-- CAMPO RESTRITO: mesmos valores de origemDadosEntrada. -->
+  <destinoDadosSaida></destinoDadosSaida>
+  <detalhesDadosSaida></detalhesDadosSaida>
+  <!-- CAMPO RESTRITO, sem fallback "Outro": use exatamente Sim | Não | Não sei -->
+  <dadosSigilosos></dadosSigilosos>
+  <!-- Preencha só se dadosSigilosos = Sim. Cada <categoria> deve corresponder exatamente a um destes rótulos (item que não bater é descartado da lista): Dados pessoais de clientes (LGPD) | Dados pessoais de colaboradores | Folha de pagamento e remuneração | Dados bancários e financeiros | Dados de saúde | Dados fiscais e contábeis | Contratos e jurídico | Propriedade intelectual | Credenciais e acessos -->
+  <categoriasDadosSigilosos>
+    <!-- <categoria>Dados pessoais de clientes (LGPD)</categoria> -->
+  </categoriasDadosSigilosos>
+  <detalhesDadosSigilosos></detalhesDadosSigilosos>
+  <!-- Sistemas sobre os quais a automação atua (SAP, portal da Receita, CRM interno...). <nome> é obrigatório (linha sem nome é descartada). <comoAcessar> é só o PONTEIRO de onde encontrar o acesso — NUNCA a senha, token ou chave, mesmo que apareça na transcrição. Nunca invente um sistema que não foi citado. -->
+  <sistemas>
+    <!--
+    <sistema>
+      <nome>SAP</nome>
+      <pontoAcesso>srv-sap.empresa.local</pontoAcesso>
+      <comoAcessar>Cofre do TI, pasta Automações</comoAcessar>
+    </sistema>
+    -->
+  </sistemas>
+  <!-- Contas/usernames que a automação usa. <usuario> é obrigatório (linha sem usuário é descartada) e é SÓ o login — NUNCA a senha, token ou chave. <tipo> é CAMPO RESTRITO: Usuário de serviço | Usuário nominal | Conta de e-mail | Chave de API | Certificado digital | Outro. <sistema> deve repetir, caractere por caractere, um <nome> já usado em <sistemas> acima. Nunca invente uma conta que não foi citada. -->
+  <contas>
+    <!--
+    <conta>
+      <usuario>rpa_sap</usuario>
+      <tipo>Usuário de serviço</tipo>
+      <sistema>SAP</sistema>
+      <responsavel>João do Financeiro</responsavel>
+      <observacoes></observacoes>
+    </conta>
+    -->
+  </contas>
   <colaboradoresEnvolvidos></colaboradoresEnvolvidos>
   <detalhesColaboradores></detalhesColaboradores>
   <duracaoPorExecucao></duracaoPorExecucao>

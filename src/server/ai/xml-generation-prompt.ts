@@ -1,5 +1,5 @@
 // Espelha o conteúdo da seção "## Prompt" de docs/prompt-geracao-xml.md
-// (histórico 7, 2026-07-07). ESSE ARQUIVO E O .md DEVEM FICAR SINCRONIZADOS —
+// (histórico 2026-08-11). ESSE ARQUIVO E O .md DEVEM FICAR SINCRONIZADOS —
 // ver a nota no topo de docs/prompt-geracao-xml.md: sempre que o schema do
 // XML mudar (public/modelo-solicitacao-projeto.xml,
 // src/app/(private)/cliente/solicitar/utils/xml-import.ts,
@@ -48,6 +48,43 @@ Antes de preencher qualquer XML, faça esta leitura analítica:
 <localAcessosAplicacaoExistente></localAcessosAplicacaoExistente>
 <referenciaAcessosAplicacaoExistente></referenciaAcessosAplicacaoExistente>
 <producaoDesdeAplicacaoExistente></producaoDesdeAplicacaoExistente>
+<ativoAplicacaoExistente></ativoAplicacaoExistente>
+<cargoResponsavelAplicacaoExistente></cargoResponsavelAplicacaoExistente>
+<setorResponsavelAplicacaoExistente></setorResponsavelAplicacaoExistente>
+<responsavelSubstitutoAplicacaoExistente></responsavelSubstitutoAplicacaoExistente>
+<acoesContingencia>
+  <!-- <acao>Acionar o TI interno</acao> -->
+</acoesContingencia>
+<detalhesContingencia></detalhesContingencia>
+<origemDadosEntrada></origemDadosEntrada>
+<detalhesDadosEntrada></detalhesDadosEntrada>
+<destinoDadosSaida></destinoDadosSaida>
+<detalhesDadosSaida></detalhesDadosSaida>
+<dadosSigilosos></dadosSigilosos>
+<categoriasDadosSigilosos>
+  <!-- <categoria>Dados pessoais de clientes (LGPD)</categoria> -->
+</categoriasDadosSigilosos>
+<detalhesDadosSigilosos></detalhesDadosSigilosos>
+<sistemas>
+  <!--
+  <sistema>
+    <nome>SAP</nome>
+    <pontoAcesso>srv-sap.empresa.local</pontoAcesso>
+    <comoAcessar>Cofre do TI, pasta Automações</comoAcessar>
+  </sistema>
+  -->
+</sistemas>
+<contas>
+  <!--
+  <conta>
+    <usuario>rpa_sap</usuario>
+    <tipo>Usuário de serviço</tipo>
+    <sistema>SAP</sistema>
+    <responsavel>João do Financeiro</responsavel>
+    <observacoes></observacoes>
+  </conta>
+  -->
+</contas>
 <colaboradoresEnvolvidos></colaboradoresEnvolvidos>
 <duracaoPorExecucao></duracaoPorExecucao>
 <periodicidade></periodicidade>
@@ -110,6 +147,39 @@ Antes de preencher qualquer XML, faça esta leitura analítica:
   CERTO: "Com o João do Financeiro"
   ERRADO: "usuário robo_fin senha Abc12345" (credencial literal — nunca)
 - <producaoDesdeAplicacaoExistente>: data em que a automação entrou em produção, no formato AAAA-MM-DD. Se a transcrição só der o mês ou o ano ("desde o começo de 2024", "faz uns dois anos"), use o primeiro dia do período mais provável (2024-01-01) e registre a imprecisão em <informacoesAdicionais>. Se não houver pista nenhuma, deixe vazio.
+- <ativoAplicacaoExistente>: identificador técnico do ativo onde a automação roda hoje — hostname, IP ou número de patrimônio (ex.: "SRV-RPA-01"). **Nunca invente um hostname, IP ou número de patrimônio plausível** — preencha só se a transcrição citar um identificador literal; "roda no servidor do financeiro" sem nome/IP específico não é suficiente (isso já é coberto por <hospedagemAplicacaoExistente>).
+  ERRADO: <ativoAplicacaoExistente>SRV-RPA-01</ativoAplicacaoExistente> quando a transcrição só diz "fica num servidor lá do TI" (nenhum identificador foi citado)
+  CERTO: transcrição diz "a máquina se chama SRV-FIN-03", <ativoAplicacaoExistente>SRV-FIN-03</ativoAplicacaoExistente>
+- <cargoResponsavelAplicacaoExistente>: cargo (não o nome) de quem cuida da automação hoje, como citado na transcrição (ex.: "Analista de Processos"). Deixe vazio se não mencionado — não confunda com <responsavelAplicacaoExistente> (o nome da pessoa).
+- <setorResponsavelAplicacaoExistente>: nome do setor/área do responsável (ex.: "Financeiro", "TI"). Precisa ser o nome de uma área já cadastrada no sistema para ser reconhecido automaticamente na importação — se não bater com nenhuma área cadastrada, a tag é simplesmente ignorada, sem erro. Use o nome mais provável citado na transcrição; o pior caso é só não preencher esse campo. **Nunca invente um setor que não foi citado.**
+- <responsavelSubstitutoAplicacaoExistente>: nome (ou cargo, se o nome não foi dito) de quem assume se o responsável atual sair da empresa. Vazio se a transcrição não abordou isso.
+- <acoesContingencia>/<acao>: cada item deve corresponder EXATAMENTE a um destes rótulos (item que não bater é descartado da lista, sem bloquear a importação):
+  Reexecutar ou reiniciar a automação | Verificar log ou relatório de erro | Verificar credenciais e acessos expirados | Acionar o TI interno | Acionar o fornecedor ou desenvolvedor externo | Executar o processo manualmente enquanto isso | Acionar o responsável da área de negócio | Não existe caminho definido hoje
+  **Nunca invente um plano de contingência que não foi mencionado na transcrição.** Se a transcrição disser explicitamente que ninguém sabe o que fazer ou que não há plano, use o item "Não existe caminho definido hoje" — essa opção existe para registrar essa ausência como um dado, não como uma lacuna. Se o assunto simplesmente não foi discutido, deixe a lista vazia (isso NÃO é a mesma coisa que "não existe caminho definido").
+- <detalhesContingencia>: passo a passo em texto livre, se a transcrição detalhar como agir. Não repita os rótulos de <acoesContingencia>, complemente-os.
+- <origemDadosEntrada> / <destinoDadosSaida>: **CAMPO RESTRITO**, use exatamente um destes valores, e nada além disso:
+  Sistema (ERP, CRM, portal) | Planilha | E-mail | API | Banco de dados | Pasta de rede ou SharePoint | Site ou portal web | Entrada manual de uma pessoa | Outro
+  Se a transcrição não deixar claro qual se aplica, deixe vazio — não force "Outro" nem chute. O nome do sistema/planilha específico, caminho ou frequência vai no campo de detalhes correspondente, nunca dentro desta tag.
+  ERRADO: <origemDadosEntrada>Planilha compartilhada no SharePoint do financeiro</origemDadosEntrada>
+  CERTO: <origemDadosEntrada>Planilha</origemDadosEntrada> — o complemento "compartilhada no SharePoint do financeiro" vai em <detalhesDadosEntrada>.
+- <detalhesDadosEntrada> / <detalhesDadosSaida>: nome do sistema/planilha específico, caminho ou frequência, como citado na transcrição.
+- <dadosSigilosos>: **CAMPO RESTRITO, sem fallback "Outro"**. Use exatamente um destes valores: Sim | Não | Não sei
+  Pergunte-se: a automação lida com dados pessoais, financeiros, de saúde, credenciais etc.? Se o assunto não foi discutido na reunião, deixe vazio — não assuma "Não" por padrão só porque ninguém mencionou.
+- <categoriasDadosSigilosos>/<categoria>: preencha só se <dadosSigilosos> = "Sim". Cada item deve corresponder EXATAMENTE a um destes rótulos (item que não bater é descartado da lista):
+  Dados pessoais de clientes (LGPD) | Dados pessoais de colaboradores | Folha de pagamento e remuneração | Dados bancários e financeiros | Dados de saúde | Dados fiscais e contábeis | Contratos e jurídico | Propriedade intelectual | Credenciais e acessos
+- <detalhesDadosSigilosos>: que dado, de quem, com que finalidade — texto livre, com base no que a transcrição disser.
+- <sistemas>/<sistema>: um item por sistema sobre o qual a automação atua (SAP, portal da Receita, CRM interno etc.) — vale mesmo para uma automação nova, ainda a desenvolver, porque ela também vai atuar sobre sistemas. Cada <sistema> tem três subtags:
+  <nome>: obrigatório para a linha ser aproveitada (linha sem nome é descartada na importação). Nome do sistema, como citado na transcrição.
+  <pontoAcesso>: URL, servidor ou instância — ex.: "srv-sap.empresa.local" ou o link do portal.
+  <comoAcessar>: ponteiro curto de ONDE encontrar o acesso (cofre, pasta, pessoa) — **NUNCA a credencial em si.** Mesma regra de <referenciaAcessosAplicacaoExistente>: se a transcrição citar usuário+senha literal, ignore a credencial e descreva só a localização.
+  **Nunca invente um sistema que não foi citado na transcrição** — uma linha vazia ou genérica ("Sistema interno") é pior do que não ter a linha.
+- <contas>/<conta>: um item por conta/usuário que a automação usa para acessar os sistemas de <sistemas> acima. Cada <conta> tem cinco subtags:
+  <usuario>: obrigatório para a linha ser aproveitada (linha sem usuário é descartada na importação). Só o login/identificador — **NUNCA a senha, token ou chave**, mesmo que apareçam na transcrição.
+  <tipo>: **CAMPO RESTRITO**, use exatamente um destes valores: Usuário de serviço | Usuário nominal | Conta de e-mail | Chave de API | Certificado digital | Outro
+  <sistema>: deve repetir, caractere por caractere, o valor de algum <nome> já usado em <sistemas> acima — é assim que a importação liga a conta ao sistema certo. Se não bater com nenhum <nome>, a conta ainda é importada, só que sem sistema vinculado.
+  <responsavel>: de quem é a conta / quem responde por ela.
+  <observacoes>: texto livre, opcional.
+  **Nunca invente uma conta, usuário ou sistema vinculado que não foi citado na transcrição.**
 - <colaboradoresEnvolvidos>: **campo importante, não deixe vazio por padrão** — número inteiro de pessoas envolvidas na execução MANUAL do processo hoje. Busque ativamente na transcrição qualquer pista sobre quem faz a tarefa (nomes citados, "eu que faço isso", "duas pessoas revezam", "o time todo passa por isso") e converta para um número — só deixe vazio se a transcrição genuinamente não der nenhuma pista, o que deve ser raro numa reunião de levantamento.
   NÃO confunda com quem desenvolveu uma automação/script/fluxo informal já existente (isso vai em <detalhesAplicacaoExistente>, não aqui) — "colaboradoresEnvolvidos" é sobre quem executa o processo, não quem programou uma ferramenta para ele.
   ERRADO: deixar vazio porque a transcrição só menciona "foi o Leandro que desenvolveu o fluxo em Power Automate" (isso é sobre desenvolvimento da automação, não sobre quem faz o processo manualmente)
@@ -151,7 +221,7 @@ Antes de preencher qualquer XML, faça esta leitura analítica:
 
 ## Regras gerais
 
-1. Use SOMENTE informações explícitas ou razoavelmente inferíveis da transcrição. Não invente números, nomes ou prazos. Nos campos de texto livre (<descricao>, <narrativaDoProcesso>, <detalhesProcessoAtual>, <detalhesAplicacaoExistente>, <detalhesBeneficios>), prefira sempre a versão mais completa que a transcrição permitir, dentro do limite de 2-3 frases indicado em cada campo — não comprima informação real da reunião numa frase única e genérica.
+1. Use SOMENTE informações explícitas ou razoavelmente inferíveis da transcrição. Não invente números, nomes ou prazos — e o mesmo vale para hostname/ativo, conta/usuário, plano de contingência ou sistema: se não foi citado na transcrição, a tag correspondente fica vazia; uma ficha de catálogo com dado inventado é pior que uma ficha vazia. Nos campos de texto livre (<descricao>, <narrativaDoProcesso>, <detalhesProcessoAtual>, <detalhesAplicacaoExistente>, <detalhesBeneficios>), prefira sempre a versão mais completa que a transcrição permitir, dentro do limite de 2-3 frases indicado em cada campo — não comprima informação real da reunião numa frase única e genérica.
 2. Se um campo não pode ser preenchido com segurança, deixe a tag vazia — nunca escreva "não informado" dentro dela.
 3. Toda inferência, cálculo ou conversão deve ser explicado na seção de observações ao final (fora do XML), mesmo quando também repetido dentro de <informacoesAdicionais>.
 4. Não misture informações de processos diferentes no mesmo XML.
@@ -186,6 +256,25 @@ XML resultante:
 <localAcessosAplicacaoExistente></localAcessosAplicacaoExistente>
 <referenciaAcessosAplicacaoExistente></referenciaAcessosAplicacaoExistente>
 <producaoDesdeAplicacaoExistente></producaoDesdeAplicacaoExistente>
+<ativoAplicacaoExistente></ativoAplicacaoExistente>
+<cargoResponsavelAplicacaoExistente></cargoResponsavelAplicacaoExistente>
+<setorResponsavelAplicacaoExistente></setorResponsavelAplicacaoExistente>
+<responsavelSubstitutoAplicacaoExistente></responsavelSubstitutoAplicacaoExistente>
+<acoesContingencia>
+</acoesContingencia>
+<detalhesContingencia></detalhesContingencia>
+<origemDadosEntrada></origemDadosEntrada>
+<detalhesDadosEntrada></detalhesDadosEntrada>
+<destinoDadosSaida></destinoDadosSaida>
+<detalhesDadosSaida></detalhesDadosSaida>
+<dadosSigilosos></dadosSigilosos>
+<categoriasDadosSigilosos>
+</categoriasDadosSigilosos>
+<detalhesDadosSigilosos></detalhesDadosSigilosos>
+<sistemas>
+</sistemas>
+<contas>
+</contas>
 <colaboradoresEnvolvidos>2</colaboradoresEnvolvidos>
 <duracaoPorExecucao>8</duracaoPorExecucao>
 <periodicidade>Mensal</periodicidade>

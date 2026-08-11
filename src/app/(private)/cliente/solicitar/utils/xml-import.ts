@@ -10,6 +10,12 @@ import {
   CURRENT_APPLICATION_HOSTING_OPTIONS,
   CURRENT_APPLICATION_ACCESS_LOCATION_OPTIONS,
   CURRENT_APPLICATION_ACCESS_REFERENCE_MAX_LENGTH,
+  CURRENT_APPLICATION_DATA_ENDPOINT_OPTIONS,
+  CURRENT_APPLICATION_CONTINGENCY_OPTIONS,
+  AUTOMATION_ACCOUNT_TYPE_OPTIONS,
+  AUTOMATION_ACCOUNT_USERNAME_MAX_LENGTH,
+  SENSITIVE_DATA_ANSWER_OPTIONS,
+  SENSITIVE_DATA_CATEGORY_OPTIONS,
 } from "./solicitar.utils";
 
 export interface XmlImportContext {
@@ -55,6 +61,15 @@ function getListItems(root: Element, groupTag: string, itemTag: string): string[
     .filter((c) => c.tagName === itemTag)
     .map((c) => (c.textContent ?? "").trim())
     .filter((t) => t.length > 0);
+}
+
+// Mesmo achado de <groupTag> que getListItems, mas devolve os elementos em vez
+// do texto — usado por <sistemas>/<sistema> e <contas>/<conta>, cujos itens
+// carregam vários campos (sub-tags) em vez de um texto único.
+function getListElements(root: Element, groupTag: string, itemTag: string): Element[] {
+  const group = Array.from(root.children).find((c) => c.tagName === groupTag);
+  if (!group) return [];
+  return Array.from(group.children).filter((c) => c.tagName === itemTag);
 }
 
 function matchByLabel<T extends { label: string }>(
@@ -262,6 +277,203 @@ export function parseSolicitacaoXml(
     }
   }
 
+  // Critérios do catálogo (ativo, cargo/setor do responsável, substituto,
+  // contingência, origem/destino de dados, dados sigilosos, sistemas e
+  // contas). Mesmo padrão do resto da função: tudo opcional, nada bloqueia o
+  // import, valor não reconhecido vira "outro" (quando a lista tiver essa
+  // opção) ou é descartado com aviso (quando não tiver).
+  const currentApplicationAssetId = getDirectChildText(root, "ativoAplicacaoExistente");
+  const currentApplicationOwnerRole = getDirectChildText(
+    root,
+    "cargoResponsavelAplicacaoExistente"
+  );
+
+  // <setorResponsavelAplicacaoExistente> — mesma tabela ProjectArea de <area>,
+  // mas SEM fallback "outro": a ficha só aceita área já cadastrada (ver
+  // SustentacaoBlock), não há campo de texto livre pra guardar o nome cru.
+  const setorResponsavelTag = getDirectChildText(root, "setorResponsavelAplicacaoExistente");
+  let currentApplicationOwnerAreaId = "";
+  if (setorResponsavelTag) {
+    const setorMatch = matchByLabel(setorResponsavelTag, context.areas);
+    if (setorMatch?.id) {
+      currentApplicationOwnerAreaId = setorMatch.id;
+    } else {
+      warnings.push(
+        `<setorResponsavelAplicacaoExistente> com valor '${setorResponsavelTag}' não corresponde a nenhuma área cadastrada e foi ignorado.`
+      );
+    }
+  }
+
+  const currentApplicationBackupOwner = getDirectChildText(
+    root,
+    "responsavelSubstitutoAplicacaoExistente"
+  );
+
+  // <acoesContingencia>/<acao> — item não reconhecido não bloqueia o import:
+  // não entra na lista (a lista não tem opção "outro") e o texto original é
+  // preservado em <detalhesContingencia>, mesmo padrão de <beneficios>.
+  const contingencyItems = getListItems(root, "acoesContingencia", "acao");
+  const currentApplicationContingencyActions: string[] = [];
+  const unmatchedContingencyItems: string[] = [];
+  for (const item of contingencyItems) {
+    const match = matchByLabel(item, CURRENT_APPLICATION_CONTINGENCY_OPTIONS);
+    if (match) {
+      currentApplicationContingencyActions.push(match.key);
+    } else {
+      unmatchedContingencyItems.push(item);
+      warnings.push(
+        `O item '${item}' dentro de <acoesContingencia> não corresponde a nenhuma ação conhecida; foi removido da lista e o texto foi preservado nos detalhes de contingência.`
+      );
+    }
+  }
+  const detalhesContingenciaTag = getDirectChildText(root, "detalhesContingencia");
+  const currentApplicationContingencyDetails = [detalhesContingenciaTag, ...unmatchedContingencyItems]
+    .filter(Boolean)
+    .join(" | ");
+
+  // <origemDadosEntrada> / <destinoDadosSaida> — com fallback "Outro"
+  const origemTag = getDirectChildText(root, "origemDadosEntrada");
+  let currentApplicationDataInput = "";
+  if (origemTag) {
+    const match = matchByLabel(origemTag, CURRENT_APPLICATION_DATA_ENDPOINT_OPTIONS);
+    currentApplicationDataInput = match ? match.value : "outro";
+    if (!match) {
+      warnings.push(
+        `<origemDadosEntrada> com valor '${origemTag}' não corresponde a nenhuma opção conhecida; foi tratado como "Outro".`
+      );
+    }
+  }
+  const currentApplicationDataInputDetails = getDirectChildText(root, "detalhesDadosEntrada");
+
+  const destinoTag = getDirectChildText(root, "destinoDadosSaida");
+  let currentApplicationDataOutput = "";
+  if (destinoTag) {
+    const match = matchByLabel(destinoTag, CURRENT_APPLICATION_DATA_ENDPOINT_OPTIONS);
+    currentApplicationDataOutput = match ? match.value : "outro";
+    if (!match) {
+      warnings.push(
+        `<destinoDadosSaida> com valor '${destinoTag}' não corresponde a nenhuma opção conhecida; foi tratado como "Outro".`
+      );
+    }
+  }
+  const currentApplicationDataOutputDetails = getDirectChildText(root, "detalhesDadosSaida");
+
+  // <dadosSigilosos> — CAMPO RESTRITO, sem fallback "Outro" (Sim/Não/Não sei).
+  const dadosSigilososTag = getDirectChildText(root, "dadosSigilosos");
+  let handlesSensitiveData = "";
+  if (dadosSigilososTag) {
+    const match = matchByLabel(dadosSigilososTag, SENSITIVE_DATA_ANSWER_OPTIONS);
+    if (match) {
+      handlesSensitiveData = match.value;
+    } else {
+      warnings.push(
+        `<dadosSigilosos> com valor '${dadosSigilososTag}' não corresponde a nenhuma opção conhecida (Sim, Não ou Não sei) e foi ignorado.`
+      );
+    }
+  }
+
+  // <categoriasDadosSigilosos>/<categoria> — mesmo padrão de <acoesContingencia>:
+  // item não reconhecido não entra na lista, texto preservado nos detalhes.
+  const categoriaItems = getListItems(root, "categoriasDadosSigilosos", "categoria");
+  const sensitiveDataCategories: string[] = [];
+  const unmatchedCategoriaItems: string[] = [];
+  for (const item of categoriaItems) {
+    const match = matchByLabel(item, SENSITIVE_DATA_CATEGORY_OPTIONS);
+    if (match) {
+      sensitiveDataCategories.push(match.key);
+    } else {
+      unmatchedCategoriaItems.push(item);
+      warnings.push(
+        `O item '${item}' dentro de <categoriasDadosSigilosos> não corresponde a nenhuma categoria conhecida; foi removido da lista e o texto foi preservado nos detalhes de dados sigilosos.`
+      );
+    }
+  }
+  const detalhesDadosSigilososTag = getDirectChildText(root, "detalhesDadosSigilosos");
+  const sensitiveDataDetails = [detalhesDadosSigilososTag, ...unmatchedCategoriaItems]
+    .filter(Boolean)
+    .join(" | ");
+
+  // <sistemas>/<sistema> — linha sem <nome> é descartada (não há como
+  // referenciar essa linha depois, nem em <contas>/<sistema>).
+  const systemElements = getListElements(root, "sistemas", "sistema");
+  const targetSystems: SolicitarProjetoFormData["targetSystems"] = [];
+  for (const el of systemElements) {
+    const nome = getDirectChildText(el, "nome");
+    if (!nome) {
+      warnings.push(`Uma linha dentro de <sistemas> não tinha <nome> e foi descartada.`);
+      continue;
+    }
+    let accessNotes = getDirectChildText(el, "comoAcessar");
+    if (accessNotes.length > CURRENT_APPLICATION_ACCESS_REFERENCE_MAX_LENGTH) {
+      accessNotes = accessNotes.slice(0, CURRENT_APPLICATION_ACCESS_REFERENCE_MAX_LENGTH);
+      warnings.push(
+        `<comoAcessar> do sistema '${nome}' tinha mais de ${CURRENT_APPLICATION_ACCESS_REFERENCE_MAX_LENGTH} caracteres e foi truncado.`
+      );
+    }
+    targetSystems.push({
+      targetSystemId: "",
+      customName: nome,
+      accessPoint: getDirectChildText(el, "pontoAcesso"),
+      accessNotes,
+    });
+  }
+
+  // <contas>/<conta> — processada DEPOIS de <sistemas> de propósito: o
+  // <sistema> de cada conta casa por nome com as linhas já montadas acima.
+  // Linha sem <usuario> é descartada. Conta cujo <sistema> não bate com
+  // nenhuma linha de <sistemas> entra com systemIndex ausente (null) — nunca
+  // chutado: o servidor estoura se o índice ficar fora do intervalo.
+  const accountElements = getListElements(root, "contas", "conta");
+  const automationAccounts: SolicitarProjetoFormData["automationAccounts"] = [];
+  for (const el of accountElements) {
+    let username = getDirectChildText(el, "usuario");
+    if (!username) {
+      warnings.push(`Uma linha dentro de <contas> não tinha <usuario> e foi descartada.`);
+      continue;
+    }
+    if (username.length > AUTOMATION_ACCOUNT_USERNAME_MAX_LENGTH) {
+      warnings.push(
+        `<usuario> '${username}' tinha mais de ${AUTOMATION_ACCOUNT_USERNAME_MAX_LENGTH} caracteres e foi truncado.`
+      );
+      username = username.slice(0, AUTOMATION_ACCOUNT_USERNAME_MAX_LENGTH);
+    }
+
+    const tipoTag = getDirectChildText(el, "tipo");
+    let accountType = "";
+    if (tipoTag) {
+      const match = matchByLabel(tipoTag, AUTOMATION_ACCOUNT_TYPE_OPTIONS);
+      accountType = match ? match.value : "outro";
+      if (!match) {
+        warnings.push(
+          `<tipo> da conta '${username}' com valor '${tipoTag}' não corresponde a nenhuma opção conhecida; foi tratado como "Outro".`
+        );
+      }
+    }
+
+    const sistemaTag = getDirectChildText(el, "sistema");
+    let systemIndex: number | null = null;
+    if (sistemaTag) {
+      const idx = targetSystems.findIndex(
+        (s) => s.customName.trim().toLowerCase() === sistemaTag.trim().toLowerCase()
+      );
+      if (idx >= 0) {
+        systemIndex = idx;
+      } else {
+        warnings.push(
+          `A conta '${username}' referencia o sistema '${sistemaTag}', que não corresponde a nenhum item de <sistemas>; entrou sem sistema vinculado.`
+        );
+      }
+    }
+
+    automationAccounts.push({
+      username,
+      systemIndex,
+      accountType,
+      ownerName: getDirectChildText(el, "responsavel"),
+      notes: getDirectChildText(el, "observacoes"),
+    });
+  }
+
   // <colaboradoresEnvolvidos> — deve ser um número (contagem). Se vier texto (ex.: nomes),
   // não bloqueia o import: o número fica vazio e o texto é preservado em <detalhesColaboradores>.
   const colaboradoresTag = getDirectChildText(root, "colaboradoresEnvolvidos");
@@ -451,24 +663,21 @@ export function parseSolicitacaoXml(
     urgency,
     deadline,
     additionalInfo,
-    // Preenchidos vazios de propósito: as tags novas do XML entram na task da
-    // ficha de catálogo. Aqui só mantemos o literal completo, já que o tipo de
-    // saída do Zod passou a exigir estes campos.
-    currentApplicationAssetId: "",
-    currentApplicationOwnerRole: "",
-    currentApplicationOwnerAreaId: "",
-    currentApplicationDataInput: "",
-    currentApplicationDataInputDetails: "",
-    currentApplicationDataOutput: "",
-    currentApplicationDataOutputDetails: "",
-    currentApplicationContingencyActions: [],
-    currentApplicationContingencyDetails: "",
-    currentApplicationBackupOwner: "",
-    handlesSensitiveData: "",
-    sensitiveDataCategories: [],
-    sensitiveDataDetails: "",
-    targetSystems: [],
-    automationAccounts: [],
+    currentApplicationAssetId,
+    currentApplicationOwnerRole,
+    currentApplicationOwnerAreaId,
+    currentApplicationDataInput,
+    currentApplicationDataInputDetails,
+    currentApplicationDataOutput,
+    currentApplicationDataOutputDetails,
+    currentApplicationContingencyActions,
+    currentApplicationContingencyDetails,
+    currentApplicationBackupOwner,
+    handlesSensitiveData,
+    sensitiveDataCategories,
+    sensitiveDataDetails,
+    targetSystems,
+    automationAccounts,
   };
 
   return {
