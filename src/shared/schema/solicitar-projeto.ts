@@ -1,5 +1,8 @@
 import { z } from "zod";
-import { CURRENT_APPLICATION_ACCESS_REFERENCE_MAX_LENGTH } from "@/shared/constants/project-taxonomy";
+import {
+  CURRENT_APPLICATION_ACCESS_REFERENCE_MAX_LENGTH,
+  AUTOMATION_ACCOUNT_USERNAME_MAX_LENGTH,
+} from "@/shared/constants/project-taxonomy";
 
 const ratingScale = z
   .number()
@@ -44,6 +47,50 @@ export const solicitarProjetoSchema = z
       .optional()
       .default(""),
     currentApplicationLiveSince: z.string().optional().default(""),
+    currentApplicationAssetId: z.string().optional().default(""),
+    currentApplicationOwnerRole: z.string().optional().default(""),
+    currentApplicationOwnerAreaId: z.string().optional().default(""),
+    currentApplicationDataInput: z.string().optional().default(""),
+    currentApplicationDataInputDetails: z.string().optional().default(""),
+    currentApplicationDataOutput: z.string().optional().default(""),
+    currentApplicationDataOutputDetails: z.string().optional().default(""),
+    currentApplicationContingencyActions: z.array(z.string()).optional().default([]),
+    currentApplicationContingencyDetails: z.string().optional().default(""),
+    currentApplicationBackupOwner: z.string().optional().default(""),
+    handlesSensitiveData: z.string().optional().default(""),
+    sensitiveDataCategories: z.array(z.string()).optional().default([]),
+    sensitiveDataDetails: z.string().optional().default(""),
+    targetSystems: z
+      .array(
+        z.object({
+          targetSystemId: z.string().optional().default(""),
+          customName: z.string().optional().default(""),
+          accessPoint: z.string().optional().default(""),
+          accessNotes: z
+            .string()
+            .max(CURRENT_APPLICATION_ACCESS_REFERENCE_MAX_LENGTH, "Máximo de 200 caracteres")
+            .optional()
+            .default(""),
+        })
+      )
+      .optional()
+      .default([]),
+    automationAccounts: z
+      .array(
+        z.object({
+          username: z
+            .string()
+            .max(AUTOMATION_ACCOUNT_USERNAME_MAX_LENGTH, "Máximo de 120 caracteres")
+            .optional()
+            .default(""),
+          systemIndex: z.number().int().min(0).nullable().optional().default(null),
+          accountType: z.string().optional().default(""),
+          ownerName: z.string().optional().default(""),
+          notes: z.string().optional().default(""),
+        })
+      )
+      .optional()
+      .default([]),
     peopleInvolved: z.string().optional().default(""),
     peopleInvolvedDetails: z.string().optional().default(""),
     taskDurationHours: z.string().optional().default(""),

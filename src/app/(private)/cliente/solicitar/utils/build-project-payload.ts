@@ -2,7 +2,13 @@ import type { Project } from "@/shared/types";
 import type { SolicitarProjetoFormData } from "@/shared/schema/solicitar-projeto";
 import { PLATFORMS } from "./solicitar.utils";
 
-export type ProjectPayload = Omit<Project, "id" | "createdAt" | "updatedAt">;
+// `Project` (shared/types) só expõe `targetSystems`/`automationAccounts` como
+// arrays de leitura já resolvidos pelo servidor; o payload de escrita usa o
+// formato de entrada da mutation (`automationInventory`, contas por índice de
+// sistema), por isso é preciso estender aqui em vez de reaproveitar o tipo de leitura.
+export type ProjectPayload = Omit<Project, "id" | "createdAt" | "updatedAt"> & {
+  automationInventory?: ReturnType<typeof buildAutomationInventory>;
+};
 
 export function buildProjectPayload(params: {
   data: SolicitarProjetoFormData;
@@ -97,6 +103,24 @@ export function buildProjectPayload(params: {
     currentApplicationLiveSince: data.currentApplicationLiveSince
       ? new Date(data.currentApplicationLiveSince)
       : undefined,
+    currentApplicationAssetId: data.currentApplicationAssetId || undefined,
+    currentApplicationOwnerRole: data.currentApplicationOwnerRole || undefined,
+    currentApplicationOwnerAreaId: data.currentApplicationOwnerAreaId || undefined,
+    currentApplicationDataInput: data.currentApplicationDataInput || undefined,
+    currentApplicationDataInputDetails: data.currentApplicationDataInputDetails || undefined,
+    currentApplicationDataOutput: data.currentApplicationDataOutput || undefined,
+    currentApplicationDataOutputDetails: data.currentApplicationDataOutputDetails || undefined,
+    currentApplicationContingencyActions: data.currentApplicationContingencyActions?.length
+      ? data.currentApplicationContingencyActions
+      : undefined,
+    currentApplicationContingencyDetails: data.currentApplicationContingencyDetails || undefined,
+    currentApplicationBackupOwner: data.currentApplicationBackupOwner || undefined,
+    handlesSensitiveData: data.handlesSensitiveData || undefined,
+    sensitiveDataCategories: data.sensitiveDataCategories?.length
+      ? data.sensitiveDataCategories
+      : undefined,
+    sensitiveDataDetails: data.sensitiveDataDetails || undefined,
+    automationInventory: buildAutomationInventory(data),
     projectNarrative: data.projectNarrative || undefined,
     benefits: benefits.length ? benefits : undefined,
     benefitsDetails: data.benefitsDetails || undefined,
@@ -116,5 +140,39 @@ export function buildProjectPayload(params: {
         ? taskDurationHoursValue
         : undefined,
     processFrequency: processFrequencyValue || undefined,
+  };
+}
+
+function buildAutomationInventory(data: SolicitarProjetoFormData) {
+  const systems = (data.targetSystems ?? []).filter(
+    (s) => s.targetSystemId || s.customName.trim()
+  );
+  // O índice precisa apontar para a lista JÁ FILTRADA: descartar uma linha vazia
+  // no meio desloca todas as seguintes, e as contas passariam a apontar para o
+  // sistema errado — em silêncio, sem erro.
+  const indexMap = new Map<number, number>();
+  (data.targetSystems ?? []).forEach((s, original) => {
+    if (s.targetSystemId || s.customName.trim()) indexMap.set(original, indexMap.size);
+  });
+
+  const accounts = (data.automationAccounts ?? [])
+    .filter((a) => a.username.trim())
+    .map((a) => ({
+      username: a.username.trim(),
+      systemIndex: a.systemIndex != null ? indexMap.get(a.systemIndex) : undefined,
+      accountType: a.accountType || undefined,
+      ownerName: a.ownerName || undefined,
+      notes: a.notes || undefined,
+    }));
+
+  if (systems.length === 0 && accounts.length === 0) return undefined;
+  return {
+    systems: systems.map((s) => ({
+      targetSystemId: s.targetSystemId || undefined,
+      customName: s.customName.trim() || undefined,
+      accessPoint: s.accessPoint || undefined,
+      accessNotes: s.accessNotes || undefined,
+    })),
+    accounts,
   };
 }
