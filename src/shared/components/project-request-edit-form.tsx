@@ -188,7 +188,8 @@ export function ProjectRequestEditForm({
   });
 
   // Hidratada uma única vez, via função nomeada (`buildAutomationInventoryValue`
-  // em automation-inventory-fields.tsx) que faz a conversão leitura -> formulário:
+  // em automation-inventory-value.ts, reexportada por automation-inventory-fields.tsx)
+  // que faz a conversão leitura -> formulário:
   // resolve `projectTargetSystemId` (id estável) para `systemIndex` (posição),
   // usando um Map construído a partir da MESMA lista `project.targetSystems`
   // que alimenta as linhas do formulário. Não precisa de useEffect de

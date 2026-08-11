@@ -207,7 +207,7 @@ export function ArchitectureTab({ projectId }: ArchitectureTabProps) {
   // `buildAutomationInventoryValue` — a função nomeada que resolve
   // `projectTargetSystemId` (id estável) para `systemIndex` (posição), usando
   // um Map construído a partir da MESMA lista `project.targetSystems` que
-  // alimenta as linhas do formulário. Ver automation-inventory-fields.tsx.
+  // alimenta as linhas do formulário. Ver automation-inventory-value.ts.
   const [automationInventory, setAutomationInventory] = useState<AutomationInventoryValue>({
     systems: [],
     accounts: [],

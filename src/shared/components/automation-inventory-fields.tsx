@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { Plus, X } from "lucide-react";
 import { trpc } from "@/shared/trpc/client";
 import { Button } from "@/src/shared/components/ui/button";
@@ -19,7 +19,22 @@ import {
   AUTOMATION_ACCOUNT_USERNAME_MAX_LENGTH,
   CURRENT_APPLICATION_ACCESS_REFERENCE_MAX_LENGTH,
 } from "@/shared/constants/project-taxonomy";
-import type { ProjectTargetSystemView, ProjectAutomationAccountView } from "@/shared/types";
+import {
+  EMPTY_AUTOMATION_ACCOUNT_ROW,
+  EMPTY_TARGET_SYSTEM_ROW,
+  removeTargetSystemRow,
+  type AutomationAccountFormRow,
+  type AutomationInventoryValue,
+  type TargetSystemFormRow,
+} from "@/shared/components/automation-inventory-value";
+
+// Tipos e funções puras (conversão leitura<->formulário, remapeamento de
+// índice) moraram neste arquivo antes; agora vivem isoladas em
+// `automation-inventory-value.ts`, sem depender de React — é a parte que
+// mais precisa ser lida sozinha, longe do ruído de JSX. Reexportadas aqui
+// para que os três chamadores (wizard, ficha, Especificação) continuem
+// importando de `automation-inventory-fields` sem mudar nada.
+export * from "@/shared/components/automation-inventory-value";
 
 // Cópia local de propósito — o mesmo helper já vive duplicado em
 // `project-request-edit-form.tsx` e `architecture-tab.tsx`. Importar de
@@ -35,174 +50,13 @@ function slugify(text: string): string {
     .replace(/\s+/g, "-");
 }
 
-export interface TargetSystemFormRow {
-  targetSystemId: string;
-  customName: string;
-  accessPoint: string;
-  accessNotes: string;
-}
-
-export interface AutomationAccountFormRow {
-  username: string;
-  systemIndex: number | null;
-  accountType: string;
-  ownerName: string;
-  notes: string;
-}
-
-export interface AutomationInventoryValue {
-  systems: TargetSystemFormRow[];
-  accounts: AutomationAccountFormRow[];
-}
-
-export const EMPTY_TARGET_SYSTEM_ROW: TargetSystemFormRow = {
-  targetSystemId: "",
-  customName: "",
-  accessPoint: "",
-  accessNotes: "",
-};
-
-export const EMPTY_AUTOMATION_ACCOUNT_ROW: AutomationAccountFormRow = {
-  username: "",
-  systemIndex: null,
-  accountType: "",
-  ownerName: "",
-  notes: "",
-};
-
-/**
- * Remove a linha `index` de `systems` e devolve o inventário com `accounts`
- * já remapeadas: contas que apontavam para a linha removida perdem o vínculo
- * (`systemIndex: null`), e as que apontavam para índices maiores decrementam
- * uma posição. Centralizada aqui — não em cada tela que usa este componente —
- * porque sistemas e contas viajam juntos no servidor (`automationInventory`
- * em `project.router.ts`, que resolve `systemIndex` -> id na mesma
- * transação): duplicar este remapeamento em cada chamador é exatamente onde
- * nasce um vínculo trocado sem erro.
- */
-export function removeTargetSystemRow(
-  value: AutomationInventoryValue,
-  index: number
-): AutomationInventoryValue {
-  return {
-    systems: value.systems.filter((_, i) => i !== index),
-    accounts: value.accounts.map((account) => {
-      if (account.systemIndex == null) return account;
-      if (account.systemIndex === index) return { ...account, systemIndex: null };
-      if (account.systemIndex > index) return { ...account, systemIndex: account.systemIndex - 1 };
-      return account;
-    }),
-  };
-}
-
-/**
- * Converte as listas de LEITURA (`ProjectTargetSystemView[]` /
- * `ProjectAutomationAccountView[]`, como devolvidas por `project.byId`) para
- * o formato de FORMULÁRIO deste componente. Usada para hidratar a edição
- * (ficha do projeto, aba Especificação) a partir de um projeto existente.
- *
- * Ponto crítico: `ProjectAutomationAccountView.projectTargetSystemId`
- * referencia o id ESTÁVEL da linha de sistema; o formulário referencia por
- * ÍNDICE (`systemIndex`), porque é assim que o servidor grava
- * (`replaceAutomationInventory` em `project.router.ts` recria as linhas do
- * zero a cada save e resolve índice -> id na mesma transação). O mapa
- * id->índice é construído a partir da MESMA lista `systems` que alimenta o
- * formulário — nunca de uma lista paralela — para que o índice devolvido
- * aqui seja garantidamente a posição real da linha depois de convertida.
- *
- * `ProjectTargetSystemView.name` já vem RESOLVIDO (nome do catálogo, ou o
- * customName quando a linha não está no catálogo). Para reconstruir o
- * formulário: se `targetSystemId` não é nulo, a linha veio do catálogo e
- * `customName` volta vazio; se é nulo, `name` inteiro volta como `customName`.
- */
-export function buildAutomationInventoryValue(
-  systems: ProjectTargetSystemView[] | undefined,
-  accounts: ProjectAutomationAccountView[] | undefined
-): AutomationInventoryValue {
-  const rows: TargetSystemFormRow[] = (systems ?? []).map((s) => ({
-    targetSystemId: s.targetSystemId ?? "",
-    customName: s.targetSystemId ? "" : s.name,
-    accessPoint: s.accessPoint ?? "",
-    accessNotes: s.accessNotes ?? "",
-  }));
-
-  // Índice = posição na MESMA lista `systems` acima (não em `rows` — mas as
-  // duas têm exatamente a mesma ordem e o mesmo tamanho, por construção).
-  const indexById = new Map<string, number>((systems ?? []).map((s, index) => [s.id, index]));
-
-  const accountRows: AutomationAccountFormRow[] = (accounts ?? []).map((a) => ({
-    username: a.username,
-    systemIndex:
-      a.projectTargetSystemId != null ? indexById.get(a.projectTargetSystemId) ?? null : null,
-    accountType: a.accountType ?? "",
-    ownerName: a.ownerName ?? "",
-    notes: a.notes ?? "",
-  }));
-
-  return { systems: rows, accounts: accountRows };
-}
-
-/** Payload aceito por `project.update`/`project.create` em `automationInventory`. */
-export interface AutomationInventoryInput {
-  systems: {
-    targetSystemId?: string;
-    customName?: string;
-    accessPoint?: string;
-    accessNotes?: string;
-  }[];
-  accounts: {
-    username: string;
-    systemIndex?: number;
-    accountType?: string;
-    ownerName?: string;
-    notes?: string;
-  }[];
-}
-
-/**
- * Converte o valor do formulário para o payload que `project.update` espera
- * em `automationInventory`. Linhas em branco são descartadas — o servidor as
- * rejeita (`targetSystemInputSchema` exige catálogo ou nome; `automationAccountInputSchema`
- * exige username não vazio). O índice de cada conta é remapeado para a lista
- * JÁ FILTRADA de sistemas: descartar uma linha vazia no meio desloca as
- * seguintes, e a conta precisa acompanhar — mesma regra que
- * `build-project-payload.ts` aplica no wizard.
- */
-export function toAutomationInventoryInput(value: AutomationInventoryValue): AutomationInventoryInput {
-  const indexMap = new Map<number, number>();
-  const systems = value.systems.flatMap((s, originalIndex) => {
-    if (!s.targetSystemId && !s.customName.trim()) return [];
-    indexMap.set(originalIndex, indexMap.size);
-    return [
-      {
-        targetSystemId: s.targetSystemId || undefined,
-        customName: s.customName.trim() || undefined,
-        accessPoint: s.accessPoint.trim() || undefined,
-        accessNotes: s.accessNotes.trim() || undefined,
-      },
-    ];
-  });
-
-  const accounts = value.accounts
-    .filter((a) => a.username.trim())
-    .map((a) => ({
-      username: a.username.trim(),
-      systemIndex: a.systemIndex != null ? indexMap.get(a.systemIndex) : undefined,
-      accountType: a.accountType || undefined,
-      ownerName: a.ownerName.trim() || undefined,
-      notes: a.notes.trim() || undefined,
-    }));
-
-  return { systems, accounts };
-}
-
 interface AutomationInventoryFieldsProps {
   /** Inventário completo — sistemas E contas, mesmo quando `section` só renderiza um dos dois. */
   value: AutomationInventoryValue;
   /**
    * Sempre recebe o inventário inteiro (as duas listas), mesmo quando só uma
    * mudou. Mantém o contrato único de leitura/escrita que o servidor espera —
-   * ver `removeTargetSystemRow` acima.
+   * ver `removeTargetSystemRow` em automation-inventory-value.ts.
    */
   onChange: (value: AutomationInventoryValue) => void;
   /**
@@ -265,6 +119,20 @@ function TargetSystemsSection({
   const { data: targetSystemsCatalog = [] } = trpc.taxonomy.listTargetSystems.useQuery();
   const systemOptions = targetSystemsCatalog.map((s) => ({ value: s.id, label: s.name }));
 
+  // `createTargetSystem.mutate` é ida-e-volta de rede: o `onSuccess` roda em
+  // um render futuro, não no render em que o usuário clicou "Cadastrar no
+  // catálogo". Se `onSuccess` fechasse sobre `value` (a prop deste render),
+  // qualquer edição feita enquanto a requisição está no ar — em QUALQUER
+  // linha, de sistema ou de conta, já que as duas seções compartilham o
+  // mesmo `value` — seria silenciosamente descartada: `onSuccess` recriaria
+  // o inventário inteiro a partir do snapshot velho mais o próprio patch.
+  // `valueRef` sempre aponta pro `value` mais recente, atualizado a cada
+  // render (sem lista de dependências), então `onSuccess` lê o estado vivo.
+  const valueRef = useRef(value);
+  useEffect(() => {
+    valueRef.current = value;
+  });
+
   const createTargetSystem = trpc.taxonomy.createTargetSystem.useMutation({
     onError: (error) =>
       toast({
@@ -298,7 +166,16 @@ function TargetSystemsSection({
         onSuccess: (created) => {
           utils.taxonomy.listTargetSystems.invalidate();
           toast({ title: `Sistema "${created.name}" criado` });
-          updateRow(index, { targetSystemId: created.id, customName: "" });
+          // Lê o inventário mais recente via ref (ver comentário acima), não
+          // `value`/`updateRow` — que fechariam sobre o snapshot de quando o
+          // botão foi clicado, revertendo qualquer edição feita nesse meio-tempo.
+          const current = valueRef.current;
+          onChange({
+            ...current,
+            systems: current.systems.map((row, i) =>
+              i === index ? { ...row, targetSystemId: created.id, customName: "" } : row
+            ),
+          });
         },
       }
     );
