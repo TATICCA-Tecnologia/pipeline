@@ -34,6 +34,16 @@ async function main() {
     },
   });
 
+  // Diferente de `MainToolCategory` (que só nasce do combobox do usuário),
+  // `TargetSystemCategory` é pré-populada: sistema-alvo é um domínio
+  // previsível e universal (SAP, Protheus, Receita), então semear evita que
+  // os primeiros usuários criem cinco variações de "ERP" antes de existir uma
+  // categoria canônica.
+  //
+  // "Portal governamental" e "Site externo de terceiros" se sobrepõem — um
+  // portal do governo é, tecnicamente, um site externo de terceiros. O
+  // recorte é proposital (é um caso muito comum em RPA no Brasil): quando os
+  // dois se aplicam, "Portal governamental" tem precedência.
   const TARGET_SYSTEM_CATEGORIES = [
     "ERP",
     "Sistema fiscal/contábil",
@@ -41,7 +51,7 @@ async function main() {
     "Banco ou instituição financeira",
     "E-mail e mensageria",
     "Office e planilhas",
-    "Armazenamento de arquivos",
+    "Armazenamento de arquivos (SharePoint, rede, Drive)",
     "Banco de dados",
     "CRM",
     "RH e folha",

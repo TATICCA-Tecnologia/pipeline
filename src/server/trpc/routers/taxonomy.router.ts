@@ -501,13 +501,13 @@ export const taxonomyRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       // Idempotente por slug, em vez de CONFLICT: `listTargetSystems` só devolve
-      // sistemas ativos, e a tela de Arquitetura ainda filtra por categoria
-      // — então um sistema que existe mas está inativo (ou está em outra
-      // categoria) fica invisível para o usuário, que naturalmente tenta
-      // criá-lo. Com CONFLICT ele entrava num beco sem saída: não conseguia
-      // nem ver nem criar. Aqui o sistema existente é reativado, recebe a
-      // categoria caso ainda não tenha uma, e é devolvido como se tivesse sido
-      // criado — que é exatamente o que o usuário pediu.
+      // sistemas ativos, e a tela de seleção vai filtrar por categoria — então
+      // um sistema que existe mas está inativo (ou está em outra categoria)
+      // ficaria invisível para o usuário, que naturalmente tentaria recriá-lo.
+      // Com CONFLICT ele entraria num beco sem saída: não conseguiria nem ver
+      // nem criar. Aqui o sistema existente é reativado, recebe a categoria
+      // caso ainda não tenha uma, e é devolvido como se tivesse sido criado —
+      // que é exatamente o que o usuário pediu.
       const exists = await ctx.db.targetSystem.findUnique({ where: { slug: input.slug } });
       if (exists) {
         return ctx.db.targetSystem.update({
