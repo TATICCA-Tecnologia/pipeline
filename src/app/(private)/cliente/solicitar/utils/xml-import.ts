@@ -451,6 +451,24 @@ export function parseSolicitacaoXml(
     urgency,
     deadline,
     additionalInfo,
+    // Preenchidos vazios de propósito: as tags novas do XML entram na task da
+    // ficha de catálogo. Aqui só mantemos o literal completo, já que o tipo de
+    // saída do Zod passou a exigir estes campos.
+    currentApplicationAssetId: "",
+    currentApplicationOwnerRole: "",
+    currentApplicationOwnerAreaId: "",
+    currentApplicationDataInput: "",
+    currentApplicationDataInputDetails: "",
+    currentApplicationDataOutput: "",
+    currentApplicationDataOutputDetails: "",
+    currentApplicationContingencyActions: [],
+    currentApplicationContingencyDetails: "",
+    currentApplicationBackupOwner: "",
+    handlesSensitiveData: "",
+    sensitiveDataCategories: [],
+    sensitiveDataDetails: "",
+    targetSystems: [],
+    automationAccounts: [],
   };
 
   return {
