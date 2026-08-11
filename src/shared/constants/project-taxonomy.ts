@@ -156,9 +156,8 @@ export const CURRENT_APPLICATION_ACCESS_LOCATION_OPTIONS = [
 // de credenciais num campo que é para dizer ONDE procurar, não O QUE usar.
 export const CURRENT_APPLICATION_ACCESS_REFERENCE_MAX_LENGTH = 200;
 
-// ATENÇÃO: como nas listas acima, os LABELS abaixo estão duplicados como texto
-// literal em docs/prompt-geracao-xml.md e em src/server/ai/xml-generation-prompt.ts,
-// e a importação de XML casa por label. Mexeu no label, mexa nos três lugares.
+// As listas abaixo estão sujeitas ao mesmo aviso de duplicação de labels da
+// seção ATENÇÃO acima.
 
 /** Serve aos dois selects do critério 5 — entrada e saída têm a mesma natureza. */
 export const CURRENT_APPLICATION_DATA_ENDPOINT_OPTIONS = [
@@ -195,6 +194,9 @@ export const AUTOMATION_ACCOUNT_TYPE_OPTIONS = [
   { value: "outro", label: "Outro" },
 ];
 
+/** Curto de propósito: username é identificador, não bloco de credenciais. */
+export const AUTOMATION_ACCOUNT_USERNAME_MAX_LENGTH = 120;
+
 export const SENSITIVE_DATA_ANSWER_OPTIONS = [
   { value: "sim", label: "Sim" },
   { value: "nao", label: "Não" },
@@ -212,9 +214,6 @@ export const SENSITIVE_DATA_CATEGORY_OPTIONS = [
   { key: "propriedade-intelectual", label: "Propriedade intelectual" },
   { key: "credenciais-acessos", label: "Credenciais e acessos" },
 ];
-
-/** Curto de propósito: username é identificador, não bloco de credenciais. */
-export const AUTOMATION_ACCOUNT_USERNAME_MAX_LENGTH = 120;
 
 export const BENEFIT_OPTIONS = [
   {
@@ -367,13 +366,18 @@ export function resolveSensitiveDataAnswerLabel(
   return resolveLabel(value, SENSITIVE_DATA_ANSWER_OPTIONS);
 }
 
-/** Traduz um array de chaves (Json) para labels, ignorando chaves desconhecidas. */
+/**
+ * Traduz um array de chaves (vindo de coluna Json?) para labels. Chave
+ * desconhecida vira a própria chave crua, NÃO some: é o idioma já usado em
+ * quatro lugares para BENEFIT_OPTIONS, e o mesmo de resolveLabel. Descartar
+ * faria um item renomeado na taxonomia desaparecer da tela sem rastro.
+ */
 export function resolveKeyLabels(
   keys: unknown,
-  options: { key: string; label: string }[]
+  options: readonly { key: string; label: string }[]
 ): string[] {
   if (!Array.isArray(keys)) return [];
   return keys
-    .map((k) => options.find((o) => o.key === k)?.label)
-    .filter((l): l is string => !!l);
+    .filter((k): k is string => typeof k === "string")
+    .map((k) => options.find((o) => o.key === k)?.label ?? k);
 }
