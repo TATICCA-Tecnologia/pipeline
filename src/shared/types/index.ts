@@ -34,6 +34,29 @@ export interface PersonOfInterest {
   userId?: string;
 }
 
+export interface ProjectTargetSystemView {
+  id: string;
+  targetSystemId: string | null;
+  /** Nome já resolvido: do catálogo, ou o customName quando fora dele. */
+  name: string;
+  categoryName: string | null;
+  accessPoint: string | null;
+  accessNotes: string | null;
+  order: number;
+}
+
+export interface ProjectAutomationAccountView {
+  id: string;
+  username: string;
+  projectTargetSystemId: string | null;
+  /** Nome do sistema em que a conta é usada, já resolvido. */
+  systemName: string | null;
+  accountType: string | null;
+  ownerName: string | null;
+  notes: string | null;
+  order: number;
+}
+
 // Projeto
 export interface Project {
   id: string;
@@ -97,6 +120,22 @@ export interface Project {
   mainToolId?: string;
   mainToolCategory?: { id: string; name: string; slug: string };
   mainToolCategoryId?: string;
+  currentApplicationAssetId?: string | null;
+  currentApplicationOwnerRole?: string | null;
+  currentApplicationOwnerAreaId?: string | null;
+  currentApplicationOwnerAreaName?: string | null;
+  currentApplicationDataInput?: string | null;
+  currentApplicationDataInputDetails?: string | null;
+  currentApplicationDataOutput?: string | null;
+  currentApplicationDataOutputDetails?: string | null;
+  currentApplicationContingencyActions?: string[] | null;
+  currentApplicationContingencyDetails?: string | null;
+  currentApplicationBackupOwner?: string | null;
+  handlesSensitiveData?: string | null;
+  sensitiveDataCategories?: string[] | null;
+  sensitiveDataDetails?: string | null;
+  targetSystems?: ProjectTargetSystemView[];
+  automationAccounts?: ProjectAutomationAccountView[];
   executionStrategy?: string;
   architectNotes?: string;
   implementationEffortDays?: number;
