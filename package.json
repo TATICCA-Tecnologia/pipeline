@@ -12,7 +12,8 @@
     "db:migrate": "prisma migrate dev",
     "db:seed": "prisma db seed",
     "db:create-super-admin": "tsx prisma/create-super-admin.ts",
-    "deck:preview": "tsx scripts/preview-executive-slides.ts"
+    "deck:preview": "tsx scripts/preview-executive-slides.ts",
+    "verify:inventory": "tsx scripts/verify-automation-inventory.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
