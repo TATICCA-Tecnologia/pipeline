@@ -14,7 +14,8 @@
     "db:create-super-admin": "tsx prisma/create-super-admin.ts",
     "deck:preview": "tsx scripts/preview-executive-slides.ts",
     "verify:inventory": "tsx scripts/verify-automation-inventory.ts",
-    "verify:xml": "tsx scripts/verify-xml-roundtrip.ts"
+    "verify:xml": "tsx scripts/verify-xml-roundtrip.ts",
+    "verify:solicitacao-xml": "tsx scripts/verify-solicitacao-xml.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
