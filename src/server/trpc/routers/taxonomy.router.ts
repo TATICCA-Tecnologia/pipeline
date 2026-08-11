@@ -12,6 +12,8 @@ import { TRPCError } from "@trpc/server";
 const MERGE_TYPE = z.enum([
   "mainTool",
   "mainToolCategory",
+  "targetSystem",
+  "targetSystemCategory",
   "projectKind",
   "costCategory",
   "urgencyLevel",
@@ -870,6 +872,27 @@ export const taxonomyRouter = router({
             extraCount: await ctx.db.mainTool.count({ where: { categoryId: sourceId } }),
             extraLabel: "ferramenta",
           };
+        case "targetSystem":
+          // Ao contrário de `mainTool`, `Project` não tem FK direta para
+          // `TargetSystem` — o vínculo passa pela tabela de junção
+          // `ProjectTargetSystem`.
+          return {
+            projectCount: await ctx.db.projectTargetSystem.count({
+              where: { targetSystemId: sourceId },
+            }),
+            extraCount: 0,
+            extraLabel: null,
+          };
+        case "targetSystemCategory":
+          // Diferente de `mainToolCategory`, `Project` não tem uma FK direta
+          // para a categoria de sistema-alvo (só para o sistema em si, via
+          // `ProjectTargetSystem`) — então não existe "projeto que selecionou
+          // só a categoria" para contar aqui.
+          return {
+            projectCount: 0,
+            extraCount: await ctx.db.targetSystem.count({ where: { categoryId: sourceId } }),
+            extraLabel: "sistema",
+          };
         case "projectKind":
           return {
             projectCount: await ctx.db.project.count({
@@ -941,6 +964,28 @@ export const taxonomyRouter = router({
               data: { categoryId: targetId },
             });
             await tx.mainToolCategory.delete({ where: { id: sourceId } });
+            break;
+          }
+          case "targetSystem": {
+            // Ao contrário de `mainTool`, o vínculo com projeto não é uma
+            // coluna de `Project`, e sim linhas de `ProjectTargetSystem` — o
+            // reponte é sobre essa tabela de junção.
+            await tx.projectTargetSystem.updateMany({
+              where: { targetSystemId: sourceId },
+              data: { targetSystemId: targetId },
+            });
+            await tx.targetSystem.delete({ where: { id: sourceId } });
+            break;
+          }
+          case "targetSystemCategory": {
+            // Os sistemas da categoria de origem também precisam migrar,
+            // senão ficariam órfãos (categoryId vira null pelo SetNull) e
+            // sumiriam dos filtros por categoria.
+            await tx.targetSystem.updateMany({
+              where: { categoryId: sourceId },
+              data: { categoryId: targetId },
+            });
+            await tx.targetSystemCategory.delete({ where: { id: sourceId } });
             break;
           }
           case "projectKind": {

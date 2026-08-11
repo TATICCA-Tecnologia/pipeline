@@ -32,6 +32,8 @@ import { findSimilarPairs, type NamedRecord } from "@/shared/lib/similar-names";
 export type MergeType =
   | "mainTool"
   | "mainToolCategory"
+  | "targetSystem"
+  | "targetSystemCategory"
   | "projectKind"
   | "costCategory"
   | "urgencyLevel";

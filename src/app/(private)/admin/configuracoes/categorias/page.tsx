@@ -16,6 +16,7 @@ type MainToolCategoryItem = RouterOutputs["taxonomy"]["listAllMainToolCategories
 
 import { Button } from "@/src/shared/components/ui/button";
 import { MergeSuggestions } from "@/src/shared/components/merge-suggestions";
+import { TargetSystemsSection } from "./_components/target-systems-section";
 import { Input } from "@/src/shared/components/ui/input";
 import { Card, CardContent, CardHeader } from "@/src/shared/components/ui/card";
 import {
@@ -789,6 +790,8 @@ export default function CategoriasPage() {
           </Card>
         )}
       </div>
+
+      <TargetSystemsSection />
 
       {/* Tipos de Projeto */}
       <div className="space-y-3">
