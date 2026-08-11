@@ -26,6 +26,7 @@ import {
   type CombinedScoreWeights,
 } from "@/shared/lib/scoring";
 import { computeAnnualSavingBRL } from "@/shared/lib/savings";
+import type { ProjectTargetSystemView, ProjectAutomationAccountView } from "@/shared/types";
 
 // Fallback dos pesos default do SystemSettings (schema.prisma), usado apenas se
 // a linha "default" ainda não existir por algum motivo (nunca deveria acontecer
@@ -284,6 +285,69 @@ async function replaceAutomationInventory(
   }
 }
 
+// Formato cru devolvido pelo `select`/`include` de targetSystems em list/byId
+// (ver Step 1 dos dois procedures abaixo).
+type TargetSystemRow = {
+  id: string;
+  targetSystemId: string | null;
+  customName: string | null;
+  accessPoint: string | null;
+  accessNotes: string | null;
+  order: number;
+  targetSystem: { name: string; category: { name: string } | null } | null;
+};
+
+// Achata ProjectTargetSystem para o formato de leitura do front. Descarta
+// linhas sem nome resolvível (nem sistema do catálogo, nem customName) —
+// dado inconsistente que só entraria por caminho fora do Zod de escrita
+// (ver targetSystemInputSchema), nunca deve acontecer via formulário. Uma
+// linha só com customName (sistema fora do catálogo) É válida e fica.
+function mapTargetSystemsForView(systems: TargetSystemRow[]): ProjectTargetSystemView[] {
+  return systems
+    .filter((s) => !!(s.targetSystem?.name || s.customName))
+    .map((s) => ({
+      id: s.id,
+      targetSystemId: s.targetSystemId,
+      name: (s.targetSystem?.name || s.customName) as string,
+      categoryName: s.targetSystem?.category?.name ?? null,
+      accessPoint: s.accessPoint,
+      accessNotes: s.accessNotes,
+      order: s.order,
+    }));
+}
+
+// Formato cru devolvido pelo `select`/`include` de automationAccounts.
+type AutomationAccountRow = {
+  id: string;
+  username: string;
+  projectTargetSystemId: string | null;
+  accountType: string | null;
+  ownerName: string | null;
+  notes: string | null;
+  order: number;
+  projectTargetSystem: {
+    customName: string | null;
+    targetSystem: { name: string } | null;
+  } | null;
+};
+
+// Achata ProjectAutomationAccount para o formato de leitura do front.
+function mapAutomationAccountsForView(
+  accounts: AutomationAccountRow[]
+): ProjectAutomationAccountView[] {
+  return accounts.map((a) => ({
+    id: a.id,
+    username: a.username,
+    projectTargetSystemId: a.projectTargetSystemId,
+    systemName:
+      a.projectTargetSystem?.targetSystem?.name ?? a.projectTargetSystem?.customName ?? null,
+    accountType: a.accountType,
+    ownerName: a.ownerName,
+    notes: a.notes,
+    order: a.order,
+  }));
+}
+
 export const projectRouter = router({
   list: publicProcedure
     .input(
@@ -318,6 +382,34 @@ export const projectRouter = router({
           solutionTypes: { select: { id: true, name: true, slug: true } },
           features: true,
           peopleOfInterest: { include: { person: true } },
+          ownerArea: { select: { id: true, name: true } },
+          targetSystems: {
+            orderBy: { order: "asc" },
+            select: {
+              id: true,
+              targetSystemId: true,
+              customName: true,
+              accessPoint: true,
+              accessNotes: true,
+              order: true,
+              targetSystem: { select: { name: true, category: { select: { name: true } } } },
+            },
+          },
+          automationAccounts: {
+            orderBy: { order: "asc" },
+            select: {
+              id: true,
+              username: true,
+              projectTargetSystemId: true,
+              accountType: true,
+              ownerName: true,
+              notes: true,
+              order: true,
+              projectTargetSystem: {
+                select: { customName: true, targetSystem: { select: { name: true } } },
+              },
+            },
+          },
         },
         orderBy: { updatedAt: "desc" },
       });
@@ -359,6 +451,24 @@ export const projectRouter = router({
         currentApplicationAccessLocation: p.currentApplicationAccessLocation ?? undefined,
         currentApplicationAccessReference: p.currentApplicationAccessReference ?? undefined,
         currentApplicationLiveSince: p.currentApplicationLiveSince ?? undefined,
+        currentApplicationAssetId: p.currentApplicationAssetId ?? undefined,
+        currentApplicationOwnerRole: p.currentApplicationOwnerRole ?? undefined,
+        currentApplicationOwnerAreaId: p.currentApplicationOwnerAreaId ?? undefined,
+        currentApplicationOwnerAreaName: p.ownerArea?.name ?? undefined,
+        currentApplicationDataInput: p.currentApplicationDataInput ?? undefined,
+        currentApplicationDataInputDetails: p.currentApplicationDataInputDetails ?? undefined,
+        currentApplicationDataOutput: p.currentApplicationDataOutput ?? undefined,
+        currentApplicationDataOutputDetails: p.currentApplicationDataOutputDetails ?? undefined,
+        currentApplicationContingencyActions:
+          (p.currentApplicationContingencyActions as string[] | null) ?? undefined,
+        currentApplicationContingencyDetails:
+          p.currentApplicationContingencyDetails ?? undefined,
+        currentApplicationBackupOwner: p.currentApplicationBackupOwner ?? undefined,
+        handlesSensitiveData: p.handlesSensitiveData ?? undefined,
+        sensitiveDataCategories: (p.sensitiveDataCategories as string[] | null) ?? undefined,
+        sensitiveDataDetails: p.sensitiveDataDetails ?? undefined,
+        targetSystems: mapTargetSystemsForView(p.targetSystems),
+        automationAccounts: mapAutomationAccountsForView(p.automationAccounts),
         additionalInfo: p.additionalInfo ?? undefined,
         projectNarrative: p.projectNarrative ?? undefined,
         benefits: (p.benefits as string[] | null) ?? undefined,
@@ -413,6 +523,34 @@ export const projectRouter = router({
           tasks: true,
           features: true,
           peopleOfInterest: { include: { person: true } },
+          ownerArea: { select: { id: true, name: true } },
+          targetSystems: {
+            orderBy: { order: "asc" },
+            select: {
+              id: true,
+              targetSystemId: true,
+              customName: true,
+              accessPoint: true,
+              accessNotes: true,
+              order: true,
+              targetSystem: { select: { name: true, category: { select: { name: true } } } },
+            },
+          },
+          automationAccounts: {
+            orderBy: { order: "asc" },
+            select: {
+              id: true,
+              username: true,
+              projectTargetSystemId: true,
+              accountType: true,
+              ownerName: true,
+              notes: true,
+              order: true,
+              projectTargetSystem: {
+                select: { customName: true, targetSystem: { select: { name: true } } },
+              },
+            },
+          },
         },
       });
       if (!project)
@@ -452,6 +590,27 @@ export const projectRouter = router({
         currentApplicationAccessLocation: project.currentApplicationAccessLocation ?? undefined,
         currentApplicationAccessReference: project.currentApplicationAccessReference ?? undefined,
         currentApplicationLiveSince: project.currentApplicationLiveSince ?? undefined,
+        currentApplicationAssetId: project.currentApplicationAssetId ?? undefined,
+        currentApplicationOwnerRole: project.currentApplicationOwnerRole ?? undefined,
+        currentApplicationOwnerAreaId: project.currentApplicationOwnerAreaId ?? undefined,
+        currentApplicationOwnerAreaName: project.ownerArea?.name ?? undefined,
+        currentApplicationDataInput: project.currentApplicationDataInput ?? undefined,
+        currentApplicationDataInputDetails:
+          project.currentApplicationDataInputDetails ?? undefined,
+        currentApplicationDataOutput: project.currentApplicationDataOutput ?? undefined,
+        currentApplicationDataOutputDetails:
+          project.currentApplicationDataOutputDetails ?? undefined,
+        currentApplicationContingencyActions:
+          (project.currentApplicationContingencyActions as string[] | null) ?? undefined,
+        currentApplicationContingencyDetails:
+          project.currentApplicationContingencyDetails ?? undefined,
+        currentApplicationBackupOwner: project.currentApplicationBackupOwner ?? undefined,
+        handlesSensitiveData: project.handlesSensitiveData ?? undefined,
+        sensitiveDataCategories:
+          (project.sensitiveDataCategories as string[] | null) ?? undefined,
+        sensitiveDataDetails: project.sensitiveDataDetails ?? undefined,
+        targetSystems: mapTargetSystemsForView(project.targetSystems),
+        automationAccounts: mapAutomationAccountsForView(project.automationAccounts),
         projectNarrative: project.projectNarrative ?? undefined,
         benefits: (project.benefits as string[] | null) ?? undefined,
         benefitsDetails: project.benefitsDetails ?? undefined,

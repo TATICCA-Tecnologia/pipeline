@@ -12,6 +12,8 @@ import type {
   Priority,
   ProjectRequest,
   ActivityLog,
+  ProjectTargetSystemView,
+  ProjectAutomationAccountView,
 } from "@/shared/types";
 import { trpc } from "@/shared/trpc/client";
 import { useAuth } from "@/shared/context/auth-context";
@@ -79,6 +81,8 @@ function mapProject(p: {
   handlesSensitiveData?: string | null;
   sensitiveDataCategories?: string[] | null;
   sensitiveDataDetails?: string | null;
+  targetSystems?: ProjectTargetSystemView[] | null;
+  automationAccounts?: ProjectAutomationAccountView[] | null;
   projectNarrative?: string | null;
   benefits?: string[] | null;
   benefitsDetails?: string | null;
@@ -130,6 +134,22 @@ function mapProject(p: {
     currentApplicationAccessLocation: p.currentApplicationAccessLocation ?? undefined,
     currentApplicationAccessReference: p.currentApplicationAccessReference ?? undefined,
     currentApplicationLiveSince: p.currentApplicationLiveSince ?? undefined,
+    currentApplicationAssetId: p.currentApplicationAssetId ?? undefined,
+    currentApplicationOwnerRole: p.currentApplicationOwnerRole ?? undefined,
+    currentApplicationOwnerAreaId: p.currentApplicationOwnerAreaId ?? undefined,
+    currentApplicationOwnerAreaName: p.currentApplicationOwnerAreaName ?? undefined,
+    currentApplicationDataInput: p.currentApplicationDataInput ?? undefined,
+    currentApplicationDataInputDetails: p.currentApplicationDataInputDetails ?? undefined,
+    currentApplicationDataOutput: p.currentApplicationDataOutput ?? undefined,
+    currentApplicationDataOutputDetails: p.currentApplicationDataOutputDetails ?? undefined,
+    currentApplicationContingencyActions: p.currentApplicationContingencyActions ?? undefined,
+    currentApplicationContingencyDetails: p.currentApplicationContingencyDetails ?? undefined,
+    currentApplicationBackupOwner: p.currentApplicationBackupOwner ?? undefined,
+    handlesSensitiveData: p.handlesSensitiveData ?? undefined,
+    sensitiveDataCategories: p.sensitiveDataCategories ?? undefined,
+    sensitiveDataDetails: p.sensitiveDataDetails ?? undefined,
+    targetSystems: p.targetSystems ?? undefined,
+    automationAccounts: p.automationAccounts ?? undefined,
     projectNarrative: p.projectNarrative ?? undefined,
     benefits: p.benefits ?? undefined,
     benefitsDetails: p.benefitsDetails ?? undefined,
