@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { Prisma } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { router, publicProcedure, protectedProcedure, adminProcedure } from "../trpc";
 import { toFrontendStatus, toPrismaStatus } from "../mappers";
@@ -14,6 +15,7 @@ import type { FrontendProjectStatus } from "../mappers";
 import {
   PROCESS_FREQUENCY_MULTIPLIERS,
   CURRENT_APPLICATION_ACCESS_REFERENCE_MAX_LENGTH,
+  AUTOMATION_ACCOUNT_USERNAME_MAX_LENGTH,
 } from "@/shared/constants/project-taxonomy";
 import {
   computeQualitativeScore,
@@ -52,6 +54,39 @@ const projectStatusSchema = z.enum([
 ]);
 
 const complexitySchema = z.enum(["baixa", "media", "alta"]);
+
+const targetSystemInputSchema = z
+  .object({
+    targetSystemId: z.string().optional(),
+    customName: z.string().optional(),
+    accessPoint: z.string().optional(),
+    accessNotes: z.string().max(CURRENT_APPLICATION_ACCESS_REFERENCE_MAX_LENGTH).optional(),
+  })
+  .refine((s) => !!s.targetSystemId || !!s.customName?.trim(), {
+    message: "Escolha um sistema do catálogo ou informe um nome",
+  });
+
+const automationAccountInputSchema = z.object({
+  username: z.string().min(1).max(AUTOMATION_ACCOUNT_USERNAME_MAX_LENGTH),
+  /**
+   * POSIÇÃO na lista `systems` do mesmo payload, não um id: a gravação
+   * substitui as linhas por inteiro e destrói os ids anteriores.
+   */
+  systemIndex: z.number().int().min(0).optional(),
+  accountType: z.string().optional(),
+  ownerName: z.string().optional(),
+  notes: z.string().optional(),
+});
+
+/**
+ * Sistemas e contas viajam juntos de propósito. As contas apontam para linhas
+ * de ProjectTargetSystem por índice, então gravar um sem o outro deixaria todo
+ * vínculo nulo — em silêncio, sem erro.
+ */
+const automationInventoryInputSchema = z.object({
+  systems: z.array(targetSystemInputSchema),
+  accounts: z.array(automationAccountInputSchema),
+});
 
 // TTL do lock de presença "sendo editado por" (soft lock — ver acquireLock/
 // releaseLock/activeLocks abaixo). O modal manda heartbeat a cada 20s
@@ -106,6 +141,19 @@ const SOLICITATION_FIELD_LABELS: Record<string, string> = {
   currentApplicationAccessLocation: "Onde ficam os acessos",
   currentApplicationAccessReference: "Referência dos acessos",
   currentApplicationLiveSince: "Em produção desde",
+  currentApplicationAssetId: "Identificação do ativo",
+  currentApplicationOwnerRole: "Cargo do responsável",
+  currentApplicationOwnerAreaId: "Setor do responsável",
+  currentApplicationDataInput: "Origem dos dados de entrada",
+  currentApplicationDataInputDetails: "Detalhes da entrada de dados",
+  currentApplicationDataOutput: "Destino dos dados de saída",
+  currentApplicationDataOutputDetails: "Detalhes da saída de dados",
+  currentApplicationContingencyActions: "O que fazer se a automação parar",
+  currentApplicationContingencyDetails: "Detalhes da contingência",
+  currentApplicationBackupOwner: "Responsável substituto",
+  handlesSensitiveData: "Mexe em dados sigilosos",
+  sensitiveDataCategories: "Categorias de dados sigilosos",
+  sensitiveDataDetails: "Detalhes dos dados sigilosos",
   projectNarrative: "Narrativa do processo",
   benefits: "Benefícios esperados",
   benefitsDetails: "Detalhes dos benefícios",
@@ -153,6 +201,54 @@ function computeCurrentAnnualHours(
   const multiplier = PROCESS_FREQUENCY_MULTIPLIERS[frequency];
   if (!multiplier) return null;
   return duration * multiplier;
+}
+
+type AutomationInventoryInput = z.infer<typeof automationInventoryInputSchema>;
+
+/**
+ * Substituição integral, dentro de uma transação. A ORDEM é obrigatória:
+ * apagar contas → apagar sistemas → recriar sistemas → recriar contas.
+ * Recriar as contas antes dos sistemas, ou referenciar sistema por id em vez de
+ * índice, zeraria todo projectTargetSystemId a cada save sem levantar erro.
+ */
+async function replaceAutomationInventory(
+  tx: Prisma.TransactionClient,
+  projectId: string,
+  inventory: AutomationInventoryInput
+): Promise<void> {
+  await tx.projectAutomationAccount.deleteMany({ where: { projectId } });
+  await tx.projectTargetSystem.deleteMany({ where: { projectId } });
+
+  const createdSystemIds: string[] = [];
+  for (const [index, system] of inventory.systems.entries()) {
+    const row = await tx.projectTargetSystem.create({
+      data: {
+        projectId,
+        targetSystemId: system.targetSystemId || null,
+        customName: system.customName?.trim() || null,
+        accessPoint: system.accessPoint?.trim() || null,
+        accessNotes: system.accessNotes?.trim() || null,
+        order: index,
+      },
+      select: { id: true },
+    });
+    createdSystemIds.push(row.id);
+  }
+
+  for (const [index, account] of inventory.accounts.entries()) {
+    await tx.projectAutomationAccount.create({
+      data: {
+        projectId,
+        username: account.username.trim(),
+        projectTargetSystemId:
+          account.systemIndex != null ? createdSystemIds[account.systemIndex] ?? null : null,
+        accountType: account.accountType || null,
+        ownerName: account.ownerName?.trim() || null,
+        notes: account.notes?.trim() || null,
+        order: index,
+      },
+    });
+  }
 }
 
 export const projectRouter = router({
@@ -412,6 +508,20 @@ export const projectRouter = router({
           .max(CURRENT_APPLICATION_ACCESS_REFERENCE_MAX_LENGTH)
           .optional(),
         currentApplicationLiveSince: z.date().optional(),
+        currentApplicationAssetId: z.string().optional(),
+        currentApplicationOwnerRole: z.string().optional(),
+        currentApplicationOwnerAreaId: z.string().optional(),
+        currentApplicationDataInput: z.string().optional(),
+        currentApplicationDataInputDetails: z.string().optional(),
+        currentApplicationDataOutput: z.string().optional(),
+        currentApplicationDataOutputDetails: z.string().optional(),
+        currentApplicationContingencyActions: z.array(z.string()).optional(),
+        currentApplicationContingencyDetails: z.string().optional(),
+        currentApplicationBackupOwner: z.string().optional(),
+        handlesSensitiveData: z.string().optional(),
+        sensitiveDataCategories: z.array(z.string()).optional(),
+        sensitiveDataDetails: z.string().optional(),
+        automationInventory: automationInventoryInputSchema.optional(),
         projectNarrative: z.string().optional(),
         benefits: z.array(z.string()).optional(),
         benefitsDetails: z.string().optional(),
@@ -458,69 +568,88 @@ export const projectRouter = router({
       });
       const defaultHourlyRateBRLForCreate = settingsForCreate?.defaultHourlyRateBRL ?? 90;
 
-      const project = await ctx.db.project.create({
-        data: {
-          title: input.title,
-          description: input.description ?? null,
-          type: "OUTRO",
-          category: "OUTRO",
-          status: toPrismaStatus(input.status as FrontendProjectStatus),
-          priority: input.priority.toUpperCase() as "LOW" | "MEDIUM" | "HIGH" | "URGENT",
-          clientId: input.clientId,
-          developerId: input.developerId ?? null,
-          companyId: input.companyId ?? null,
-          areaId: input.areaId ?? null,
-          themeId: input.themeId ?? null,
-          platform: input.projectType,
-          deadline: input.estimatedDeadline ?? null,
-          targetAudience: input.targetAudience ?? null,
-          expectedUsers: input.expectedUsers ?? null,
-          urgency: input.urgency ?? null,
-          additionalInfo: input.additionalInfo ?? null,
-          hasExistingSystem: input.hasExistingSystem ?? null,
-          existingSystemDetails: input.existingSystemDetails ?? null,
-          hasCurrentApplication: input.hasCurrentApplication ?? null,
-          currentApplicationDetails: input.currentApplicationDetails ?? null,
-          currentApplicationHosting: input.currentApplicationHosting ?? null,
-          currentApplicationHostingCustom: input.currentApplicationHostingCustom ?? null,
-          currentApplicationAuthor: input.currentApplicationAuthor ?? null,
-          currentApplicationOwner: input.currentApplicationOwner ?? null,
-          currentApplicationAccessLocation: input.currentApplicationAccessLocation ?? null,
-          currentApplicationAccessReference: input.currentApplicationAccessReference ?? null,
-          currentApplicationLiveSince: input.currentApplicationLiveSince ?? null,
-          projectNarrative: input.projectNarrative ?? null,
-          benefits: input.benefits ?? undefined,
-          benefitsDetails: input.benefitsDetails ?? null,
-          monthlyHoursSaved: input.monthlyHoursSaved ?? null,
-          ratingErrorReduction: input.ratingErrorReduction ?? null,
-          ratingProcessCriticality: input.ratingProcessCriticality ?? null,
-          ratingInternalImpact: input.ratingInternalImpact ?? null,
-          ratingExternalImpact: input.ratingExternalImpact ?? null,
-          ratingCompliance: input.ratingCompliance ?? null,
-          peopleInvolved: input.peopleInvolved ?? null,
-          peopleInvolvedDetails: input.peopleInvolvedDetails ?? null,
-          taskDurationHours: input.taskDurationHours ?? null,
-          processFrequency: input.processFrequency ?? null,
-          currentAnnualHours: computeCurrentAnnualHours(
-            input.taskDurationHours,
-            input.processFrequency
-          ),
-          estimatedAnnualSavingBRL: computeAnnualSavingBRL(
-            input.monthlyHoursSaved ?? null,
-            defaultHourlyRateBRLForCreate
-          ),
-          features:
-            input.features && input.features.length
-              ? {
-                  create: input.features.map((name) => ({ name })),
-                }
-              : undefined,
-        },
-        include: {
-          client: { select: { id: true, name: true, email: true } },
-          developer: { select: { id: true, name: true, email: true } },
-          features: true,
-        },
+      const project = await ctx.db.$transaction(async (tx) => {
+        const created = await tx.project.create({
+          data: {
+            title: input.title,
+            description: input.description ?? null,
+            type: "OUTRO",
+            category: "OUTRO",
+            status: toPrismaStatus(input.status as FrontendProjectStatus),
+            priority: input.priority.toUpperCase() as "LOW" | "MEDIUM" | "HIGH" | "URGENT",
+            clientId: input.clientId,
+            developerId: input.developerId ?? null,
+            companyId: input.companyId ?? null,
+            areaId: input.areaId ?? null,
+            themeId: input.themeId ?? null,
+            platform: input.projectType,
+            deadline: input.estimatedDeadline ?? null,
+            targetAudience: input.targetAudience ?? null,
+            expectedUsers: input.expectedUsers ?? null,
+            urgency: input.urgency ?? null,
+            additionalInfo: input.additionalInfo ?? null,
+            hasExistingSystem: input.hasExistingSystem ?? null,
+            existingSystemDetails: input.existingSystemDetails ?? null,
+            hasCurrentApplication: input.hasCurrentApplication ?? null,
+            currentApplicationDetails: input.currentApplicationDetails ?? null,
+            currentApplicationHosting: input.currentApplicationHosting ?? null,
+            currentApplicationHostingCustom: input.currentApplicationHostingCustom ?? null,
+            currentApplicationAuthor: input.currentApplicationAuthor ?? null,
+            currentApplicationOwner: input.currentApplicationOwner ?? null,
+            currentApplicationAccessLocation: input.currentApplicationAccessLocation ?? null,
+            currentApplicationAccessReference: input.currentApplicationAccessReference ?? null,
+            currentApplicationLiveSince: input.currentApplicationLiveSince ?? null,
+            currentApplicationAssetId: input.currentApplicationAssetId ?? null,
+            currentApplicationOwnerRole: input.currentApplicationOwnerRole ?? null,
+            currentApplicationOwnerAreaId: input.currentApplicationOwnerAreaId ?? null,
+            currentApplicationDataInput: input.currentApplicationDataInput ?? null,
+            currentApplicationDataInputDetails: input.currentApplicationDataInputDetails ?? null,
+            currentApplicationDataOutput: input.currentApplicationDataOutput ?? null,
+            currentApplicationDataOutputDetails: input.currentApplicationDataOutputDetails ?? null,
+            currentApplicationContingencyActions: input.currentApplicationContingencyActions ?? undefined,
+            currentApplicationContingencyDetails: input.currentApplicationContingencyDetails ?? null,
+            currentApplicationBackupOwner: input.currentApplicationBackupOwner ?? null,
+            handlesSensitiveData: input.handlesSensitiveData ?? null,
+            sensitiveDataCategories: input.sensitiveDataCategories ?? undefined,
+            sensitiveDataDetails: input.sensitiveDataDetails ?? null,
+            projectNarrative: input.projectNarrative ?? null,
+            benefits: input.benefits ?? undefined,
+            benefitsDetails: input.benefitsDetails ?? null,
+            monthlyHoursSaved: input.monthlyHoursSaved ?? null,
+            ratingErrorReduction: input.ratingErrorReduction ?? null,
+            ratingProcessCriticality: input.ratingProcessCriticality ?? null,
+            ratingInternalImpact: input.ratingInternalImpact ?? null,
+            ratingExternalImpact: input.ratingExternalImpact ?? null,
+            ratingCompliance: input.ratingCompliance ?? null,
+            peopleInvolved: input.peopleInvolved ?? null,
+            peopleInvolvedDetails: input.peopleInvolvedDetails ?? null,
+            taskDurationHours: input.taskDurationHours ?? null,
+            processFrequency: input.processFrequency ?? null,
+            currentAnnualHours: computeCurrentAnnualHours(
+              input.taskDurationHours,
+              input.processFrequency
+            ),
+            estimatedAnnualSavingBRL: computeAnnualSavingBRL(
+              input.monthlyHoursSaved ?? null,
+              defaultHourlyRateBRLForCreate
+            ),
+            features:
+              input.features && input.features.length
+                ? {
+                    create: input.features.map((name) => ({ name })),
+                  }
+                : undefined,
+          },
+          include: {
+            client: { select: { id: true, name: true, email: true } },
+            developer: { select: { id: true, name: true, email: true } },
+            features: true,
+          },
+        });
+        if (input.automationInventory) {
+          await replaceAutomationInventory(tx, created.id, input.automationInventory);
+        }
+        return created;
       });
       await ctx.db.activityLog.create({
         data: {
@@ -599,6 +728,20 @@ export const projectRouter = router({
           .nullable()
           .optional(),
         currentApplicationLiveSince: z.date().nullable().optional(),
+        currentApplicationAssetId: z.string().optional(),
+        currentApplicationOwnerRole: z.string().optional(),
+        currentApplicationOwnerAreaId: z.string().optional(),
+        currentApplicationDataInput: z.string().optional(),
+        currentApplicationDataInputDetails: z.string().optional(),
+        currentApplicationDataOutput: z.string().optional(),
+        currentApplicationDataOutputDetails: z.string().optional(),
+        currentApplicationContingencyActions: z.array(z.string()).optional(),
+        currentApplicationContingencyDetails: z.string().optional(),
+        currentApplicationBackupOwner: z.string().optional(),
+        handlesSensitiveData: z.string().optional(),
+        sensitiveDataCategories: z.array(z.string()).optional(),
+        sensitiveDataDetails: z.string().optional(),
+        automationInventory: automationInventoryInputSchema.optional(),
         projectNarrative: z.string().nullable().optional(),
         benefits: z.array(z.string()).nullable().optional(),
         benefitsDetails: z.string().nullable().optional(),
@@ -722,6 +865,32 @@ export const projectRouter = router({
         data.currentApplicationAccessReference = rest.currentApplicationAccessReference;
       if (rest.currentApplicationLiveSince !== undefined)
         data.currentApplicationLiveSince = rest.currentApplicationLiveSince;
+      if (rest.currentApplicationAssetId !== undefined)
+        data.currentApplicationAssetId = rest.currentApplicationAssetId;
+      if (rest.currentApplicationOwnerRole !== undefined)
+        data.currentApplicationOwnerRole = rest.currentApplicationOwnerRole;
+      if (rest.currentApplicationOwnerAreaId !== undefined)
+        data.currentApplicationOwnerAreaId = rest.currentApplicationOwnerAreaId;
+      if (rest.currentApplicationDataInput !== undefined)
+        data.currentApplicationDataInput = rest.currentApplicationDataInput;
+      if (rest.currentApplicationDataInputDetails !== undefined)
+        data.currentApplicationDataInputDetails = rest.currentApplicationDataInputDetails;
+      if (rest.currentApplicationDataOutput !== undefined)
+        data.currentApplicationDataOutput = rest.currentApplicationDataOutput;
+      if (rest.currentApplicationDataOutputDetails !== undefined)
+        data.currentApplicationDataOutputDetails = rest.currentApplicationDataOutputDetails;
+      if (rest.currentApplicationContingencyActions !== undefined)
+        data.currentApplicationContingencyActions = rest.currentApplicationContingencyActions;
+      if (rest.currentApplicationContingencyDetails !== undefined)
+        data.currentApplicationContingencyDetails = rest.currentApplicationContingencyDetails;
+      if (rest.currentApplicationBackupOwner !== undefined)
+        data.currentApplicationBackupOwner = rest.currentApplicationBackupOwner;
+      if (rest.handlesSensitiveData !== undefined)
+        data.handlesSensitiveData = rest.handlesSensitiveData;
+      if (rest.sensitiveDataCategories !== undefined)
+        data.sensitiveDataCategories = rest.sensitiveDataCategories;
+      if (rest.sensitiveDataDetails !== undefined)
+        data.sensitiveDataDetails = rest.sensitiveDataDetails;
       if (rest.projectNarrative !== undefined) data.projectNarrative = rest.projectNarrative;
       if (rest.benefits !== undefined) data.benefits = rest.benefits;
       if (rest.benefitsDetails !== undefined) data.benefitsDetails = rest.benefitsDetails;
@@ -759,9 +928,15 @@ export const projectRouter = router({
         current as unknown as Record<string, unknown>
       );
 
-      const project = await ctx.db.project.update({
-        where: { id },
-        data,
+      const project = await ctx.db.$transaction(async (tx) => {
+        const updated = await tx.project.update({
+          where: { id },
+          data,
+        });
+        if (rest.automationInventory) {
+          await replaceAutomationInventory(tx, updated.id, rest.automationInventory);
+        }
+        return updated;
       });
       await ctx.db.activityLog.create({
         data: {
