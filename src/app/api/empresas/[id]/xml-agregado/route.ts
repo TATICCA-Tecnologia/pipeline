@@ -59,6 +59,19 @@ export async function GET(
           solutionTypes: { select: { id: true, name: true, slug: true } },
           features: true,
           peopleOfInterest: { include: { person: true } },
+          ownerArea: { select: { name: true } },
+          targetSystems: {
+            orderBy: { order: "asc" },
+            include: { targetSystem: { select: { name: true, category: { select: { name: true } } } } },
+          },
+          automationAccounts: {
+            orderBy: { order: "asc" },
+            include: {
+              projectTargetSystem: {
+                select: { customName: true, targetSystem: { select: { name: true } } },
+              },
+            },
+          },
         },
       }),
       db.urgencyLevel.findMany({
@@ -90,6 +103,49 @@ export async function GET(
       currentApplicationAccessLocation: p.currentApplicationAccessLocation ?? undefined,
       currentApplicationAccessReference: p.currentApplicationAccessReference ?? undefined,
       currentApplicationLiveSince: p.currentApplicationLiveSince ?? undefined,
+      currentApplicationAssetId: p.currentApplicationAssetId ?? undefined,
+      currentApplicationOwnerRole: p.currentApplicationOwnerRole ?? undefined,
+      currentApplicationOwnerAreaName: p.ownerArea?.name ?? undefined,
+      currentApplicationDataInput: p.currentApplicationDataInput ?? undefined,
+      currentApplicationDataInputDetails: p.currentApplicationDataInputDetails ?? undefined,
+      currentApplicationDataOutput: p.currentApplicationDataOutput ?? undefined,
+      currentApplicationDataOutputDetails: p.currentApplicationDataOutputDetails ?? undefined,
+      currentApplicationContingencyActions:
+        (p.currentApplicationContingencyActions as string[] | null) ?? undefined,
+      currentApplicationContingencyDetails: p.currentApplicationContingencyDetails ?? undefined,
+      currentApplicationBackupOwner: p.currentApplicationBackupOwner ?? undefined,
+      handlesSensitiveData: p.handlesSensitiveData ?? undefined,
+      sensitiveDataCategories: (p.sensitiveDataCategories as string[] | null) ?? undefined,
+      sensitiveDataDetails: p.sensitiveDataDetails ?? undefined,
+      // Descarta linhas sem nome resolvível (nem catálogo, nem customName) —
+      // mesmo invariante de mapTargetSystemsForView em project.router.ts; não
+      // deve acontecer por uso legítimo do formulário, só por dado inconsistente.
+      targetSystems: p.targetSystems.flatMap((s) => {
+        const name = s.targetSystem?.name || s.customName;
+        if (!name) return [];
+        return [
+          {
+            id: s.id,
+            targetSystemId: s.targetSystemId,
+            name,
+            categoryName: s.targetSystem?.category?.name ?? null,
+            accessPoint: s.accessPoint,
+            accessNotes: s.accessNotes,
+            order: s.order,
+          },
+        ];
+      }),
+      automationAccounts: p.automationAccounts.map((a) => ({
+        id: a.id,
+        username: a.username,
+        projectTargetSystemId: a.projectTargetSystemId,
+        systemName:
+          a.projectTargetSystem?.targetSystem?.name ?? a.projectTargetSystem?.customName ?? null,
+        accountType: a.accountType,
+        ownerName: a.ownerName,
+        notes: a.notes,
+        order: a.order,
+      })),
       peopleInvolved: p.peopleInvolved ?? undefined,
       taskDurationHours: p.taskDurationHours ?? undefined,
       processFrequency: p.processFrequency ?? undefined,

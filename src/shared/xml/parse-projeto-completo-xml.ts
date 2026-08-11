@@ -8,8 +8,37 @@ import {
   CURRENT_APPLICATION_HOSTING_OPTIONS,
   CURRENT_APPLICATION_ACCESS_LOCATION_OPTIONS,
   CURRENT_APPLICATION_ACCESS_REFERENCE_MAX_LENGTH,
+  CURRENT_APPLICATION_DATA_ENDPOINT_OPTIONS,
+  CURRENT_APPLICATION_CONTINGENCY_OPTIONS,
+  AUTOMATION_ACCOUNT_TYPE_OPTIONS,
+  AUTOMATION_ACCOUNT_USERNAME_MAX_LENGTH,
+  SENSITIVE_DATA_ANSWER_OPTIONS,
+  SENSITIVE_DATA_CATEGORY_OPTIONS,
 } from "@/shared/constants/project-taxonomy";
 import { EXECUTION_STRATEGIES } from "@/src/app/(private)/admin/projetos/[id]/especificacao/_constants/architecture";
+
+// Formato pronto para alimentar `automationInventoryInputSchema` (ver
+// project.router.ts): `customName` porque um nome vindo de XML nunca casa com
+// um `targetSystemId` do catálogo local — id não sobrevive entre bases.
+export interface ParsedTargetSystem {
+  customName: string;
+  accessPoint?: string;
+  accessNotes?: string;
+}
+
+// `systemIndex` já é a POSIÇÃO dentro do array `targetSystems` irmão deste
+// objeto, igual ao que `automationAccountInputSchema.systemIndex` espera —
+// resolvido por nome (ver resolução logo abaixo, seção "sistema"). Ausente
+// quando o `<sistema>` da conta não bate com nenhum `<sistema>` de
+// `<sistemas>`: NUNCA um índice chutado, porque o servidor rejeita índice
+// fora do intervalo com BAD_REQUEST (replaceAutomationInventory).
+export interface ParsedAutomationAccount {
+  username: string;
+  systemIndex?: number;
+  accountType?: string;
+  ownerName?: string;
+  notes?: string;
+}
 
 export interface ParsedProjetoCompleto {
   projetoId?: string;
@@ -33,6 +62,21 @@ export interface ParsedProjetoCompleto {
   // String "AAAA-MM-DD", igual a estimatedDeadline — convertida para Date pelo
   // caller (project-xml-import-export.tsx).
   currentApplicationLiveSince?: string;
+  currentApplicationAssetId?: string;
+  currentApplicationOwnerRole?: string;
+  currentApplicationOwnerAreaName?: string;
+  currentApplicationDataInput?: string;
+  currentApplicationDataInputDetails?: string;
+  currentApplicationDataOutput?: string;
+  currentApplicationDataOutputDetails?: string;
+  currentApplicationContingencyActions?: string[];
+  currentApplicationContingencyDetails?: string;
+  currentApplicationBackupOwner?: string;
+  handlesSensitiveData?: string;
+  sensitiveDataCategories?: string[];
+  sensitiveDataDetails?: string;
+  targetSystems?: ParsedTargetSystem[];
+  automationAccounts?: ParsedAutomationAccount[];
   peopleInvolved?: number;
   taskDurationHours?: number;
   processFrequency?: string;
@@ -85,6 +129,15 @@ function getListItems(root: Element, groupTag: string, itemTag: string): string[
     .filter((c) => c.tagName === itemTag)
     .map((c) => (c.textContent ?? "").trim())
     .filter((t) => t.length > 0);
+}
+
+// Mesma navegação de getListItems, mas devolve os elementos <itemTag> em vez
+// do texto — usado por <sistemas>/<sistema> e <contas>/<conta>, cujos itens
+// carregam vários campos filhos em vez de um único texto.
+function getGroupElements(root: Element, groupTag: string, itemTag: string): Element[] {
+  const group = Array.from(root.children).find((c) => c.tagName === groupTag);
+  if (!group) return [];
+  return Array.from(group.children).filter((c) => c.tagName === itemTag);
 }
 
 function matchValueByLabel(
@@ -209,6 +262,111 @@ export function parseProjetoCompletoXml(
       );
     }
   }
+  data.currentApplicationAssetId = getDirectChildText(root, "ativoAplicacaoExistente");
+  data.currentApplicationOwnerRole = getDirectChildText(root, "cargoResponsavelAplicacaoExistente");
+  data.currentApplicationOwnerAreaName = getDirectChildText(
+    root,
+    "setorResponsavelAplicacaoExistente"
+  );
+  data.currentApplicationBackupOwner = getDirectChildText(
+    root,
+    "responsavelSubstitutoAplicacaoExistente"
+  );
+  const rawContingencyActions = getListItems(root, "acoesContingencia", "acao");
+  data.currentApplicationContingencyActions = rawContingencyActions?.map(
+    (label) => matchKeyByLabel(label, CURRENT_APPLICATION_CONTINGENCY_OPTIONS) ?? label
+  );
+  data.currentApplicationContingencyDetails = getDirectChildText(root, "detalhesContingencia");
+  data.currentApplicationDataInput = resolveEnum(
+    getDirectChildText(root, "origemDadosEntrada"),
+    CURRENT_APPLICATION_DATA_ENDPOINT_OPTIONS,
+    "Origem dos dados de entrada",
+    warnings
+  );
+  data.currentApplicationDataInputDetails = getDirectChildText(root, "detalhesDadosEntrada");
+  data.currentApplicationDataOutput = resolveEnum(
+    getDirectChildText(root, "destinoDadosSaida"),
+    CURRENT_APPLICATION_DATA_ENDPOINT_OPTIONS,
+    "Destino dos dados de saída",
+    warnings
+  );
+  data.currentApplicationDataOutputDetails = getDirectChildText(root, "detalhesDadosSaida");
+  data.handlesSensitiveData = resolveEnum(
+    getDirectChildText(root, "dadosSigilosos"),
+    SENSITIVE_DATA_ANSWER_OPTIONS,
+    "Lida com dados sigilosos",
+    warnings
+  );
+  const rawSensitiveDataCategories = getListItems(root, "categoriasDadosSigilosos", "categoria");
+  data.sensitiveDataCategories = rawSensitiveDataCategories?.map(
+    (label) => matchKeyByLabel(label, SENSITIVE_DATA_CATEGORY_OPTIONS) ?? label
+  );
+  data.sensitiveDataDetails = getDirectChildText(root, "detalhesDadosSigilosos");
+
+  // Sistemas PRIMEIRO — as contas (logo abaixo) resolvem o vínculo por nome
+  // contra esta lista, então precisam da lista já pronta.
+  const targetSystems: ParsedTargetSystem[] = [];
+  for (const systemEl of getGroupElements(root, "sistemas", "sistema")) {
+    const nome = getDirectChildText(systemEl, "nome");
+    if (!nome) {
+      warnings.push('Um "<sistema>" sem "<nome>" foi ignorado.');
+      continue;
+    }
+    let comoAcessar = getDirectChildText(systemEl, "comoAcessar");
+    if (comoAcessar && comoAcessar.length > CURRENT_APPLICATION_ACCESS_REFERENCE_MAX_LENGTH) {
+      comoAcessar = comoAcessar.slice(0, CURRENT_APPLICATION_ACCESS_REFERENCE_MAX_LENGTH);
+      warnings.push(
+        `"Como acessar" do sistema "${nome}" tinha mais de ${CURRENT_APPLICATION_ACCESS_REFERENCE_MAX_LENGTH} caracteres — foi truncado.`
+      );
+    }
+    targetSystems.push({
+      customName: nome,
+      accessPoint: getDirectChildText(systemEl, "pontoAcesso"),
+      accessNotes: comoAcessar,
+    });
+  }
+  data.targetSystems = targetSystems.length > 0 ? targetSystems : undefined;
+
+  // <conta><sistema> carrega o NOME do sistema, não um id: id não sobrevive
+  // entre bases (ver comentário em ParsedAutomationAccount). Sem
+  // correspondência, a conta entra com vínculo nulo (systemIndex ausente) —
+  // NUNCA é descartada por isso, e NUNCA vira um índice chutado (o servidor
+  // estoura BAD_REQUEST para índice fora do intervalo).
+  const systemIndexByName = new Map(
+    targetSystems.map((s, i) => [s.customName.trim().toLowerCase(), i])
+  );
+  const automationAccounts: ParsedAutomationAccount[] = [];
+  for (const accountEl of getGroupElements(root, "contas", "conta")) {
+    let usuario = getDirectChildText(accountEl, "usuario");
+    if (!usuario) {
+      warnings.push('Uma "<conta>" sem "<usuario>" foi ignorada.');
+      continue;
+    }
+    if (usuario.length > AUTOMATION_ACCOUNT_USERNAME_MAX_LENGTH) {
+      const original = usuario;
+      usuario = usuario.slice(0, AUTOMATION_ACCOUNT_USERNAME_MAX_LENGTH);
+      warnings.push(
+        `Usuário da conta "${original}" tinha mais de ${AUTOMATION_ACCOUNT_USERNAME_MAX_LENGTH} caracteres — foi truncado.`
+      );
+    }
+    const tipoLabel = getDirectChildText(accountEl, "tipo");
+    const accountType = tipoLabel
+      ? matchValueByLabel(tipoLabel, AUTOMATION_ACCOUNT_TYPE_OPTIONS) ?? tipoLabel
+      : undefined;
+    const sistemaNome = getDirectChildText(accountEl, "sistema");
+    const systemIndex = sistemaNome
+      ? systemIndexByName.get(sistemaNome.trim().toLowerCase())
+      : undefined;
+    automationAccounts.push({
+      username: usuario,
+      systemIndex,
+      accountType,
+      ownerName: getDirectChildText(accountEl, "responsavel"),
+      notes: getDirectChildText(accountEl, "observacoes"),
+    });
+  }
+  data.automationAccounts = automationAccounts.length > 0 ? automationAccounts : undefined;
+
   data.peopleInvolved = parseNumber(
     getDirectChildText(root, "colaboradoresEnvolvidos"),
     "Colaboradores envolvidos",

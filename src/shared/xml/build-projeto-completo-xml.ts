@@ -1,4 +1,8 @@
-import type { Project } from "@/shared/types";
+import type {
+  Project,
+  ProjectTargetSystemView,
+  ProjectAutomationAccountView,
+} from "@/shared/types";
 import {
   PLATFORMS,
   HAS_EXISTING_SYSTEM_OPTIONS,
@@ -8,7 +12,13 @@ import {
   BENEFIT_OPTIONS,
   CURRENT_APPLICATION_HOSTING_OPTIONS,
   CURRENT_APPLICATION_ACCESS_LOCATION_OPTIONS,
+  CURRENT_APPLICATION_CONTINGENCY_OPTIONS,
+  SENSITIVE_DATA_CATEGORY_OPTIONS,
   resolveLabel,
+  resolveDataEndpointLabel,
+  resolveAccountTypeLabel,
+  resolveSensitiveDataAnswerLabel,
+  resolveKeyLabels,
 } from "@/shared/constants/project-taxonomy";
 import { EXECUTION_STRATEGIES } from "@/src/app/(private)/admin/projetos/[id]/especificacao/_constants/architecture";
 
@@ -29,6 +39,56 @@ function tag(name: string, value: string | number | null | undefined): string {
 function listTag(groupName: string, itemName: string, items: string[]): string {
   const inner = items.map((item) => `    <${itemName}>${escapeXml(item)}</${itemName}>`).join("\n");
   return `  <${groupName}>\n${inner}\n  </${groupName}>`;
+}
+
+function nestedTag(indent: string, name: string, value: string | number | null | undefined): string {
+  const text = value === null || value === undefined ? "" : escapeXml(String(value));
+  return `${indent}<${name}>${text}</${name}>`;
+}
+
+// Sistemas sobre os quais a automação atua. Aninhado (não listTag simples)
+// porque cada sistema carrega vários campos, não só um texto — mesmo padrão
+// de <contas> logo abaixo.
+function buildTargetSystemsXml(systems: ProjectTargetSystemView[]): string {
+  if (systems.length === 0) {
+    return "  <sistemas>\n  </sistemas>";
+  }
+  const items = systems
+    .map((s) => {
+      const fields = [
+        nestedTag("      ", "nome", s.name),
+        nestedTag("      ", "categoria", s.categoryName),
+        nestedTag("      ", "pontoAcesso", s.accessPoint),
+        nestedTag("      ", "comoAcessar", s.accessNotes),
+      ].join("\n");
+      return `    <sistema>\n${fields}\n    </sistema>`;
+    })
+    .join("\n");
+  return `  <sistemas>\n${items}\n  </sistemas>`;
+}
+
+// Contas/usernames usados pela automação. NUNCA inclui senha/token — o
+// modelo (ProjectAutomationAccount) não tem esse campo, de propósito.
+// <sistema> aqui carrega o NOME do sistema vinculado (resolvido em
+// systemName por replaceAutomationInventory/mapAutomationAccountsForView),
+// não um id: o id não sobrevive a um round-trip entre bases diferentes.
+function buildAutomationAccountsXml(accounts: ProjectAutomationAccountView[]): string {
+  if (accounts.length === 0) {
+    return "  <contas>\n  </contas>";
+  }
+  const items = accounts
+    .map((a) => {
+      const fields = [
+        nestedTag("      ", "usuario", a.username),
+        nestedTag("      ", "tipo", resolveAccountTypeLabel(a.accountType)),
+        nestedTag("      ", "sistema", a.systemName),
+        nestedTag("      ", "responsavel", a.ownerName),
+        nestedTag("      ", "observacoes", a.notes),
+      ].join("\n");
+      return `    <conta>\n${fields}\n    </conta>`;
+    })
+    .join("\n");
+  return `  <contas>\n${items}\n  </contas>`;
 }
 
 function labelForBenefit(key: string): string {
@@ -73,6 +133,21 @@ export type ProjetoCompletoXmlData = Pick<
   | "currentApplicationAccessLocation"
   | "currentApplicationAccessReference"
   | "currentApplicationLiveSince"
+  | "currentApplicationAssetId"
+  | "currentApplicationOwnerRole"
+  | "currentApplicationOwnerAreaName"
+  | "currentApplicationDataInput"
+  | "currentApplicationDataInputDetails"
+  | "currentApplicationDataOutput"
+  | "currentApplicationDataOutputDetails"
+  | "currentApplicationContingencyActions"
+  | "currentApplicationContingencyDetails"
+  | "currentApplicationBackupOwner"
+  | "handlesSensitiveData"
+  | "sensitiveDataCategories"
+  | "sensitiveDataDetails"
+  | "targetSystems"
+  | "automationAccounts"
   | "peopleInvolved"
   | "taskDurationHours"
   | "processFrequency"
@@ -159,6 +234,35 @@ export function buildProjetoCompletoXmlFields(
   lines.push(
     tag("producaoDesdeAplicacaoExistente", formatDeadline(project.currentApplicationLiveSince))
   );
+  lines.push(tag("ativoAplicacaoExistente", project.currentApplicationAssetId));
+  lines.push(tag("cargoResponsavelAplicacaoExistente", project.currentApplicationOwnerRole));
+  lines.push(tag("setorResponsavelAplicacaoExistente", project.currentApplicationOwnerAreaName));
+  lines.push(
+    tag("responsavelSubstitutoAplicacaoExistente", project.currentApplicationBackupOwner)
+  );
+  lines.push(
+    listTag(
+      "acoesContingencia",
+      "acao",
+      resolveKeyLabels(project.currentApplicationContingencyActions, CURRENT_APPLICATION_CONTINGENCY_OPTIONS)
+    )
+  );
+  lines.push(tag("detalhesContingencia", project.currentApplicationContingencyDetails));
+  lines.push(tag("origemDadosEntrada", resolveDataEndpointLabel(project.currentApplicationDataInput)));
+  lines.push(tag("detalhesDadosEntrada", project.currentApplicationDataInputDetails));
+  lines.push(tag("destinoDadosSaida", resolveDataEndpointLabel(project.currentApplicationDataOutput)));
+  lines.push(tag("detalhesDadosSaida", project.currentApplicationDataOutputDetails));
+  lines.push(tag("dadosSigilosos", resolveSensitiveDataAnswerLabel(project.handlesSensitiveData)));
+  lines.push(
+    listTag(
+      "categoriasDadosSigilosos",
+      "categoria",
+      resolveKeyLabels(project.sensitiveDataCategories, SENSITIVE_DATA_CATEGORY_OPTIONS)
+    )
+  );
+  lines.push(tag("detalhesDadosSigilosos", project.sensitiveDataDetails));
+  lines.push(buildTargetSystemsXml(project.targetSystems ?? []));
+  lines.push(buildAutomationAccountsXml(project.automationAccounts ?? []));
   lines.push(tag("colaboradoresEnvolvidos", project.peopleInvolved));
   lines.push(tag("duracaoPorExecucao", project.taskDurationHours));
   lines.push(tag("periodicidade", resolveLabel(project.processFrequency, PROCESS_FREQUENCIES)));
