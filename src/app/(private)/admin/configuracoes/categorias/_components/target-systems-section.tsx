@@ -75,19 +75,42 @@ export function TargetSystemsSection() {
   const [categoryDialog, setCategoryDialog] = useState<{ open: boolean; editing?: { id: string; name: string; slug: string; order: number } }>({ open: false });
   const [categoryForm, setCategoryForm] = useState({ name: "", slug: "", order: 0 });
 
+  // As quatro invalidam também `listAllTargetSystems`: o nome/remoção de uma
+  // categoria muda o badge de categoria exibido em cada sistema (e apagar uma
+  // categoria vira `categoryId: null` via SetNull nos sistemas dela), então a
+  // lista de sistemas ficaria com dado obsoleto até um refetch acidental.
   const createCategory = trpc.taxonomy.createTargetSystemCategory.useMutation({
-    onSuccess: () => { utils.taxonomy.listAllTargetSystemCategories.invalidate(); setCategoryDialog({ open: false }); toast({ title: "Categoria de sistema criada" }); },
+    onSuccess: () => {
+      utils.taxonomy.listAllTargetSystemCategories.invalidate();
+      utils.taxonomy.listAllTargetSystems.invalidate();
+      setCategoryDialog({ open: false });
+      toast({ title: "Categoria de sistema criada" });
+    },
     onError: (e: { message: string }) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
   });
   const updateCategory = trpc.taxonomy.updateTargetSystemCategory.useMutation({
-    onSuccess: () => { utils.taxonomy.listAllTargetSystemCategories.invalidate(); setCategoryDialog({ open: false }); toast({ title: "Categoria de sistema atualizada" }); },
+    onSuccess: () => {
+      utils.taxonomy.listAllTargetSystemCategories.invalidate();
+      utils.taxonomy.listAllTargetSystems.invalidate();
+      setCategoryDialog({ open: false });
+      toast({ title: "Categoria de sistema atualizada" });
+    },
     onError: (e: { message: string }) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
   });
   const deleteCategory = trpc.taxonomy.deleteTargetSystemCategory.useMutation({
-    onSuccess: () => { utils.taxonomy.listAllTargetSystemCategories.invalidate(); toast({ title: "Categoria de sistema removida" }); },
+    onSuccess: () => {
+      utils.taxonomy.listAllTargetSystemCategories.invalidate();
+      utils.taxonomy.listAllTargetSystems.invalidate();
+      toast({ title: "Categoria de sistema removida" });
+    },
+    onError: (e: { message: string }) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
   });
   const toggleCategory = trpc.taxonomy.updateTargetSystemCategory.useMutation({
-    onSuccess: () => utils.taxonomy.listAllTargetSystemCategories.invalidate(),
+    onSuccess: () => {
+      utils.taxonomy.listAllTargetSystemCategories.invalidate();
+      utils.taxonomy.listAllTargetSystems.invalidate();
+    },
+    onError: (e: { message: string }) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
   });
 
   function openNewCategory() {
@@ -121,9 +144,11 @@ export function TargetSystemsSection() {
   });
   const deleteSystem = trpc.taxonomy.deleteTargetSystem.useMutation({
     onSuccess: () => { utils.taxonomy.listAllTargetSystems.invalidate(); toast({ title: "Sistema removido" }); },
+    onError: (e: { message: string }) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
   });
   const toggleSystem = trpc.taxonomy.updateTargetSystem.useMutation({
     onSuccess: () => utils.taxonomy.listAllTargetSystems.invalidate(),
+    onError: (e: { message: string }) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
   });
 
   function openNewSystem() {
@@ -210,12 +235,17 @@ export function TargetSystemsSection() {
                     onCheckedChange={(v) => toggleCategory.mutate({ id: cat.id, isActive: v })}
                     className="scale-75"
                   />
-                  <button onClick={() => openEditCategory(cat)} className="text-muted-foreground hover:text-foreground">
+                  <button
+                    onClick={() => openEditCategory(cat)}
+                    className="text-muted-foreground hover:text-foreground"
+                    aria-label={`Editar ${cat.name}`}
+                  >
                     <Pencil className="h-3 w-3" />
                   </button>
                   <button
                     onClick={() => setDeleteConfirm({ open: true, type: "targetSystemCategory", id: cat.id, label: cat.name })}
                     className="text-destructive/60 hover:text-destructive"
+                    aria-label={`Remover ${cat.name}`}
                   >
                     <Trash2 className="h-3 w-3" />
                   </button>
@@ -269,12 +299,17 @@ export function TargetSystemsSection() {
                     onCheckedChange={(v) => toggleSystem.mutate({ id: system.id, isActive: v })}
                     className="scale-75"
                   />
-                  <button onClick={() => openEditSystem(system)} className="text-muted-foreground hover:text-foreground">
+                  <button
+                    onClick={() => openEditSystem(system)}
+                    className="text-muted-foreground hover:text-foreground"
+                    aria-label={`Editar ${system.name}`}
+                  >
                     <Pencil className="h-3 w-3" />
                   </button>
                   <button
                     onClick={() => setDeleteConfirm({ open: true, type: "targetSystem", id: system.id, label: system.name })}
                     className="text-destructive/60 hover:text-destructive"
+                    aria-label={`Remover ${system.name}`}
                   >
                     <Trash2 className="h-3 w-3" />
                   </button>

@@ -546,7 +546,22 @@ export const taxonomyRouter = router({
   deleteTargetSystem: adminProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      await ctx.db.targetSystem.delete({ where: { id: input.id } });
+      const system = await ctx.db.targetSystem.findUnique({ where: { id: input.id } });
+      if (!system) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Sistema não encontrado" });
+      }
+      await ctx.db.$transaction(async (tx) => {
+        // SetNull deixaria a linha sem targetSystemId E sem customName — exatamente o
+        // que o comentário de ProjectTargetSystem chama de "linha sem sentido", com
+        // accessPoint, accessNotes e contas penduradas em nada. Rebaixar para texto
+        // livre preserva a informação: o projeto continua registrando que atua sobre
+        // esse sistema, só não aponta mais para o catálogo.
+        await tx.projectTargetSystem.updateMany({
+          where: { targetSystemId: input.id, customName: null },
+          data: { customName: system.name },
+        });
+        await tx.targetSystem.delete({ where: { id: input.id } });
+      });
       return { success: true };
     }),
 
