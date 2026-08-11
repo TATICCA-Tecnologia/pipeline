@@ -60,14 +60,20 @@ const targetSystemInputSchema = z
     targetSystemId: z.string().optional(),
     customName: z.string().optional(),
     accessPoint: z.string().optional(),
-    accessNotes: z.string().max(CURRENT_APPLICATION_ACCESS_REFERENCE_MAX_LENGTH).optional(),
+    accessNotes: z
+      .string()
+      .max(CURRENT_APPLICATION_ACCESS_REFERENCE_MAX_LENGTH, "Máximo de 200 caracteres")
+      .optional(),
   })
   .refine((s) => !!s.targetSystemId || !!s.customName?.trim(), {
     message: "Escolha um sistema do catálogo ou informe um nome",
   });
 
 const automationAccountInputSchema = z.object({
-  username: z.string().min(1).max(AUTOMATION_ACCOUNT_USERNAME_MAX_LENGTH),
+  username: z
+    .string()
+    .min(1, "Informe o usuário")
+    .max(AUTOMATION_ACCOUNT_USERNAME_MAX_LENGTH, "Máximo de 120 caracteres"),
   /**
    * POSIÇÃO na lista `systems` do mesmo payload, não um id: a gravação
    * substitui as linhas por inteiro e destrói os ids anteriores.
@@ -82,6 +88,13 @@ const automationAccountInputSchema = z.object({
  * Sistemas e contas viajam juntos de propósito. As contas apontam para linhas
  * de ProjectTargetSystem por índice, então gravar um sem o outro deixaria todo
  * vínculo nulo — em silêncio, sem erro.
+ *
+ * Semântica omitir-vs-vazio, não óbvia e fácil de errar do lado do cliente:
+ * OMITIR `automationInventory` inteiro em project.update PRESERVA as listas
+ * existentes do projeto; mandar `{ systems: [], accounts: [] }` APAGA as duas.
+ * Um formulário que sempre serialize `systems: []` mesmo quando o usuário não
+ * abriu a seção de sistemas/contas apagaria dados sem querer — o campo
+ * precisa ficar de fora do payload quando a intenção é "não mexer nisso".
  */
 const automationInventoryInputSchema = z.object({
   systems: z.array(targetSystemInputSchema),
@@ -220,6 +233,9 @@ async function replaceAutomationInventory(
   await tx.projectTargetSystem.deleteMany({ where: { projectId } });
 
   const createdSystemIds: string[] = [];
+  // Um create por linha, sequencial — não createMany. createMany não devolve
+  // os ids gerados, e é justamente o id de cada linha que a tradução
+  // índice→id das contas (abaixo) precisa.
   for (const [index, system] of inventory.systems.entries()) {
     const row = await tx.projectTargetSystem.create({
       data: {
@@ -235,13 +251,30 @@ async function replaceAutomationInventory(
     createdSystemIds.push(row.id);
   }
 
+  // Valida TODOS os índices antes de criar qualquer conta — falhar cedo, com
+  // uma mensagem que aponta a conta e o índice culpados, em vez de deixar
+  // metade das contas gravadas (o rollback da transação cobre a consistência
+  // do banco de qualquer forma, mas a mensagem de erro fica pior). Índice fora
+  // de [0, systems.length) só acontece por payload malformado — nunca por uso
+  // legítimo do formulário — mas é justamente o caminho que a Task 12 (import
+  // de XML) vai exercitar, e lá um índice inválido é sintoma de XML mal
+  // gerado que precisa aparecer, não virar conta órfã em silêncio.
+  for (const account of inventory.accounts) {
+    if (account.systemIndex != null && !(account.systemIndex in createdSystemIds)) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: `Conta "${account.username}" aponta para o sistema de índice ${account.systemIndex}, que não existe na lista enviada (${createdSystemIds.length} sistemas).`,
+      });
+    }
+  }
+
   for (const [index, account] of inventory.accounts.entries()) {
     await tx.projectAutomationAccount.create({
       data: {
         projectId,
         username: account.username.trim(),
         projectTargetSystemId:
-          account.systemIndex != null ? createdSystemIds[account.systemIndex] ?? null : null,
+          account.systemIndex != null ? createdSystemIds[account.systemIndex] : null,
         accountType: account.accountType || null,
         ownerName: account.ownerName?.trim() || null,
         notes: account.notes?.trim() || null,
