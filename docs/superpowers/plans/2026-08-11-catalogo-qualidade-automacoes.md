@@ -567,22 +567,81 @@ git commit -m "feat: catalogo de sistemas-alvo no taxonomy router"
 ### Task 5: Catálogo de sistemas na admin de categorias
 
 **Files:**
+- Create: `src/app/(private)/admin/configuracoes/categorias/_components/target-systems-section.tsx`
 - Modify: `src/app/(private)/admin/configuracoes/categorias/page.tsx`
+- Modify: `src/server/trpc/routers/taxonomy.router.ts`
+- Modify: `src/shared/components/merge-suggestions.tsx`
 
-- [ ] **Step 1: Duplicar a seção de ferramentas**
+**Duas correções ao plano original, descobertas ao inspecionar o código:**
 
-A página já tem a seção completa de `MainToolCategory` + `MainTool` (estado, dialogs, mutations, tabela) a partir da linha ~262. Duplicar com a mesma substituição de identificadores da Task 4, trocando os textos de toast: "Categoria de ferramenta criada" → "Categoria de sistema criada", e assim por diante. Título da seção: **"Sistemas em que as automações atuam"**, com o subtítulo "Ex.: SAP dentro de ERP — os sistemas e sites sobre os quais os robôs agem, não a ferramenta com que foram construídos."
+**1. Componente novo, não duplicação inline.** `page.tsx` já tem 1520 linhas; duplicar a
+seção inline levaria a ~1720. A seção nova vai para `_components/`, convenção que o
+repositório já usa em seis lugares (`admin/clientes/_components`,
+`admin/projetos/_components`, …). `page.tsx` ganha só um import e um render. As
+seções existentes ficam onde estão — isto é adição, não reestruturação.
 
-- [ ] **Step 2: Verificar na tela**
+O componente carrega o próprio estado, as próprias mutations e os próprios dialogs,
+então o union `deleteConfirm` de `page.tsx` **não** é tocado.
 
-Run: `pnpm dev` e abrir `/admin/configuracoes/categorias`
-Expected: a seção nova aparece, criar uma categoria e um sistema funciona, e a lista sobrevive ao reload.
+**2. Suporte a merge é obrigatório aqui, ao contrário do que o plano original supunha.**
+`MergeSuggestions` e as procedures `merge`/`mergeImpact` operam sobre o enum fechado
+`MERGE_TYPE` (`taxonomy.router.ts:12-18`). Sem estender esse enum, a seção nova fica
+sem detecção de duplicata.
 
-- [ ] **Step 3: Commit**
+Isso não é simetria cosmética com `MainTool`: `MainTool` é populado por arquitetos,
+enquanto `TargetSystem` vai ser populado **inline por todo usuário cliente** no wizard
+(Task 9). É o catálogo com maior risco de acumular "SAP", "S.A.P." e "SAP ECC" como
+três registros. Um catálogo de qualidade sem merge apodrece exatamente onde mais
+importa.
+
+- [ ] **Step 1: Estender `MERGE_TYPE` e os dois switches**
+
+Em `src/server/trpc/routers/taxonomy.router.ts`, acrescentar `"targetSystem"` e
+`"targetSystemCategory"` ao enum `MERGE_TYPE` (linha 12), e o `case` correspondente
+em `mergeImpact` (linha ~858) e em `merge` (linha ~912), espelhando os cases de
+`mainTool`/`mainToolCategory`.
+
+Diferença de contagem: `mainTool` conta `project.count({ where: { mainToolId } })`.
+O equivalente aqui é `projectTargetSystem.count({ where: { targetSystemId } })` — o
+vínculo é pela tabela de junção, não por uma FK direta em `Project`.
+
+- [ ] **Step 2: Estender o union `MergeType`**
+
+Em `src/shared/components/merge-suggestions.tsx` (linha 32), acrescentar os dois
+valores ao union.
+
+- [ ] **Step 3: Escrever o componente da seção**
+
+`_components/target-systems-section.tsx`, espelhando as duas seções de
+`MainToolCategory` + `MainTool` de `page.tsx` (estado, mutations, dialogs, listagem,
+`MergeSuggestions`, `Switch` de ativo, editar, apagar), com os textos trocados:
+
+- Seção de categorias: título **"Categorias de Sistema"**, subtítulo "Agrupam os
+  sistemas em que as automações atuam (ex.: 'ERP' agrupa SAP, Protheus...)."
+- Seção de sistemas: título **"Sistemas em que as automações atuam"**, subtítulo
+  "Ex.: SAP dentro de ERP — os sistemas e sites sobre os quais os robôs agem, não a
+  ferramenta com que foram construídos."
+- Toasts: "Categoria de sistema criada/atualizada/removida", "Sistema criado/
+  atualizado/removido".
+
+- [ ] **Step 4: Renderizar em `page.tsx`**
+
+Import e render logo depois da seção "Ferramentas principais", que é a vizinha
+conceitual.
+
+- [ ] **Step 5: Verificar**
+
+Run: `npx tsc --noEmit` — os 10 erros de baseline e nada além.
+Run: `pnpm dev`, abrir `/admin/configuracoes/categorias`.
+Expected: a seção nova aparece depois de "Ferramentas principais"; criar categoria e
+sistema funciona; a lista sobrevive ao reload; a sugestão de merge aparece ao criar
+dois nomes parecidos.
+
+- [ ] **Step 6: Commit**
 
 ```bash
-git add "src/app/(private)/admin/configuracoes/categorias/page.tsx"
-git commit -m "feat: admin do catalogo de sistemas-alvo"
+git add "src/app/(private)/admin/configuracoes/categorias/" src/server/trpc/routers/taxonomy.router.ts src/shared/components/merge-suggestions.tsx
+git commit -m "feat: admin do catalogo de sistemas-alvo, com merge"
 ```
 
 ---
@@ -751,7 +810,15 @@ Nas queries que devolvem projeto (`byId` e as listagens que alimentam a ficha), 
           },
 ```
 
-E achatar para os tipos da Task 3, resolvendo `name` como `targetSystem?.name ?? customName ?? ""`.
+E achatar para os tipos da Task 3, resolvendo `name` como `targetSystem?.name ?? customName`.
+
+**Só em `byId`, nunca em `list`.** `list` alimenta o provider global
+`projects-context`, consultado em toda navegação e invalidado a cada mutação de
+qualquer projeto; as duas listas com `include` aninhado ali custariam joins em todo o
+app sem consumidor. As telas de ficha já buscam por `byId` à parte
+(`project-details.modal.tsx:73`, `projeto/[id]/hooks/project.hook.ts:4`) — é esse o
+padrão do repositório: `list` = card leve, `byId` = ficha completa sob demanda. Os 13
+campos **escalares** ficam nos dois, porque vêm da mesma linha, sem join.
 
 - [ ] **Step 5b: Mapear no contexto (adiado da Task 3)**
 
@@ -813,6 +880,18 @@ git commit -m "feat: persistencia dos campos de catalogo e das listas de sistema
 - [ ] **Step 1: Escrever o script**
 
 Este é o cenário que falha em silêncio: salvar duas vezes sem mudar nada não pode perder o vínculo.
+
+**Correção ao esboço abaixo:** ele reimplementa a transação à mão, o que testaria uma
+cópia da lógica em vez do código real. O script deve chamar `project.create` e
+`project.update` pelo `createCaller` do tRPC — o mesmo padrão que
+`src/server/deck/build-existing-automations-deck.ts` usa — para exercitar
+`replaceAutomationInventory` de verdade, incluindo a tradução `systemIndex` → id e a
+validação de índice fora do intervalo.
+
+**Este script exige `DATABASE_URL` e não roda na máquina de desenvolvimento atual**
+(não há `.env`). Ele é entregue como artefato executável contra um banco descartável
+ou no ambiente de deploy; enquanto não rodar, a regressão que ele cobre permanece
+não verificada, e isso deve ser dito explicitamente em vez de presumido resolvido.
 
 ```ts
 import { PrismaClient } from "@prisma/client";
@@ -1079,6 +1158,15 @@ Acrescentar `"sistemas"` ao union `StepKey` (linha 113). Acrescentar `"handlesSe
 - [ ] **Step 3: Lista de sistemas**
 
 `_components/target-systems-list.tsx`, com `useFieldArray` de react-hook-form sobre `targetSystems`. Por linha: `CreatableCombobox` de `trpc.taxonomy.listTargetSystems` (mesmo uso de `architecture-tab.tsx:361-372`, com `onCreate` chamando `createTargetSystem`), input de `accessPoint` ("Onde é acessado — URL, servidor ou instância"), input de `accessNotes` com o helper **"Onde encontrar o acesso — nunca escreva senhas ou tokens aqui"**, e botão de remover. Botão "Adicionar sistema" no fim. Renderizar no passo `sistemas`, fora de qualquer condicional: vale para todo projeto.
+
+**Exigência que vale para a Task 9 e para a Task 10:** hidratar o formulário a partir
+de um projeto existente precisa de uma **função de conversão nomeada**, não de um
+spread ou reaproveitamento. A leitura devolve `ProjectTargetSystemView[]` (resolvido,
+com id) e `ProjectAutomationAccountView[]` (com `projectTargetSystemId`); o formulário
+precisa de linhas com `targetSystemId`/`customName` e de contas com **`systemIndex`**.
+Converter `projectTargetSystemId` → posição na lista é exatamente onde um índice
+trocado nasce sem erro. Escreva `viewToFormRows` (ou nome equivalente) explicitamente,
+e mapeie id → índice por um `Map` construído da mesma lista que vai para o formulário.
 
 - [ ] **Step 4: Lista de contas**
 
