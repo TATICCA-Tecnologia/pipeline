@@ -6,21 +6,26 @@ import { addProjectSlide, type ProjectDeckRow } from "../src/server/deck/build-d
 /**
  * Gera preview-processo-slide.pptx com dados fixos, sem tocar no banco.
  * Serve para conferir o slide de processo depois da Task 14 (sistemas
- * envolvidos + dados sigilosos na coluna esquerda) — em especial se a coluna
- * esquerda vaza para fora do slide no pior caso de altura. Rode:
- * pnpm deck:preview-processo
+ * envolvidos + dados sigilosos na coluna esquerda) e da correção pós-revisão
+ * (reordenação + guarda de estouro `fitsInColumn`) — em especial se algum
+ * bloco desenha fora do slide, e o que a guarda pula quando não cabe tudo.
+ * Rode: pnpm deck:preview-processo
  *
- * Três casos, cada um um slide:
- *   1. Pior caso "oficial" da Task 14: description + architectNotes longos +
- *      os dois blocos novos preenchidos (8 sistemas, dados sigilosos com
- *      todas as categorias) — SEM benefícios, no escopo exato pedido no plano.
- *   2. Os dois blocos novos vazios — tem que sair idêntico ao slide de hoje
- *      (sem os rótulos "Sistemas envolvidos"/"Dados sigilosos").
- *   3. Pior caso ABSOLUTO: caso 1 + benefícios (todas as 6 opções) também
- *      preenchido — os cinco blocos textuais da coluna esquerda ao mesmo
- *      tempo. Não pedido explicitamente pelo plano, mas gerado para medir se
- *      essa combinação (rara, porém possível via formulário) ainda cabe no
- *      slide — ver relatório da Task 14.
+ * Quatro casos, cada um um slide:
+ *   1. Pior caso "oficial" do plano da Task 14: description + architectNotes
+ *      longos + os dois blocos novos preenchidos no máximo (8 sistemas,
+ *      sigilo com todas as categorias) — SEM benefícios.
+ *   2. Os dois blocos novos vazios — tem que sair idêntico ao slide de antes
+ *      da Task 14 (sem os rótulos "Sistemas envolvidos"/"Dados sigilosos").
+ *   3. Os CINCO blocos textuais preenchidos ao mesmo tempo (description,
+ *      architectNotes, benefícios, sistemas, dados sigilosos) — o pedido
+ *      explícito da correção pós-revisão. Mede quanto sobra/falta e o que a
+ *      guarda decide pular.
+ *   4. Description + architectNotes + benefícios, SEM nenhum campo novo da
+ *      Task 14 — isola se a guarda `fitsInColumn` já pulava "Benefícios
+ *      esperados" antes mesmo de qualquer campo novo entrar em cena (ver
+ *      relatório: essa é a checagem que importa para saber se o efeito da
+ *      guarda é raro ou comum).
  */
 
 const LONG_DESCRIPTION =
@@ -52,6 +57,11 @@ const ALL_SENSITIVE_CATEGORIES = [
   "credenciais-acessos",
 ];
 
+// Uma só (não as 6) de propósito: "melhor caso realista" de benefícios — o
+// caso 4 testa se mesmo um projeto modesto (1 benefício curto) já perde o
+// bloco quando description+architectNotes também estão presentes, que é a
+// pergunta que decide se o efeito da guarda é raro ou comum.
+const ONE_BENEFIT = ["reducao-trabalho-operacional"];
 const ALL_BENEFITS = [
   "reducao-trabalho-operacional",
   "melhor-relacionamento-cliente",
@@ -80,9 +90,9 @@ const BASE: Omit<ProjectDeckRow, "targetSystems" | "handlesSensitiveData" | "sen
   area: { name: "Financeiro" },
 };
 
-// Caso 1: pior caso oficial do plano — description + architectNotes longos,
-// os dois blocos novos preenchidos no máximo (8 sistemas, sigilo com todas as
-// categorias), SEM benefícios.
+// Caso 1: pior caso "oficial" do plano — description + architectNotes
+// longos, os dois blocos novos preenchidos no máximo (8 sistemas, sigilo com
+// todas as categorias), SEM benefícios.
 const worstCaseOfficial: ProjectDeckRow = {
   ...BASE,
   benefits: [],
@@ -93,7 +103,7 @@ const worstCaseOfficial: ProjectDeckRow = {
 };
 
 // Caso 2: os dois blocos novos vazios — tem que sair idêntico ao slide de
-// hoje (sem "Sistemas envolvidos" nem "Dados sigilosos").
+// antes da Task 14 (sem "Sistemas envolvidos" nem "Dados sigilosos").
 const emptyNewFields: ProjectDeckRow = {
   ...BASE,
   title: "Emissão de boletos — Comercial (sem campos novos)",
@@ -104,12 +114,11 @@ const emptyNewFields: ProjectDeckRow = {
   sensitiveDataDetails: null,
 };
 
-// Caso 3: pior caso ABSOLUTO — caso 1 + benefícios (todas as opções) também
-// preenchido, para medir a combinação dos cinco blocos textuais ao mesmo
-// tempo (não exigido pelo plano, gerado só para instrumentar o relatório).
-const worstCaseWithBenefits: ProjectDeckRow = {
+// Caso 3: os cinco blocos textuais preenchidos ao mesmo tempo — o cenário
+// pedido explicitamente na correção pós-revisão.
+const fiveBlocksFilled: ProjectDeckRow = {
   ...BASE,
-  title: "Conciliação de notas fiscais (+ benefícios) — Financeiro",
+  title: "Conciliação de notas fiscais (5 blocos) — Financeiro",
   benefits: ALL_BENEFITS,
   targetSystems: EIGHT_TARGET_SYSTEMS,
   handlesSensitiveData: "sim",
@@ -117,18 +126,33 @@ const worstCaseWithBenefits: ProjectDeckRow = {
   sensitiveDataDetails: "Dados bancários de fornecedores e valores de pagamento.",
 };
 
+// Caso 4: description + architectNotes + benefícios (só 1, texto curto),
+// SEM nenhum campo novo da Task 14 — isola se a guarda já afeta o trio de
+// campos antigos por conta própria.
+const oldTrioOnly: ProjectDeckRow = {
+  ...BASE,
+  title: "Cadastro de fornecedores (sem campos novos) — Suprimentos",
+  benefits: ONE_BENEFIT,
+  targetSystems: [],
+  handlesSensitiveData: null,
+  sensitiveDataCategories: null,
+  sensitiveDataDetails: null,
+};
+
 const pres = new PptxGenJS();
 pres.layout = "LAYOUT_WIDE";
 // Só define os masters (usados por addTitledSlide) — sem addCoverSlide, mesmo
 // motivo de preview-ficha-tecnica-slide.ts: o arquivo deve sair com
-// exatamente 3 slides, um por caso, sem nada mais para atrapalhar a conferência.
+// exatamente 4 slides, um por caso, sem nada mais para atrapalhar a conferência.
 defineDeckTheme(pres, "Empresa Exemplo", "Diagnóstico de robotização");
 
-for (const project of [worstCaseOfficial, emptyNewFields, worstCaseWithBenefits]) {
+for (const project of [worstCaseOfficial, emptyNewFields, fiveBlocksFilled, oldTrioOnly]) {
   addProjectSlide(pres, project);
 }
 
 void pres.write({ outputType: "nodebuffer" }).then((buffer) => {
   fs.writeFileSync("preview-processo-slide.pptx", buffer as Buffer);
-  console.log("Gerado: preview-processo-slide.pptx (3 slides: pior caso oficial, campos novos vazios, pior caso absoluto)");
+  console.log(
+    "Gerado: preview-processo-slide.pptx (4 slides: pior caso oficial, campos novos vazios, cinco blocos preenchidos, trio antigo sem campos novos)"
+  );
 });

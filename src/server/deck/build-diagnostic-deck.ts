@@ -1139,6 +1139,25 @@ const QUALITATIVE_HEADER_TO_RADAR_GAP_IN = 0.4;
 const RADAR_CHART_DEFAULT_H = 2.3;
 const RADAR_CHART_MIN_H = 1.5; // nunca encolhe o radar abaixo disso (ilegível)
 const SLIDE_CONTENT_BOTTOM_Y = 7.3; // LAYOUT_WIDE tem 7.5" de altura; margem de 0.2"
+// Teto da guarda de estouro da coluna esquerda (ver `fitsInColumn`) —
+// deliberadamente NÃO reaproveita SLIDE_CONTENT_BOTTOM_Y (a margem
+// "confortável" de 0.2", usada só pelo cálculo do radar da coluna direita).
+// O trio description+architectNotes+"Benefícios esperados" sempre fechou em
+// 7.34" quando os três campos estão preenchidos — 0.04" acima da margem
+// confortável, mas dentro da borda física do slide (7.5"), e por isso SEMPRE
+// foi visível, mesmo antes desta correção. Se a guarda usasse 7.3" como teto,
+// "Benefícios esperados" desapareceria em QUALQUER projeto com esses três
+// campos preenchidos — não um caso raro, o caso mais comum do deck. A guarda
+// existe para impedir que um bloco caia de vez fora da página física (onde
+// fica invisível no PowerPoint), não para impor a margem estética que a
+// coluna direita usa — por isso o teto aqui é a borda física do slide (7.5")
+// menos uma folga mínima de segurança.
+const LEFT_COLUMN_HARD_BOTTOM_Y = 7.4;
+// Corte da lista de "Sistemas envolvidos" (Task 14) — mesmo espírito de
+// FICHA_MAX_SYSTEMS_SHOWN em build-existing-automations-deck.ts: a caixa é
+// uma linha de texto de altura fixa, então o número de sistemas do projeto
+// não pode ser o que determina se ela cabe no slide.
+const PROCESS_SLIDE_MAX_SYSTEMS_SHOWN = 5;
 
 function estimateWrappedLines(text: string, charsPerLine: number): number {
   return Math.max(1, Math.ceil(text.length / charsPerLine));
@@ -1153,6 +1172,22 @@ function estimateQuantTableHeight(lines: QuantitativeLine[]): number {
     const wrappedLines = Math.max(labelLines, valueLines);
     return total + ROW_BASE_HEIGHT_IN + (wrappedLines - 1) * ROW_WRAP_EXTRA_IN;
   }, 0);
+}
+
+// A coluna esquerda do slide de processo usa alturas fixas por bloco e
+// `leftY` acumulado, sem nenhum teto: nada limitava o número de blocos que
+// cabiam antes de estourar `LEFT_COLUMN_HARD_BOTTOM_Y`. Um bloco que não cabe
+// não dá erro nenhum — ele só desenha fora da área visível do slide, onde é
+// invisível no PowerPoint (não "cortado", simplesmente não aparece). Este
+// helper é a guarda: cada bloco da coluna esquerda (novo OU pré-existente)
+// checa ANTES de desenhar se cabe inteiro entre `y` e o limite útil do slide;
+// se não cabe, é pulado por completo (rótulo E texto), nunca só um dos dois —
+// um rótulo órfão sem o texto correspondente seria pior que omitir o bloco.
+// `footprintH` é a altura visual do bloco (do topo do rótulo até o fim da
+// caixa de texto abaixo dele), não o incremento de `leftY` (que inclui folga
+// extra para separar do próximo bloco).
+function fitsInColumn(y: number, footprintH: number): boolean {
+  return y + footprintH <= LEFT_COLUMN_HARD_BOTTOM_Y;
 }
 
 /**
@@ -1193,7 +1228,12 @@ export function addProjectSlide(
   const leftW = 6.1;
   let leftY = CONTENT_TOP_Y_TALL_TITLE;
 
-  if (project.description) {
+  // Cada bloco checa `fitsInColumn` com sua própria altura ANTES de desenhar
+  // — ver comentário no helper. Como a checagem usa `leftY` no momento em que
+  // o bloco seria desenhado, um bloco pulado (por não caber) nunca deixa
+  // buraco: o próximo bloco tentado usa o mesmo `leftY`, não um valor
+  // adiantado por um bloco que não existe na página.
+  if (project.description && fitsInColumn(leftY, 0.32 + 1.9)) {
     addSectionLabel(slide, "O processo hoje", leftX, leftY, leftW);
     slide.addText(project.description, {
       x: leftX,
@@ -1208,7 +1248,7 @@ export function addProjectSlide(
     leftY += 2.35;
   }
 
-  if (project.architectNotes) {
+  if (project.architectNotes && fitsInColumn(leftY, 1.7)) {
     const boxH = 1.7;
     // Borda teal à esquerda (rect fino) + caixa de fundo slate, replicando o
     // destaque `border-l-4 border-teal-500 bg-slate-50` do card React.
@@ -1241,32 +1281,65 @@ export function addProjectSlide(
     leftY += boxH + 0.25;
   }
 
-  // Sistemas envolvidos e Dados sigilosos (Task 14): os dois campos da ficha
-  // técnica (Task 13) que também valem para automação AINDA NÃO construída —
-  // ver comentário em ProjectDeckRow. Caixas de altura FIXA (não dependem do
-  // tamanho do conteúdo — `fit: "shrink"` encolhe a fonte, não a caixa), para
-  // que `leftY` avance por uma quantidade previsível independente de quantos
-  // sistemas/categorias o projeto tiver.
-  const targetSystemNames = project.targetSystems
-    .map((s) => s.targetSystem?.name || s.customName)
-    .filter((name): name is string => Boolean(name));
-  if (targetSystemNames.length > 0) {
-    addSectionLabel(slide, "Sistemas envolvidos", leftX, leftY, leftW);
-    slide.addText(targetSystemNames.join(" · "), {
+  // Benefícios esperados fica na MESMA posição relativa que tinha antes da
+  // Task 14 (logo após "Principais ações da automação") — os dois blocos
+  // novos entram DEPOIS dele, não antes. Isso preserva o layout de todo
+  // projeto que já existia; a pressão de espaço de projetos com muitos campos
+  // preenchidos recai sobre o conteúdo novo, não sobre o antigo.
+  const benefitLabels = benefitKeysOf(project.benefits).map(
+    (key) => BENEFIT_OPTIONS.find((b) => b.key === key)?.label ?? key
+  );
+  if (benefitLabels.length > 0 && fitsInColumn(leftY, 0.32 + 1.3)) {
+    addSectionLabel(slide, "Benefícios esperados", leftX, leftY, leftW);
+    slide.addText(benefitLabels.join(" · "), {
       x: leftX,
       y: leftY + 0.32,
       w: leftW,
-      h: 0.4,
+      h: 1.3,
       fontSize: 11,
       color: COLOR_PRIMARY,
       valign: "top",
       fit: "shrink",
     });
-    leftY += 0.8;
+    leftY += 1.75;
+  }
+
+  // Sistemas envolvidos e Dados sigilosos (Task 14): os dois campos da ficha
+  // técnica (Task 13) que também valem para automação AINDA NÃO construída —
+  // ver comentário em ProjectDeckRow. Caixas COMPACTAS (uma linha de texto
+  // cada, não um parágrafo) e de altura fixa — `fit: "shrink"` encolhe a
+  // fonte, não a caixa — para que `leftY` avance por uma quantidade pequena e
+  // previsível, e a guarda `fitsInColumn` acima decida se cabem, em vez de
+  // empurrar o conteúdo que já existia (description/architectNotes/benefits)
+  // para fora do slide.
+  const allTargetSystemNames = project.targetSystems
+    .map((s) => s.targetSystem?.name || s.customName)
+    .filter((name): name is string => Boolean(name));
+  // Lista truncada com "+N" no fim (mesmo espírito da tabela de sistemas da
+  // ficha técnica, Task 13): a caixa é uma linha só, então o número de
+  // sistemas do projeto não pode determinar sua altura.
+  const shownTargetSystemNames = allTargetSystemNames.slice(0, PROCESS_SLIDE_MAX_SYSTEMS_SHOWN);
+  const hiddenTargetSystemsCount = allTargetSystemNames.length - shownTargetSystemNames.length;
+  const targetSystemsText =
+    shownTargetSystemNames.join(" · ") +
+    (hiddenTargetSystemsCount > 0 ? ` +${hiddenTargetSystemsCount}` : "");
+  if (allTargetSystemNames.length > 0 && fitsInColumn(leftY, 0.32 + 0.3)) {
+    addSectionLabel(slide, "Sistemas envolvidos", leftX, leftY, leftW);
+    slide.addText(targetSystemsText, {
+      x: leftX,
+      y: leftY + 0.32,
+      w: leftW,
+      h: 0.3,
+      fontSize: 11,
+      color: COLOR_PRIMARY,
+      valign: "top",
+      fit: "shrink",
+    });
+    leftY += 0.72;
   }
 
   const sensitiveDataAnswerLabel = resolveSensitiveDataAnswerLabel(project.handlesSensitiveData);
-  if (sensitiveDataAnswerLabel) {
+  if (sensitiveDataAnswerLabel && fitsInColumn(leftY, 0.32 + 0.35)) {
     // Categorias só quando a resposta é "sim" — "não"/"não sei" não têm
     // categoria marcada (mesma regra do formulário de intake).
     const sensitiveCategoryLabels =
@@ -1282,30 +1355,13 @@ export function addProjectSlide(
       x: leftX,
       y: leftY + 0.32,
       w: leftW,
-      h: 0.45,
+      h: 0.35,
       fontSize: 11,
       color: COLOR_PRIMARY,
       valign: "top",
       fit: "shrink",
     });
-    leftY += 0.85;
-  }
-
-  const benefitLabels = benefitKeysOf(project.benefits).map(
-    (key) => BENEFIT_OPTIONS.find((b) => b.key === key)?.label ?? key
-  );
-  if (benefitLabels.length > 0) {
-    addSectionLabel(slide, "Benefícios esperados", leftX, leftY, leftW);
-    slide.addText(benefitLabels.join(" · "), {
-      x: leftX,
-      y: leftY + 0.32,
-      w: leftW,
-      h: 1.3,
-      fontSize: 11,
-      color: COLOR_PRIMARY,
-      valign: "top",
-      fit: "shrink",
-    });
+    leftY += 0.77;
   }
 
   // ----- Coluna direita: tabela quantitativa + radar qualitativo -----
