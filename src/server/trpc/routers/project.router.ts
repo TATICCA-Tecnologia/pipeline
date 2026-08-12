@@ -26,6 +26,7 @@ import {
   type CombinedScoreWeights,
 } from "@/shared/lib/scoring";
 import { computeAnnualSavingBRL } from "@/shared/lib/savings";
+import { toNullableFkId } from "@/shared/lib/nullable-fk";
 import type { ProjectTargetSystemView, ProjectAutomationAccountView } from "@/shared/types";
 
 // Fallback dos pesos default do SystemSettings (schema.prisma), usado apenas se
@@ -751,10 +752,10 @@ export const projectRouter = router({
             status: toPrismaStatus(input.status as FrontendProjectStatus),
             priority: input.priority.toUpperCase() as "LOW" | "MEDIUM" | "HIGH" | "URGENT",
             clientId: input.clientId,
-            developerId: input.developerId ?? null,
-            companyId: input.companyId ?? null,
-            areaId: input.areaId ?? null,
-            themeId: input.themeId ?? null,
+            developerId: toNullableFkId(input.developerId),
+            companyId: toNullableFkId(input.companyId),
+            areaId: toNullableFkId(input.areaId),
+            themeId: toNullableFkId(input.themeId),
             platform: input.projectType,
             deadline: input.estimatedDeadline ?? null,
             targetAudience: input.targetAudience ?? null,
@@ -774,7 +775,7 @@ export const projectRouter = router({
             currentApplicationLiveSince: input.currentApplicationLiveSince ?? null,
             currentApplicationAssetId: input.currentApplicationAssetId ?? null,
             currentApplicationOwnerRole: input.currentApplicationOwnerRole ?? null,
-            currentApplicationOwnerAreaId: input.currentApplicationOwnerAreaId ?? null,
+            currentApplicationOwnerAreaId: toNullableFkId(input.currentApplicationOwnerAreaId),
             currentApplicationDataInput: input.currentApplicationDataInput ?? null,
             currentApplicationDataInputDetails: input.currentApplicationDataInputDetails ?? null,
             currentApplicationDataOutput: input.currentApplicationDataOutput ?? null,
@@ -975,16 +976,19 @@ export const projectRouter = router({
       if (rest.description != null) data.description = rest.description;
       if (rest.status != null) data.status = toPrismaStatus(rest.status as FrontendProjectStatus);
       if (rest.priority != null) data.priority = rest.priority.toUpperCase();
-      if (rest.developerId !== undefined) data.developerId = rest.developerId;
-      if (rest.companyId !== undefined) data.companyId = rest.companyId;
-      if (rest.areaId !== undefined) data.areaId = rest.areaId;
-      if (rest.themeId !== undefined) data.themeId = rest.themeId;
+      // Todo id de FK passa por toNullableFkId: os Selects mandam "" quando
+      // nada foi escolhido, e "" numa coluna FK viola a constraint no Postgres.
+      if (rest.developerId !== undefined) data.developerId = toNullableFkId(rest.developerId);
+      if (rest.companyId !== undefined) data.companyId = toNullableFkId(rest.companyId);
+      if (rest.areaId !== undefined) data.areaId = toNullableFkId(rest.areaId);
+      if (rest.themeId !== undefined) data.themeId = toNullableFkId(rest.themeId);
       if (rest.estimatedDeadline !== undefined) data.deadline = rest.estimatedDeadline;
       if (rest.solutionTypeIds !== undefined) {
         data.solutionTypes = { set: rest.solutionTypeIds.map((id) => ({ id })) };
       }
-      if (rest.mainToolId !== undefined) data.mainToolId = rest.mainToolId;
-      if (rest.mainToolCategoryId !== undefined) data.mainToolCategoryId = rest.mainToolCategoryId;
+      if (rest.mainToolId !== undefined) data.mainToolId = toNullableFkId(rest.mainToolId);
+      if (rest.mainToolCategoryId !== undefined)
+        data.mainToolCategoryId = toNullableFkId(rest.mainToolCategoryId);
       if (rest.executionStrategy !== undefined) data.executionStrategy = rest.executionStrategy;
       if (rest.architectNotes !== undefined) data.architectNotes = rest.architectNotes;
       if (rest.complexity !== undefined) data.complexity = rest.complexity;
@@ -1043,7 +1047,7 @@ export const projectRouter = router({
       if (rest.currentApplicationOwnerRole !== undefined)
         data.currentApplicationOwnerRole = rest.currentApplicationOwnerRole;
       if (rest.currentApplicationOwnerAreaId !== undefined)
-        data.currentApplicationOwnerAreaId = rest.currentApplicationOwnerAreaId;
+        data.currentApplicationOwnerAreaId = toNullableFkId(rest.currentApplicationOwnerAreaId);
       if (rest.currentApplicationDataInput !== undefined)
         data.currentApplicationDataInput = rest.currentApplicationDataInput;
       if (rest.currentApplicationDataInputDetails !== undefined)
