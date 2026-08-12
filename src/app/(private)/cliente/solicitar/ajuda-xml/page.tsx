@@ -12,6 +12,12 @@ import {
   CURRENT_APPLICATION_HOSTING_OPTIONS,
   CURRENT_APPLICATION_ACCESS_LOCATION_OPTIONS,
   CURRENT_APPLICATION_ACCESS_REFERENCE_MAX_LENGTH,
+  CURRENT_APPLICATION_DATA_ENDPOINT_OPTIONS,
+  CURRENT_APPLICATION_CONTINGENCY_OPTIONS,
+  AUTOMATION_ACCOUNT_TYPE_OPTIONS,
+  AUTOMATION_ACCOUNT_USERNAME_MAX_LENGTH,
+  SENSITIVE_DATA_ANSWER_OPTIONS,
+  SENSITIVE_DATA_CATEGORY_OPTIONS,
   BENEFIT_OPTIONS,
 } from "../utils/solicitar.utils";
 import { useTaxonomy } from "../utils/use-taxonomy";
@@ -138,6 +144,96 @@ export default function AjudaXmlPage() {
       required: false,
       description:
         "Data em que a automação entrou em produção, no formato AAAA-MM-DD. Fora desse formato, o valor é ignorado e você recebe um aviso.",
+    },
+    {
+      tag: "ativoAplicacaoExistente",
+      required: false,
+      description:
+        "Identificador técnico da máquina onde a automação roda hoje: hostname, IP ou número de patrimônio (ex.: SRV-RPA-01). Todos os campos abaixo são opcionais — preencha só o que você tiver certeza; deixar em branco é sempre melhor do que inventar um valor.",
+    },
+    {
+      tag: "cargoResponsavelAplicacaoExistente",
+      required: false,
+      description: "Cargo de quem responde pela automação hoje (texto livre, ex.: Analista de TI Pleno).",
+    },
+    {
+      tag: "setorResponsavelAplicacaoExistente",
+      required: false,
+      description:
+        'Setor de quem responde pela automação. Precisa bater com uma área já cadastrada (mesma lista de "area", acima) para ser reconhecido — se não bater, a tag é ignorada na importação, sem bloquear o resto do arquivo e sem criar uma área nova.',
+      acceptedValues: areas.map((a) => a.label),
+    },
+    {
+      tag: "responsavelSubstitutoAplicacaoExistente",
+      required: false,
+      description: "Quem assume a automação se o responsável sair ou ficar indisponível (texto livre).",
+    },
+    {
+      tag: "acoesContingencia",
+      required: false,
+      description:
+        'O que fazer se a automação parar. Lista — cada item vai em uma tag <acao> dentro dela. Cada <acao> precisa corresponder exatamente a um dos valores aceitos; um item que não corresponder é descartado da lista, sem bloquear a importação. Contexto livre sobre o plano de contingência vai em "detalhesContingencia".',
+      acceptedValues: CURRENT_APPLICATION_CONTINGENCY_OPTIONS.map((o) => o.label),
+    },
+    {
+      tag: "detalhesContingencia",
+      required: false,
+      description: "Contexto livre sobre o que fazer se a automação parar — complementa acoesContingencia.",
+    },
+    {
+      tag: "origemDadosEntrada",
+      required: false,
+      description:
+        'De onde vêm os dados que a automação usa. Use exatamente um dos valores aceitos, sem texto adicional — detalhes vão em "Detalhes dos dados de entrada". Se não corresponder a nenhuma opção conhecida, é tratado como "Outro".',
+      acceptedValues: CURRENT_APPLICATION_DATA_ENDPOINT_OPTIONS.map((o) => o.label),
+    },
+    {
+      tag: "detalhesDadosEntrada",
+      required: false,
+      description: "Detalhes livres sobre a origem dos dados de entrada.",
+    },
+    {
+      tag: "destinoDadosSaida",
+      required: false,
+      description:
+        'Para onde vão os dados que a automação produz. Mesmos valores aceitos de origemDadosEntrada, sem texto adicional — detalhes vão em "Detalhes dos dados de saída". Se não corresponder a nenhuma opção conhecida, é tratado como "Outro".',
+      acceptedValues: CURRENT_APPLICATION_DATA_ENDPOINT_OPTIONS.map((o) => o.label),
+    },
+    {
+      tag: "detalhesDadosSaida",
+      required: false,
+      description: "Detalhes livres sobre o destino dos dados de saída.",
+    },
+    {
+      tag: "dadosSigilosos",
+      required: false,
+      description:
+        'Se a automação lida com dados sigilosos. Use exatamente um dos valores aceitos, sem texto adicional. Diferente da maioria dos campos restritos deste guia, não tem fallback "Outro": um valor que não corresponder é ignorado (fica em branco) e você recebe um aviso. Preencha categoriasDadosSigilosos e detalhesDadosSigilosos só se a resposta for Sim.',
+      acceptedValues: SENSITIVE_DATA_ANSWER_OPTIONS.map((o) => o.label),
+    },
+    {
+      tag: "categoriasDadosSigilosos",
+      required: false,
+      description:
+        'Que tipo de dado sigiloso a automação lida. Preencha só se dadosSigilosos for Sim. Lista — cada item vai em uma tag <categoria> dentro dela. Cada <categoria> precisa corresponder exatamente a um dos valores aceitos; um item que não corresponder é descartado da lista, sem bloquear a importação, e o texto original é preservado em "detalhesDadosSigilosos".',
+      acceptedValues: SENSITIVE_DATA_CATEGORY_OPTIONS.map((o) => o.label),
+    },
+    {
+      tag: "detalhesDadosSigilosos",
+      required: false,
+      description: "Contexto livre sobre os dados sigilosos que a automação manipula.",
+    },
+    {
+      tag: "sistemas",
+      required: false,
+      description:
+        `Sistemas sobre os quais a automação atua (ex.: SAP, portal da Receita, CRM interno). Cada item vai em uma tag <sistema> dentro dela, com três sub-tags: <nome> (obrigatório — uma linha sem nome é descartada), <pontoAcesso> (endereço, servidor ou URL) e <comoAcessar>. <comoAcessar> é só o PONTEIRO de onde encontrar o acesso — nome do cofre, caminho da pasta, com quem está — e nunca deve conter a senha, token ou chave em si, mesmo que você tenha essa informação em mãos. Máximo de ${CURRENT_APPLICATION_ACCESS_REFERENCE_MAX_LENGTH} caracteres em <comoAcessar>; acima disso o texto é cortado e você recebe um aviso. Não invente um sistema que a automação não usa — deixe a lista vazia se não tiver certeza.`,
+    },
+    {
+      tag: "contas",
+      required: false,
+      description:
+        `Contas/usuários que a automação usa para acessar os sistemas listados acima. Cada item vai em uma tag <conta> dentro dela, com: <usuario> (obrigatório — uma linha sem usuário é descartada; é só o login, NUNCA a senha, token ou chave — máximo de ${AUTOMATION_ACCOUNT_USERNAME_MAX_LENGTH} caracteres), <tipo> (campo restrito, sem texto adicional — valores aceitos: ${AUTOMATION_ACCOUNT_TYPE_OPTIONS.map((o) => o.label).join(", ")}), <sistema> (precisa repetir, caractere por caractere, um <nome> já usado em <sistemas> acima; se não bater, a conta entra sem sistema vinculado, sem bloquear a importação), <responsavel> e <observacoes> (texto livre). Não invente uma conta que a automação não usa.`,
     },
     {
       tag: "colaboradoresEnvolvidos",
