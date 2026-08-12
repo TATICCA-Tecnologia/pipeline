@@ -19,7 +19,10 @@ import {
 import {
   BENEFIT_OPTIONS,
   PROCESS_FREQUENCIES,
+  SENSITIVE_DATA_CATEGORY_OPTIONS,
   resolveLabel,
+  resolveSensitiveDataAnswerLabel,
+  resolveKeyLabels,
 } from "@/shared/constants/project-taxonomy";
 import { formatCurrency, formatDate } from "@/shared/utils";
 import {
@@ -111,12 +114,28 @@ const RATING_AXES: { key: RatingKey; label: string }[] = [
 
 const DEFAULT_RATING = 3;
 
+// Formato cru devolvido pelo `select` de targetSystems abaixo — mesmo join
+// targetSystem → category que project.router.ts usa em `byId`
+// (TargetSystemRow) e que build-existing-automations-deck.ts replica em
+// FichaTargetSystemRow. Só o nome é exibido no slide de processo (sem
+// accessPoint/category), mas o formato do join fica igual para as duas
+// populações (novo/existente) poderem passar o mesmo objeto de projeto.
+export type ProjectSlideTargetSystemRow = {
+  customName: string | null;
+  targetSystem: { name: string; category: { name: string } | null } | null;
+};
+
 /**
  * Campos de Project lidos pelo slide por processo. Selecionados explicitamente
  * numa ÚNICA `findMany` (ver `buildDiagnosticDeck`) — sem N+1: os dados de todos
  * os projetos vêm de uma só query, nunca uma por projeto.
+ *
+ * Exportado (Task 14) para scripts/preview-processo-slide.ts poder tipar seus
+ * projetos fixos com o mesmo formato que `addProjectSlide` espera — mesmo
+ * motivo de `ExistingAutomationProject` ser exportado em
+ * build-existing-automations-deck.ts.
  */
-type ProjectDeckRow = {
+export type ProjectDeckRow = {
   id: string;
   title: string;
   description: string | null;
@@ -134,6 +153,15 @@ type ProjectDeckRow = {
   ratingExternalImpact: number | null;
   ratingCompliance: number | null;
   area: { name: string } | null;
+  // Campos da Task 14: os dois únicos itens da "ficha técnica" (Task 13) que
+  // também valem para uma automação AINDA NÃO construída — quais sistemas ela
+  // vai tocar e se mexe com dado sigiloso dimensionam esforço e risco de uma
+  // oportunidade nova, ao contrário de hospedagem/contas/contingência, que só
+  // fazem sentido para algo que já roda.
+  handlesSensitiveData: string | null;
+  sensitiveDataCategories: unknown;
+  sensitiveDataDetails: string | null;
+  targetSystems: ProjectSlideTargetSystemRow[];
 };
 
 /**
@@ -212,6 +240,20 @@ export async function buildDiagnosticDeck(companyId: string, actingUserId: strin
         // Área usada como subtítulo do slide de processo: com dezenas de
         // slides individuais, o título sozinho não diz de quem é o processo.
         area: { select: { name: true } },
+        // Campos da Task 14 — únicos dois itens da ficha técnica (Task 13) que
+        // também valem para automação ainda não construída (ver comentário em
+        // ProjectDeckRow). Mesmo join targetSystem → category que
+        // project.router.ts usa em `byId`.
+        handlesSensitiveData: true,
+        sensitiveDataCategories: true,
+        sensitiveDataDetails: true,
+        targetSystems: {
+          orderBy: { order: "asc" },
+          select: {
+            customName: true,
+            targetSystem: { select: { name: true, category: { select: { name: true } } } },
+          },
+        },
       },
     }),
     caller.company.listCostItems({ companyId }),
@@ -1197,6 +1239,56 @@ export function addProjectSlide(
       }
     );
     leftY += boxH + 0.25;
+  }
+
+  // Sistemas envolvidos e Dados sigilosos (Task 14): os dois campos da ficha
+  // técnica (Task 13) que também valem para automação AINDA NÃO construída —
+  // ver comentário em ProjectDeckRow. Caixas de altura FIXA (não dependem do
+  // tamanho do conteúdo — `fit: "shrink"` encolhe a fonte, não a caixa), para
+  // que `leftY` avance por uma quantidade previsível independente de quantos
+  // sistemas/categorias o projeto tiver.
+  const targetSystemNames = project.targetSystems
+    .map((s) => s.targetSystem?.name || s.customName)
+    .filter((name): name is string => Boolean(name));
+  if (targetSystemNames.length > 0) {
+    addSectionLabel(slide, "Sistemas envolvidos", leftX, leftY, leftW);
+    slide.addText(targetSystemNames.join(" · "), {
+      x: leftX,
+      y: leftY + 0.32,
+      w: leftW,
+      h: 0.4,
+      fontSize: 11,
+      color: COLOR_PRIMARY,
+      valign: "top",
+      fit: "shrink",
+    });
+    leftY += 0.8;
+  }
+
+  const sensitiveDataAnswerLabel = resolveSensitiveDataAnswerLabel(project.handlesSensitiveData);
+  if (sensitiveDataAnswerLabel) {
+    // Categorias só quando a resposta é "sim" — "não"/"não sei" não têm
+    // categoria marcada (mesma regra do formulário de intake).
+    const sensitiveCategoryLabels =
+      project.handlesSensitiveData === "sim"
+        ? resolveKeyLabels(project.sensitiveDataCategories, SENSITIVE_DATA_CATEGORY_OPTIONS)
+        : [];
+    const sensitiveDataText =
+      sensitiveCategoryLabels.length > 0
+        ? `${sensitiveDataAnswerLabel} — ${sensitiveCategoryLabels.join(", ")}`
+        : sensitiveDataAnswerLabel;
+    addSectionLabel(slide, "Dados sigilosos", leftX, leftY, leftW);
+    slide.addText(sensitiveDataText, {
+      x: leftX,
+      y: leftY + 0.32,
+      w: leftW,
+      h: 0.45,
+      fontSize: 11,
+      color: COLOR_PRIMARY,
+      valign: "top",
+      fit: "shrink",
+    });
+    leftY += 0.85;
   }
 
   const benefitLabels = benefitKeysOf(project.benefits).map(
