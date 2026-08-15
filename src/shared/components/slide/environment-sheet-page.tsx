@@ -49,6 +49,7 @@ function BlockLabel({ children }: { children: ReactNode }) {
 }
 
 function LineList({ lines, tier }: { lines: SheetLine[]; tier: DensityTier }) {
+  if (lines.length === 0) return null;
   return (
     <div className="space-y-1">
       {lines.map((line) => (
@@ -67,8 +68,17 @@ function SystemsTable({ systems, tier }: { systems: EnvironmentSystem[]; tier: D
       {columns.map((column, index) => (
         <table key={index} className={`flex-1 border-collapse ${TIER_STYLE[tier].text}`}>
           <tbody>
-            {column.map((system) => (
-              <tr key={system.name + system.accessPoint} className="border-b border-slate-100">
+            {/*
+              Chave por índice de propósito. Nem `username` nem nome de sistema
+              têm unique no banco (duas linhas para o mesmo login em sistemas
+              diferentes é o caso NORMAL), e no modo demonstração a máscara
+              devolve a mesma string para todos — qualquer chave derivada do
+              conteúdo colide com certeza ali. A lista é derivada, nunca
+              reordenada e nunca sofre inserção no meio, que é exatamente
+              quando índice é a chave correta.
+            */}
+            {column.map((system, rowIndex) => (
+              <tr key={rowIndex} className="border-b border-slate-100">
                 <td className={`${TIER_STYLE[tier].row} pr-2 align-top font-medium`}>
                   {system.name}
                   {system.category && (
@@ -99,8 +109,9 @@ function AccountsTable({ accounts, tier }: { accounts: SheetAccount[]; tier: Den
       {columns.map((column, index) => (
         <table key={index} className={`flex-1 border-collapse ${TIER_STYLE[tier].text}`}>
           <tbody>
-            {column.map((account) => (
-              <tr key={account.username} className="border-b border-slate-100">
+            {/* Chave por índice — mesma razão de SystemsTable acima. */}
+            {column.map((account, rowIndex) => (
+              <tr key={rowIndex} className="border-b border-slate-100">
                 <td className={`${TIER_STYLE[tier].row} pr-2 align-top font-medium`}>
                   {account.username}
                 </td>
@@ -125,9 +136,15 @@ export function EnvironmentSheetPage({ project }: { project: Project }) {
   if (!sheet) return null;
 
   const tier = densityTierFor(sheet.itemCount);
+  // O predicado inline dá narrowing de verdade (inferred type predicates, TS 5.5+;
+  // o repo está no 5.7.3) — `flowBoxes` é FlowBox[], não (FlowBox | undefined)[].
   const flowBoxes = [sheet.flow.input, sheet.flow.runtime, sheet.flow.output].filter(
     (box) => box !== undefined
   );
+  const hasLeftColumn =
+    sheet.people.length > 0 || sheet.peopleOfInterest.length > 0 || sheet.access.length > 0;
+  const hasRightColumn =
+    sheet.systems.length > 0 || sheet.accounts.length > 0 || sheet.sensitive.length > 0;
 
   return (
     <SlidePage resetKey={`${project.id}-ambiente`} minScale={ENVIRONMENT_MIN_SLIDE_SCALE}>
@@ -185,49 +202,59 @@ export function EnvironmentSheetPage({ project }: { project: Project }) {
         )}
 
         <div className="flex gap-8">
-          <div className="flex flex-1 flex-col gap-4">
-            {(sheet.people.length > 0 || sheet.peopleOfInterest.length > 0) && (
-              <div>
-                <BlockLabel>Pessoas</BlockLabel>
-                <LineList lines={sheet.people} tier={tier} />
-                {sheet.peopleOfInterest.length > 0 && (
-                  <p className={`mt-1 ${TIER_STYLE[tier].text} leading-snug text-foreground/90`}>
-                    <span className="font-medium">Pessoas de interesse:</span>{" "}
-                    {sheet.peopleOfInterest
-                      .map((p) => (p.role ? `${p.name} (${p.role})` : p.name))
-                      .join(", ")}
-                  </p>
-                )}
-              </div>
-            )}
-            {sheet.access.length > 0 && (
-              <div>
-                <BlockLabel>Acessos e contingência</BlockLabel>
-                <LineList lines={sheet.access} tier={tier} />
-              </div>
-            )}
-          </div>
+          {/*
+            Coluna inteira vazia não é desenhada. Sem esta guarda, uma ficha só
+            com sistemas reservaria ~42% da largura em branco mais o gap —
+            "bloco vazio deixando buraco", que é justamente o que a regra de
+            omissão proíbe.
+          */}
+          {hasLeftColumn && (
+            <div className="flex flex-1 flex-col gap-4">
+              {(sheet.people.length > 0 || sheet.peopleOfInterest.length > 0) && (
+                <div>
+                  <BlockLabel>Pessoas</BlockLabel>
+                  <LineList lines={sheet.people} tier={tier} />
+                  {sheet.peopleOfInterest.length > 0 && (
+                    <p className={`mt-1 ${TIER_STYLE[tier].text} leading-snug text-foreground/90`}>
+                      <span className="font-medium">Pessoas de interesse:</span>{" "}
+                      {sheet.peopleOfInterest
+                        .map((p) => (p.role ? `${p.name} (${p.role})` : p.name))
+                        .join(", ")}
+                    </p>
+                  )}
+                </div>
+              )}
+              {sheet.access.length > 0 && (
+                <div>
+                  <BlockLabel>Acessos e contingência</BlockLabel>
+                  <LineList lines={sheet.access} tier={tier} />
+                </div>
+              )}
+            </div>
+          )}
 
-          <div className="flex flex-[1.4] flex-col gap-4">
-            {sheet.systems.length > 0 && (
-              <div>
-                <BlockLabel>Sistemas em que atua</BlockLabel>
-                <SystemsTable systems={sheet.systems} tier={tier} />
-              </div>
-            )}
-            {sheet.accounts.length > 0 && (
-              <div>
-                <BlockLabel>Contas utilizadas</BlockLabel>
-                <AccountsTable accounts={sheet.accounts} tier={tier} />
-              </div>
-            )}
-            {sheet.sensitive.length > 0 && (
-              <div>
-                <BlockLabel>Dados sigilosos</BlockLabel>
-                <LineList lines={sheet.sensitive} tier={tier} />
-              </div>
-            )}
-          </div>
+          {hasRightColumn && (
+            <div className="flex flex-[1.4] flex-col gap-4">
+              {sheet.systems.length > 0 && (
+                <div>
+                  <BlockLabel>Sistemas em que atua</BlockLabel>
+                  <SystemsTable systems={sheet.systems} tier={tier} />
+                </div>
+              )}
+              {sheet.accounts.length > 0 && (
+                <div>
+                  <BlockLabel>Contas utilizadas</BlockLabel>
+                  <AccountsTable accounts={sheet.accounts} tier={tier} />
+                </div>
+              )}
+              {sheet.sensitive.length > 0 && (
+                <div>
+                  <BlockLabel>Dados sigilosos</BlockLabel>
+                  <LineList lines={sheet.sensitive} tier={tier} />
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </SlidePage>

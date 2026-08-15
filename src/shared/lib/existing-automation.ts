@@ -126,8 +126,16 @@ function join(parts: (string | null)[], separator: string): string | null {
   return kept.length > 0 ? kept.join(separator) : null;
 }
 
+/**
+ * Linhas repetidas são descartadas. Isso não é cosmética: no modo
+ * demonstração `maskFreeText` troca TODO texto livre pela mesma string, então
+ * hospedagem-custom e ativo (ou ativo e agendamento) viram a mesma linha e a
+ * caixa mostraria o mesmo texto duas vezes na frente de um cliente.
+ */
 function flowBox(title: string, boxLines: (string | null)[]): FlowBox | undefined {
-  const kept = boxLines.filter((l): l is string => l !== null && l !== "");
+  const kept = Array.from(
+    new Set(boxLines.filter((l): l is string => l !== null && l !== ""))
+  );
   return kept.length > 0 ? { title, lines: kept } : undefined;
 }
 

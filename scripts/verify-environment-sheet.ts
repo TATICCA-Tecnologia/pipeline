@@ -177,6 +177,30 @@ function checkLabelsAndFlow(): void {
 }
 
 /**
+ * Linha repetida na mesma caixa de fluxo aparece uma vez só. O caso real é o
+ * modo demonstração: `maskFreeText` troca TODO texto livre pela MESMA string,
+ * então ativo e agendamento chegam aqui idênticos e a caixa "Onde roda"
+ * mostraria o mesmo texto duas vezes na frente de um cliente. (A fonte abaixo
+ * também preenche `hostingCustom`, mas sem `hosting` ele não vira label — o
+ * par que de fato colide é assetId + robotSchedule.)
+ */
+function checkFlowDedupe(): void {
+  const dup = buildEnvironmentSheet({
+    ...emptySource(),
+    hostingCustom: "Oculto",
+    assetId: "Oculto",
+    robotSchedule: "Oculto",
+  });
+  if (!dup) throw new Error("dedupe: ficha não deveria ser null");
+  assertEqual(
+    dup.flow.runtime,
+    { title: "Onde roda", lines: ["Oculto"] },
+    "linhas iguais na caixa de fluxo aparecem uma vez só (modo demonstração)"
+  );
+  console.log("OK: linhas repetidas na caixa de fluxo são descartadas");
+}
+
+/**
  * As três coleções são o único caminho até `itemCount`, que decide o tier de
  * densidade (Task 3) e é uma das condições de `isEmpty`. Sem esta verificação,
  * uma regressão em qualquer um dos dois passaria batida.
@@ -290,6 +314,7 @@ function main(): void {
   checkEmptyIsNull();
   checkOmission();
   checkLabelsAndFlow();
+  checkFlowDedupe();
   checkCollections();
   checkDensity();
   checkColumnSplit();
