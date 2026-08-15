@@ -328,6 +328,10 @@ export async function buildExistingAutomationsDeck(
     addInterviewsSlide(pres, interviews);
   }
   for (const project of projects) {
+    // As linhas técnicas (onde roda, quem desenvolveu, responsável, acessos,
+    // em produção desde) migraram para a ficha de ambiente — mesma repartição
+    // que o slide React faz entre a página executiva e a página 2. Aqui ficam
+    // só os dois dados de operação pós-entrega.
     const extraLines: QuantitativeLine[] = [
       {
         label: "Status operacional",
@@ -343,15 +347,11 @@ export async function buildExistingAutomationsDeck(
             : "Não informado",
         isSaving: true,
       },
-      { label: "Onde roda", value: hostingLabel(project) },
-      { label: "Quem desenvolveu", value: project.currentApplicationAuthor ?? "Não informado" },
-      { label: "Responsável hoje", value: project.currentApplicationOwner ?? "Não informado" },
-      { label: "Onde ficam os acessos", value: accessLabel(project) },
-      { label: "Em produção desde", value: liveSinceLabel(project) },
     ];
     addProjectSlide(pres, project, extraLines);
-    // Sem nenhum campo novo, o slide seria uma página de "Não informado" —
-    // deck de empresa que ainda não fez o levantamento não deve carregá-la.
+    // Sem nenhum dos campos exclusivos da ficha, a página sairia quase vazia
+    // (a regra de omissão descarta os blocos sem conteúdo) — deck de empresa
+    // que ainda não fez o levantamento não deve carregá-la.
     if (hasFichaTecnicaData(project)) {
       addFichaTecnicaSlide(pres, project);
     }
