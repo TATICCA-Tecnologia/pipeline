@@ -1,6 +1,8 @@
 import { isExistingAutomation } from "../src/shared/lib/opportunity-classification";
 import {
   buildEnvironmentSheet,
+  densityTierFor,
+  splitIntoColumns,
   type EnvironmentSheetSource,
 } from "../src/shared/lib/existing-automation";
 
@@ -208,12 +210,42 @@ function checkCollections(): void {
   console.log("OK: coleções alimentam itemCount e descartam entradas inconsistentes");
 }
 
+function checkDensity(): void {
+  assertEqual(densityTierFor(0), "comfortable", "ficha vazia é confortável");
+  assertEqual(densityTierFor(12), "comfortable", "12 itens ainda é confortável");
+  assertEqual(densityTierFor(13), "dense", "13 itens já é denso");
+  assertEqual(densityTierFor(24), "dense", "24 itens ainda é denso");
+  assertEqual(densityTierFor(25), "compact", "25 itens é compacto");
+  console.log("OK: tier de densidade");
+}
+
+function checkColumnSplit(): void {
+  assertEqual(splitIntoColumns([1, 2, 3]), [[1, 2, 3]], "lista curta fica em uma coluna");
+  assertEqual(
+    splitIntoColumns([1, 2, 3, 4, 5, 6]),
+    [[1, 2, 3, 4, 5, 6]],
+    "6 itens ainda é uma coluna (limite inclusivo)"
+  );
+  assertEqual(
+    splitIntoColumns([1, 2, 3, 4, 5, 6, 7]),
+    [
+      [1, 2, 3, 4],
+      [5, 6, 7],
+    ],
+    "7 itens quebram em duas colunas, sobra na primeira"
+  );
+  assertEqual(splitIntoColumns([]), [[]], "lista vazia devolve uma coluna vazia");
+  console.log("OK: reflow de colunas");
+}
+
 function main(): void {
   checkPredicate();
   checkEmptyIsNull();
   checkOmission();
   checkLabelsAndFlow();
   checkCollections();
+  checkDensity();
+  checkColumnSplit();
   console.log("\nTodas as verificações da Ficha de ambiente passaram.");
 }
 

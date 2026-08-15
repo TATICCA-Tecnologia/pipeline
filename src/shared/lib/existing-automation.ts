@@ -242,3 +242,32 @@ export function buildEnvironmentSheet(source: EnvironmentSheetSource): Environme
 
   return { flow, people, peopleOfInterest, access, systems, accounts, sensitive, itemCount };
 }
+
+/**
+ * Nível de compactação da ficha. Sistemas, contas e pessoas de interesse são
+ * listas sem teto no banco, e a exigência é que TUDO caiba na página — nada de
+ * "+N adicionais". O tier baixa fonte e altura de linha juntas conforme o
+ * volume; abaixo dele ainda existem o reflow de colunas (splitIntoColumns) e,
+ * só no React, o auto-shrink da própria página.
+ */
+export type DensityTier = "comfortable" | "dense" | "compact";
+
+export function densityTierFor(itemCount: number): DensityTier {
+  if (itemCount <= 12) return "comfortable";
+  if (itemCount <= 24) return "dense";
+  return "compact";
+}
+
+/** Acima deste número de itens a lista passa a ocupar duas sub-colunas. */
+export const COLUMN_SPLIT_THRESHOLD = 6;
+
+/**
+ * Devolve sempre pelo menos uma coluna (mesmo vazia), para quem desenha poder
+ * iterar sem checar tamanho. A primeira coluna fica com a sobra em lista
+ * ímpar — ler de cima para baixo, esquerda para direita, exige isso.
+ */
+export function splitIntoColumns<T>(items: T[], threshold = COLUMN_SPLIT_THRESHOLD): T[][] {
+  if (items.length <= threshold) return [items];
+  const half = Math.ceil(items.length / 2);
+  return [items.slice(0, half), items.slice(half)];
+}
