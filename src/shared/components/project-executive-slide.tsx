@@ -154,7 +154,7 @@ export function ProjectExecutiveSlide({ project }: { project: Project }) {
   return (
     // print:gap-0 — 24px de respiro entre as páginas na tela, zero na impressão:
     // o gap empurraria a segunda página para uma terceira folha no PDF.
-    <div className="flex flex-col items-center gap-6 print:gap-0">
+    <div className="flex flex-col items-center gap-6 print:block print:gap-0">
       <SlidePage resetKey={project.id}>
         <div className="relative flex flex-col p-10 pl-[100px]">
           <div className="mb-6 flex items-start justify-between">

@@ -225,7 +225,11 @@
 
 @media print {
   @page {
-    size: landscape;
+    /* Tamanho fixo 16:9 (mesma proporção do slide, ver SLIDE_WIDTH/SLIDE_HEIGHT em
+       src/shared/components/slide/slide-page.tsx) — sem isso o Chrome usa o papel
+       padrão do SO (A4/Letter), cuja proporção não bate com 16:9, gerando faixas em
+       branco e um tamanho de PDF que varia por máquina. */
+    size: 11in 6.1875in;
     margin: 0;
   }
   body * {
@@ -236,10 +240,17 @@
     visibility: visible;
   }
   .executive-slide-print-root {
-    /* Página de tamanho fixo (16:9, ver useFitToSlide no componente) — o
-       conteúdo sempre cabe numa página só, não precisa mais do ajuste de
-       fluxo variável que era necessário quando a altura crescia com o texto. */
+    /* Página de tamanho fixo (16:9, ver SlidePage em
+       src/shared/components/slide/slide-page.tsx) — o conteúdo sempre cabe na
+       página, encolhendo se preciso, então não há ajuste de fluxo variável. */
     margin: 0 auto;
     box-shadow: none;
+  }
+  /* Automação existente imprime DUAS páginas (executiva + ficha de ambiente).
+     Sem esta quebra as duas disputam a mesma folha de 11in x 6.1875in e a
+     segunda sai cortada. O seletor de irmão adjacente não afeta o slide de
+     página única, que nunca tem um irmão. */
+  .executive-slide-print-root + .executive-slide-print-root {
+    break-before: page;
   }
 }
