@@ -280,6 +280,42 @@ function checkLabelsAndFlow(): void {
   );
   console.log("OK: labels de taxonomia e faixa de fluxo");
 }
+
+/**
+ * As três coleções são o único caminho até `itemCount`, que decide o tier de
+ * densidade (Task 3) e é uma das condições de `isEmpty`. Sem esta verificação,
+ * uma regressão em qualquer um dos dois passaria batida.
+ */
+function checkCollections(): void {
+  const sheet = buildEnvironmentSheet({
+    ...emptySource(),
+    systems: [
+      { name: "SAP", category: "ERP", accessPoint: "https://sap.exemplo", accessNotes: null },
+      // Nome vazio é dado inconsistente — tem que ser descartado, não desenhado.
+      { name: "   ", category: null, accessPoint: null, accessNotes: null },
+    ],
+    accounts: [
+      { username: "svc_rpa", type: "servico", system: "SAP", owner: "TI", notes: null },
+      { username: "", type: "email", system: null, owner: null, notes: null },
+    ],
+    peopleOfInterest: [
+      { name: "Carla Menezes", role: "Gerente" },
+      { name: "", role: "Sem nome" },
+    ],
+  });
+  if (!sheet) throw new Error("coleções: ficha com sistemas/contas/pessoas não pode ser null");
+
+  assertEqual(sheet.systems.length, 1, "sistema sem nome é descartado");
+  assertEqual(sheet.accounts.length, 1, "conta sem login é descartada");
+  assertEqual(sheet.peopleOfInterest.length, 1, "pessoa sem nome é descartada");
+  assertEqual(sheet.itemCount, 3, "itemCount soma sistemas + contas + pessoas válidos");
+  assertEqual(
+    sheet.accounts[0].typeLabel,
+    "Usuário de serviço",
+    "a saída carrega o label resolvido, nunca o slug"
+  );
+  console.log("OK: coleções alimentam itemCount e descartam entradas inconsistentes");
+}
 ```
 
 E trocar o corpo de `main()` por:
@@ -290,6 +326,7 @@ function main(): void {
   checkEmptyIsNull();
   checkOmission();
   checkLabelsAndFlow();
+  checkCollections();
   console.log("\nTodas as verificações da Ficha de ambiente passaram.");
 }
 ```
@@ -341,10 +378,26 @@ export type EnvironmentSystem = {
   accessNotes: string | null;
 };
 
-/** Conta já normalizada. `type` é slug de AUTOMATION_ACCOUNT_TYPE_OPTIONS. */
+/**
+ * Conta como ela CHEGA — `type` é slug de AUTOMATION_ACCOUNT_TYPE_OPTIONS.
+ * A saída é `SheetAccount`, com o label já resolvido: os dois formatos têm
+ * nomes de tipo e de campo diferentes de propósito. Reusar o mesmo tipo nos
+ * dois lados deixaria `type` significando slug na entrada e label na saída, e
+ * quem resolvesse de novo no consumidor não veria erro nenhum —
+ * `resolveLabel` devolve o próprio valor quando não acha a opção.
+ */
 export type EnvironmentAccount = {
   username: string;
   type: string | null;
+  system: string | null;
+  owner: string | null;
+  notes: string | null;
+};
+
+/** Conta pronta para desenhar: `typeLabel` já é texto de exibição. */
+export type SheetAccount = {
+  username: string;
+  typeLabel: string | null;
   system: string | null;
   owner: string | null;
   notes: string | null;
@@ -394,7 +447,7 @@ export type EnvironmentSheet = {
   peopleOfInterest: EnvironmentPerson[];
   access: SheetLine[];
   systems: EnvironmentSystem[];
-  accounts: EnvironmentAccount[];
+  accounts: SheetAccount[];
   sensitive: SheetLine[];
   /** systems + accounts + peopleOfInterest — entrada do tier de densidade. */
   itemCount: number;
@@ -495,11 +548,11 @@ export function buildEnvironmentSheet(source: EnvironmentSheetSource): Environme
 
   // Conta com username vazio é dado inconsistente (o formulário não permite) —
   // descartada aqui em vez de renderizar uma linha em branco.
-  const accounts = source.accounts
+  const accounts: SheetAccount[] = source.accounts
     .filter((a) => clean(a.username) !== null)
     .map((a) => ({
       username: a.username.trim(),
-      type: resolveAccountTypeLabel(a.type) ?? null,
+      typeLabel: resolveAccountTypeLabel(a.type) ?? null,
       system: clean(a.system),
       owner: clean(a.owner),
       notes: clean(a.notes),
@@ -535,9 +588,10 @@ export function buildEnvironmentSheet(source: EnvironmentSheetSource): Environme
 }
 ```
 
-> Nota para quem implementa: `resolveAccountTypeLabel` já traduz o slug para label,
-> então o campo `type` do `EnvironmentAccount` **de saída** carrega o label, não o slug.
-> É intencional — quem desenha nunca precisa da taxonomia.
+> Nota para quem implementa: a entrada (`EnvironmentAccount.type`) carrega o slug e a
+> saída (`SheetAccount.typeLabel`) carrega o label já resolvido. Tipos e nomes de campo
+> diferentes de propósito — quem desenha nunca precisa da taxonomia, e nunca deve
+> conseguir confundir os dois lados.
 
 - [ ] **Step 4: Rodar para confirmar que passa**
 
@@ -1008,8 +1062,8 @@ import {
   densityTierFor,
   splitIntoColumns,
   type DensityTier,
-  type EnvironmentAccount,
   type EnvironmentSystem,
+  type SheetAccount,
   type SheetLine,
 } from "@/shared/lib/existing-automation";
 import { useDemoMode } from "@/shared/context/demo-mode-context";
@@ -1092,7 +1146,7 @@ function SystemsTable({ systems, tier }: { systems: EnvironmentSystem[]; tier: D
   );
 }
 
-function AccountsTable({ accounts, tier }: { accounts: EnvironmentAccount[]; tier: DensityTier }) {
+function AccountsTable({ accounts, tier }: { accounts: SheetAccount[]; tier: DensityTier }) {
   const columns = splitIntoColumns(accounts);
   return (
     <div className="flex gap-3">
@@ -1105,7 +1159,7 @@ function AccountsTable({ accounts, tier }: { accounts: EnvironmentAccount[]; tie
                   {account.username}
                 </td>
                 <td className={`${TIER_STYLE[tier].row} align-top text-foreground/80`}>
-                  {[account.type, account.system, account.owner].filter(Boolean).join(" · ")}
+                  {[account.typeLabel, account.system, account.owner].filter(Boolean).join(" · ")}
                   {account.notes && (
                     <span className="block text-muted-foreground">{account.notes}</span>
                   )}
@@ -1847,7 +1901,7 @@ export function addFichaTecnicaSlide(pres: PptxGenJS, project: ExistingAutomatio
     rightY = addListBlock(
       slide,
       "Contas utilizadas",
-      (a) => [a.username, [a.type, a.system, a.owner, a.notes].filter(Boolean).join(" · ")],
+      (a) => [a.username, [a.typeLabel, a.system, a.owner, a.notes].filter(Boolean).join(" · ")],
       sheet.accounts,
       FICHA_RIGHT_X,
       rightY,
