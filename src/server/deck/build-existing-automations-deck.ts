@@ -4,15 +4,13 @@ import { db } from "@/server/db";
 import { createCaller } from "@/server/trpc/root";
 import type { Context } from "@/server/trpc/context";
 import { formatCurrency, formatDate } from "@/shared/utils";
+// Só o que `hostingLabel`/`accessLabel` (do inventário) ainda resolvem aqui: a
+// ficha de ambiente resolve seus próprios labels dentro de
+// `buildEnvironmentSheet`, no módulo puro.
 import {
   CURRENT_APPLICATION_ACCESS_LOCATION_OPTIONS,
-  CURRENT_APPLICATION_CONTINGENCY_OPTIONS,
   resolveLabel,
   resolveCurrentApplicationHostingLabel,
-  resolveDataEndpointLabel,
-  resolveAccountTypeLabel,
-  resolveSensitiveDataAnswerLabel,
-  resolveKeyLabels,
 } from "@/shared/constants/project-taxonomy";
 import {
   addCoverSlide,
@@ -24,6 +22,7 @@ import {
   COLOR_MUTED,
   COLOR_SECONDARY,
   COLOR_TABLE_BORDER,
+  COLOR_ZEBRA,
   TYPE,
   MARGIN_X,
   CONTENT_W,
@@ -38,6 +37,14 @@ import {
   type Interviews,
   type QuantitativeLine,
 } from "./build-diagnostic-deck";
+import {
+  buildEnvironmentSheet,
+  densityTierFor,
+  splitIntoColumns,
+  type DensityTier,
+  type EnvironmentSheet,
+  type EnvironmentSheetSource,
+} from "@/shared/lib/existing-automation";
 
 /**
  * Deck paralelo ao de diagnóstico (build-diagnostic-deck.ts), mas para a
@@ -497,35 +504,38 @@ function addFichaBlockLabel(slide: Slide, text: string, x: number, y: number, w:
   });
 }
 
-// Limites de linhas exibidas nas duas listas. Um deck circula na frente do
-// cliente: uma tabela que cresce sem controle dentro de um bloco de altura
-// fixa (ao contrário das tabelas de página inteira, que usam autoPage) vazaria
-// sobre o bloco vizinho sem erro nenhum. Em vez disso, corta e avisa quantos
-// itens ficaram de fora — nunca vaza, nunca finge que a lista acabou.
-const FICHA_MAX_SYSTEMS_SHOWN = 6;
-const FICHA_MAX_ACCOUNTS_SHOWN = 5;
-
-// Geometria do slide de ficha técnica (Passo 13). Cinco blocos em três linhas:
-// [Hospedagem | Sistemas] / [Fluxo de dados] / [Sustentação | Contas]. Valores
-// fixos (não calculados a partir do conteúdo, ao contrário da tabela
-// quantitativa do slide de processo) porque aqui o conteúdo é sempre truncado
-// a um número máximo de linhas (ver FICHA_MAX_*_SHOWN acima) — a altura
-// necessária tem teto conhecido, então não precisa ser estimada dinamicamente.
+// Geometria da ficha de ambiente. Ao contrário da versão anterior, que
+// reservava altura fixa por linha de blocos, aqui cada coluna tem seu próprio
+// cursor Y: blocos vazios são omitidos (regra da spec de 2026-08-14) e os
+// seguintes sobem. As três larguras continuam fixas.
 const FICHA_LEFT_X = MARGIN_X;
 const FICHA_LEFT_W = 4.3;
 const FICHA_COL_GAP = 0.3;
 const FICHA_RIGHT_X = FICHA_LEFT_X + FICHA_LEFT_W + FICHA_COL_GAP;
 const FICHA_RIGHT_W = CONTENT_W - FICHA_LEFT_W - FICHA_COL_GAP;
-const FICHA_ROW_GAP = 0.15;
-const FICHA_ROW1_H = 2.05; // Hospedagem / Sistemas em que atua (até 6 linhas + aviso de corte)
-const FICHA_ROW2_H = 0.95; // Fluxo de dados (2 linhas fixas: entrada/saída)
-const FICHA_ROW3_H = 2.13; // Sustentação / Contas utilizadas (até 5 linhas + aviso de corte)
-const FICHA_ROW1_Y = CONTENT_TOP_Y_TALL_TITLE;
-const FICHA_ROW2_Y = FICHA_ROW1_Y + FICHA_ROW1_H + FICHA_ROW_GAP;
-const FICHA_ROW3_Y = FICHA_ROW2_Y + FICHA_ROW2_H + FICHA_ROW_GAP;
-// Fecha em 6.85": a régua do rodapé do master fica em 6.92", então isto deixa
-// ~0.07" de folga — suficiente porque o conteúdo de cada bloco tem teto
-// conhecido (ver comentário acima), não estimado.
+const FICHA_BLOCK_GAP = 0.22;
+/** Altura do rótulo de bloco antes do conteúdo começar. */
+const FICHA_LABEL_H = 0.32;
+/** Altura da faixa de fluxo (3 caixas, até 4 linhas cada). */
+const FICHA_FLOW_H = 1.0;
+/** Fundo da área de conteúdo — a régua do rodapé do master fica em 6.92". */
+const FICHA_BOTTOM_Y = 6.85;
+
+// Corpo das tabelas por tier de densidade. Nenhum item é descartado: quando o
+// volume cresce, a fonte desce e a lista quebra em duas colunas
+// (splitIntoColumns) — ver "Como tudo cabe" na spec.
+const FICHA_TIER_FONT: Record<DensityTier, number> = {
+  comfortable: 9,
+  dense: 8,
+  compact: 7,
+};
+
+/** Altura estimada de uma linha de tabela, por tier (em polegadas). */
+const FICHA_TIER_ROW_H: Record<DensityTier, number> = {
+  comfortable: 0.24,
+  dense: 0.21,
+  compact: 0.18,
+};
 
 // Fábrica (não constante) porque o tipo de `border` do pptxgenjs exige uma
 // tupla mutável de 4 elementos — um array widened (ou `as const`, que gera
@@ -553,9 +563,9 @@ function fichaTableBorder(): [
 // bloco. Um `accessPoint`/detalhe de texto livre longo o bastante pra quebrar
 // linha faz a linha crescer além do espaço reservado e sobrepor o bloco
 // abaixo, sem erro nenhum. Truncar aqui garante 1 linha por célula, então a
-// altura da tabela nunca passa do estimado — troca "pode vazar" por "corta e
-// avisa" (reticência = truncou; ver também "+N adicionais" para linhas
-// inteiras cortadas).
+// altura da tabela nunca passa do estimado — é o que sustenta o cursor Y desta
+// ficha (reticência = truncou). Note que isto corta DENTRO da célula: nenhuma
+// linha inteira é descartada, ao contrário da versão anterior desta ficha.
 const FICHA_TABLE_CHARS_PER_INCH = 10;
 
 function fichaTruncate(text: string, colWidthIn: number): string {
@@ -563,208 +573,278 @@ function fichaTruncate(text: string, colWidthIn: number): string {
   if (text.length <= maxChars) return text;
   return `${text.slice(0, maxChars - 1).trimEnd()}…`;
 }
+/**
+ * Espelho server-side de `projectToEnvironmentSource` (o adaptador do React).
+ * Existe separado porque a fonte é diferente — linhas cruas do Prisma, com
+ * `targetSystem`/`customName` ainda por resolver — mas o destino é o mesmo
+ * tipo, e portanto a mesma regra de omissão.
+ *
+ * Sem máscara: o deck é gerado por um admin autenticado para uma empresa
+ * específica; modo demonstração é conceito da tela, não do arquivo exportado.
+ */
+function deckProjectToEnvironmentSource(p: ExistingAutomationProject): EnvironmentSheetSource {
+  return {
+    hosting: p.currentApplicationHosting,
+    hostingCustom: p.currentApplicationHostingCustom,
+    assetId: p.currentApplicationAssetId,
+    robotSchedule: p.robotSchedule,
+    liveSince: p.currentApplicationLiveSince,
+    dataInput: p.currentApplicationDataInput,
+    dataInputDetails: p.currentApplicationDataInputDetails,
+    dataOutput: p.currentApplicationDataOutput,
+    dataOutputDetails: p.currentApplicationDataOutputDetails,
+    author: p.currentApplicationAuthor,
+    owner: p.currentApplicationOwner,
+    ownerRole: p.currentApplicationOwnerRole,
+    ownerArea: p.ownerArea?.name ?? null,
+    backupOwner: p.currentApplicationBackupOwner,
+    peopleOfInterest: p.peopleOfInterest.map((link) => ({
+      name: link.person.name,
+      role: link.person.role,
+    })),
+    accessLocation: p.currentApplicationAccessLocation,
+    accessReference: p.currentApplicationAccessReference,
+    contingencyActions: p.currentApplicationContingencyActions,
+    contingencyDetails: p.currentApplicationContingencyDetails,
+    handlesSensitiveData: p.handlesSensitiveData,
+    sensitiveDataCategories: p.sensitiveDataCategories,
+    sensitiveDataDetails: p.sensitiveDataDetails,
+    systems: p.targetSystems.map((s) => ({
+      name: targetSystemName(s) ?? "",
+      category: s.targetSystem?.category?.name ?? null,
+      accessPoint: s.accessPoint,
+      accessNotes: s.accessNotes,
+    })),
+    accounts: p.automationAccounts.map((a) => ({
+      username: a.username,
+      type: a.accountType,
+      system: accountSystemName(a),
+      owner: a.ownerName,
+      notes: a.notes,
+    })),
+  };
+}
+
+/** Desenha um bloco de texto e devolve o Y logo abaixo dele. */
+function addTextBlock(
+  slide: Slide,
+  label: string,
+  entries: { label: string; value: string }[],
+  x: number,
+  y: number,
+  w: number,
+  fontSize: number
+): number {
+  addFichaBlockLabel(slide, label, x, y, w);
+  const h = Math.min(entries.length * 0.26 + 0.1, FICHA_BOTTOM_Y - y - FICHA_LABEL_H);
+  slide.addText(
+    entries.map((entry, index) => ({
+      text: `${entry.label}: ${entry.value}`,
+      options: {
+        fontSize,
+        color: index === 0 ? COLOR_PRIMARY : COLOR_SECONDARY,
+        bold: index === 0,
+        breakLine: index < entries.length - 1,
+      },
+    })),
+    { x, y: y + FICHA_LABEL_H, w, h, valign: "top", fit: "shrink", lineSpacingMultiple: 1.25 }
+  );
+  return y + FICHA_LABEL_H + h + FICHA_BLOCK_GAP;
+}
+
+/**
+ * Desenha uma lista como uma ou duas tabelas lado a lado e devolve o Y abaixo.
+ * A quebra em duas colunas (splitIntoColumns) é o que permite listar TUDO sem
+ * descartar item nem estourar o rodapé.
+ */
+function addListBlock<T>(
+  slide: Slide,
+  label: string,
+  rowsOf: (item: T) => [string, string],
+  items: T[],
+  x: number,
+  y: number,
+  w: number,
+  tier: DensityTier
+): number {
+  addFichaBlockLabel(slide, label, x, y, w);
+  const columns = splitIntoColumns(items);
+  const columnW = (w - (columns.length - 1) * 0.15) / columns.length;
+  const tallest = Math.max(...columns.map((c) => c.length));
+
+  columns.forEach((column, index) => {
+    const colX = x + index * (columnW + 0.15);
+    const colW: [number, number] = [columnW * 0.45, columnW * 0.55];
+    const rows: TableRow[] = column.map((item) => {
+      const [first, second] = rowsOf(item);
+      return [
+        { text: fichaTruncate(first, colW[0]) },
+        { text: fichaTruncate(second, colW[1]) },
+      ];
+    });
+    slide.addTable(rows, {
+      x: colX,
+      y: y + FICHA_LABEL_H,
+      w: columnW,
+      colW,
+      fontSize: FICHA_TIER_FONT[tier],
+      color: COLOR_PRIMARY,
+      border: fichaTableBorder(),
+      valign: "middle",
+      margin: [0.02, 0.06, 0.02, 0.06],
+      autoPage: false,
+    });
+  });
+
+  return y + FICHA_LABEL_H + tallest * FICHA_TIER_ROW_H[tier] + FICHA_BLOCK_GAP;
+}
+
+/** A faixa entrada → onde roda → saída, no topo. Devolve o Y abaixo dela. */
+function addFlowStrip(slide: Slide, sheet: EnvironmentSheet, y: number): number {
+  const boxes = [sheet.flow.input, sheet.flow.runtime, sheet.flow.output].filter(
+    (box): box is NonNullable<typeof box> => box !== undefined
+  );
+  if (boxes.length === 0) return y;
+
+  const gap = 0.3;
+  const boxW = (CONTENT_W - gap * (boxes.length - 1)) / boxes.length;
+  boxes.forEach((box, index) => {
+    const x = MARGIN_X + index * (boxW + gap);
+    slide.addShape("rect", { x, y, w: boxW, h: FICHA_FLOW_H, fill: { color: COLOR_ZEBRA } });
+    slide.addShape("rect", { x, y, w: 0.04, h: FICHA_FLOW_H, fill: { color: COLOR_ACCENT } });
+    slide.addText(
+      [
+        {
+          text: box.title.toUpperCase(),
+          options: { fontSize: TYPE.eyebrow, bold: true, color: COLOR_ACCENT, breakLine: true },
+        },
+        ...box.lines.map((line, lineIndex) => ({
+          text: line,
+          options: {
+            fontSize: lineIndex === 0 ? 11 : 9,
+            bold: lineIndex === 0,
+            color: lineIndex === 0 ? COLOR_PRIMARY : COLOR_SECONDARY,
+            breakLine: lineIndex < box.lines.length - 1,
+          },
+        })),
+      ],
+      {
+        x: x + 0.16,
+        y: y + 0.08,
+        w: boxW - 0.3,
+        h: FICHA_FLOW_H - 0.16,
+        valign: "top",
+        fit: "shrink",
+        lineSpacingMultiple: 1.15,
+      }
+    );
+    if (index < boxes.length - 1) {
+      slide.addText("→", {
+        x: x + boxW,
+        y: y + FICHA_FLOW_H / 2 - 0.15,
+        w: gap,
+        h: 0.3,
+        fontSize: 16,
+        color: COLOR_ACCENT,
+        align: "center",
+      });
+    }
+  });
+
+  return y + FICHA_FLOW_H + FICHA_BLOCK_GAP;
+}
 
 export function addFichaTecnicaSlide(pres: PptxGenJS, project: ExistingAutomationProject): void {
+  const sheet = buildEnvironmentSheet(deckProjectToEnvironmentSource(project));
+  // Guard duplo com hasFichaTecnicaData no chamador: aquele decide se vale a
+  // pena a página, este garante que nunca se desenha uma ficha sem nada.
+  if (!sheet) return;
+
   // `tag` identifica este como o SEGUNDO slide da mesma solução (o primeiro
   // usa a área como tag) — sem ele, alguém folheando o deck veria dois slides
   // seguidos com o mesmo título e nenhuma pista do que os distingue.
-  const slide = addTitledSlide(pres, project.title, undefined, "Ficha técnica", true);
+  const slide = addTitledSlide(pres, project.title, undefined, "Ficha de ambiente", true);
+  const tier = densityTierFor(sheet.itemCount);
+  const fontSize = FICHA_TIER_FONT[tier];
 
-  // ----- Linha 1: Hospedagem | Sistemas em que atua -----
-  addFichaBlockLabel(slide, "Hospedagem", FICHA_LEFT_X, FICHA_ROW1_Y, FICHA_LEFT_W);
-  slide.addText(
-    [
-      {
-        text: hostingLabel(project),
-        options: { bold: true, fontSize: 13, color: COLOR_PRIMARY, breakLine: true },
-      },
-      {
-        text: `Ativo: ${project.currentApplicationAssetId ?? "Não informado"}`,
-        options: { fontSize: 10, color: COLOR_SECONDARY, breakLine: true },
-      },
-      {
-        text: `Em produção desde ${liveSinceLabel(project)}`,
-        options: { fontSize: 10, color: COLOR_MUTED },
-      },
-    ],
-    {
-      x: FICHA_LEFT_X,
-      y: FICHA_ROW1_Y + 0.32,
-      w: FICHA_LEFT_W,
-      h: FICHA_ROW1_H - 0.32,
-      valign: "top",
-      fit: "shrink",
-      lineSpacingMultiple: 1.3,
-    }
-  );
+  const blocksTop = addFlowStrip(slide, sheet, CONTENT_TOP_Y_TALL_TITLE);
 
-  addFichaBlockLabel(slide, "Sistemas em que atua", FICHA_RIGHT_X, FICHA_ROW1_Y, FICHA_RIGHT_W);
-  const systemsTableY = FICHA_ROW1_Y + 0.32;
-  if (project.targetSystems.length === 0) {
-    slide.addText("Nenhum sistema cadastrado.", {
-      x: FICHA_RIGHT_X,
-      y: systemsTableY,
-      w: FICHA_RIGHT_W,
-      h: 0.3,
-      fontSize: 10,
-      italic: true,
-      color: COLOR_MUTED,
-    });
-  } else {
-    const shown = project.targetSystems.slice(0, FICHA_MAX_SYSTEMS_SHOWN);
-    const hiddenCount = project.targetSystems.length - shown.length;
-    const systemsColW: [number, number, number] = [1.9, 1.6, FICHA_RIGHT_W - 1.9 - 1.6];
-    const rows: TableRow[] = shown.map((s) => [
-      { text: fichaTruncate(targetSystemName(s) ?? "-", systemsColW[0]) },
-      { text: fichaTruncate(s.targetSystem?.category?.name ?? "-", systemsColW[1]) },
-      { text: fichaTruncate(s.accessPoint ?? "Não informado", systemsColW[2]) },
-    ]);
-    if (hiddenCount > 0) {
-      rows.push([
-        {
-          text: `+ ${hiddenCount} sistema${hiddenCount > 1 ? "s" : ""} ${hiddenCount > 1 ? "adicionais" : "adicional"} cadastrado${hiddenCount > 1 ? "s" : ""}`,
-          options: { colspan: 3, italic: true, color: COLOR_MUTED },
-        },
-      ]);
-    }
-    slide.addTable(rows, {
-      x: FICHA_RIGHT_X,
-      y: systemsTableY,
-      w: FICHA_RIGHT_W,
-      colW: systemsColW,
-      fontSize: 9,
-      color: COLOR_PRIMARY,
-      border: fichaTableBorder(),
-      valign: "middle",
-      margin: [0.03, 0.06, 0.03, 0.06],
-      autoPage: false,
-    });
+  let leftY = blocksTop;
+  const peopleEntries = [
+    ...sheet.people,
+    ...(sheet.peopleOfInterest.length > 0
+      ? [
+          {
+            label: "Pessoas de interesse",
+            value: sheet.peopleOfInterest
+              .map((p) => (p.role ? `${p.name} (${p.role})` : p.name))
+              .join(", "),
+          },
+        ]
+      : []),
+  ];
+  if (peopleEntries.length > 0) {
+    leftY = addTextBlock(
+      slide,
+      "Pessoas",
+      peopleEntries,
+      FICHA_LEFT_X,
+      leftY,
+      FICHA_LEFT_W,
+      fontSize
+    );
+  }
+  if (sheet.access.length > 0) {
+    leftY = addTextBlock(
+      slide,
+      "Acessos e contingência",
+      sheet.access,
+      FICHA_LEFT_X,
+      leftY,
+      FICHA_LEFT_W,
+      fontSize
+    );
   }
 
-  // ----- Linha 2: Fluxo de dados (largura inteira) -----
-  addFichaBlockLabel(slide, "Fluxo de dados", FICHA_LEFT_X, FICHA_ROW2_Y, CONTENT_W);
-  const dataFlowColW: [number, number, number] = [1.3, 1.9, CONTENT_W - 1.3 - 1.9];
-  const dataFlowRows: TableRow[] = [
-    [
-      { text: "Entrada", options: { bold: true, color: COLOR_ACCENT } },
-      { text: resolveDataEndpointLabel(project.currentApplicationDataInput) ?? "Não informado" },
-      {
-        text: fichaTruncate(
-          project.currentApplicationDataInputDetails?.trim() || "Não informado",
-          dataFlowColW[2]
-        ),
-      },
-    ],
-    [
-      { text: "Saída", options: { bold: true, color: COLOR_ACCENT } },
-      { text: resolveDataEndpointLabel(project.currentApplicationDataOutput) ?? "Não informado" },
-      {
-        text: fichaTruncate(
-          project.currentApplicationDataOutputDetails?.trim() || "Não informado",
-          dataFlowColW[2]
-        ),
-      },
-    ],
-  ];
-  slide.addTable(dataFlowRows, {
-    x: FICHA_LEFT_X,
-    y: FICHA_ROW2_Y + 0.32,
-    w: CONTENT_W,
-    colW: dataFlowColW,
-    fontSize: 10,
-    color: COLOR_PRIMARY,
-    border: fichaTableBorder(),
-    valign: "middle",
-    margin: [0.03, 0.08, 0.03, 0.08],
-    autoPage: false,
-  });
-
-  // ----- Linha 3: Sustentação | Contas utilizadas -----
-  addFichaBlockLabel(slide, "Sustentação", FICHA_LEFT_X, FICHA_ROW3_Y, FICHA_LEFT_W);
-  const contingencyLabels = resolveKeyLabels(
-    project.currentApplicationContingencyActions,
-    CURRENT_APPLICATION_CONTINGENCY_OPTIONS
-  );
-  const contingencyDetails = project.currentApplicationContingencyDetails?.trim();
-  const contingencyText =
-    (contingencyLabels.length > 0 ? contingencyLabels.join(", ") : "Não informado") +
-    (contingencyDetails ? ` — ${contingencyDetails}` : "");
-  const sensitiveAnswer = resolveSensitiveDataAnswerLabel(project.handlesSensitiveData) ?? "Não informado";
-  const sensitiveDetails = project.sensitiveDataDetails?.trim();
-  slide.addText(
-    [
-      {
-        text: `${project.currentApplicationOwner ?? "Não informado"} · ${
-          project.currentApplicationOwnerRole ?? "Não informado"
-        } · ${project.ownerArea?.name ?? "Não informado"}`,
-        options: { bold: true, fontSize: 10, color: COLOR_PRIMARY, breakLine: true },
-      },
-      {
-        text: `Substituto: ${project.currentApplicationBackupOwner ?? "Não informado"}`,
-        options: { fontSize: 10, color: COLOR_SECONDARY, breakLine: true },
-      },
-      {
-        text: `Se parar: ${contingencyText}`,
-        options: { fontSize: 10, color: COLOR_SECONDARY, breakLine: true },
-      },
-      {
-        text: `Dados sigilosos: ${sensitiveAnswer}${sensitiveDetails ? ` — ${sensitiveDetails}` : ""}`,
-        options: { fontSize: 10, color: COLOR_SECONDARY },
-      },
-    ],
-    {
-      x: FICHA_LEFT_X,
-      y: FICHA_ROW3_Y + 0.32,
-      w: FICHA_LEFT_W,
-      h: FICHA_ROW3_H - 0.32,
-      valign: "top",
-      fit: "shrink",
-      lineSpacingMultiple: 1.25,
-    }
-  );
-
-  addFichaBlockLabel(slide, "Contas utilizadas", FICHA_RIGHT_X, FICHA_ROW3_Y, FICHA_RIGHT_W);
-  const accountsTableY = FICHA_ROW3_Y + 0.32;
-  if (project.automationAccounts.length === 0) {
-    slide.addText("Nenhuma conta cadastrada.", {
-      x: FICHA_RIGHT_X,
-      y: accountsTableY,
-      w: FICHA_RIGHT_W,
-      h: 0.3,
-      fontSize: 10,
-      italic: true,
-      color: COLOR_MUTED,
-    });
-  } else {
-    const shown = project.automationAccounts.slice(0, FICHA_MAX_ACCOUNTS_SHOWN);
-    const hiddenCount = project.automationAccounts.length - shown.length;
-    const accountsColW: [number, number, number] = [2.4, 1.8, FICHA_RIGHT_W - 2.4 - 1.8];
+  let rightY = blocksTop;
+  if (sheet.systems.length > 0) {
+    rightY = addListBlock(
+      slide,
+      "Sistemas em que atua",
+      (s) => [
+        [s.name, s.category].filter(Boolean).join(" · "),
+        [s.accessPoint, s.accessNotes].filter(Boolean).join(" — "),
+      ],
+      sheet.systems,
+      FICHA_RIGHT_X,
+      rightY,
+      FICHA_RIGHT_W,
+      tier
+    );
+  }
+  if (sheet.accounts.length > 0) {
     // Username aparece porque foi decisão explícita do usuário levá-lo ao
     // deck — não existe (e nunca existiu) campo de senha neste modelo.
-    const rows: TableRow[] = shown.map((a) => [
-      { text: fichaTruncate(a.username, accountsColW[0]) },
-      { text: fichaTruncate(resolveAccountTypeLabel(a.accountType) ?? "-", accountsColW[1]) },
-      { text: fichaTruncate(accountSystemName(a) ?? "-", accountsColW[2]) },
-    ]);
-    if (hiddenCount > 0) {
-      rows.push([
-        {
-          text: `+ ${hiddenCount} conta${hiddenCount > 1 ? "s" : ""} ${hiddenCount > 1 ? "adicionais" : "adicional"} cadastrada${hiddenCount > 1 ? "s" : ""}`,
-          options: { colspan: 3, italic: true, color: COLOR_MUTED },
-        },
-      ]);
-    }
-    slide.addTable(rows, {
-      x: FICHA_RIGHT_X,
-      y: accountsTableY,
-      w: FICHA_RIGHT_W,
-      colW: accountsColW,
-      fontSize: 9,
-      color: COLOR_PRIMARY,
-      border: fichaTableBorder(),
-      valign: "middle",
-      margin: [0.03, 0.06, 0.03, 0.06],
-      autoPage: false,
-    });
+    rightY = addListBlock(
+      slide,
+      "Contas utilizadas",
+      (a) => [a.username, [a.typeLabel, a.system, a.owner, a.notes].filter(Boolean).join(" · ")],
+      sheet.accounts,
+      FICHA_RIGHT_X,
+      rightY,
+      FICHA_RIGHT_W,
+      tier
+    );
+  }
+  if (sheet.sensitive.length > 0) {
+    addTextBlock(
+      slide,
+      "Dados sigilosos",
+      sheet.sensitive,
+      FICHA_RIGHT_X,
+      rightY,
+      FICHA_RIGHT_W,
+      fontSize
+    );
   }
 }
