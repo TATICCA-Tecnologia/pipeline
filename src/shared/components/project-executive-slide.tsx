@@ -6,16 +6,16 @@ import type { Project } from "@/shared/types";
 import {
   HAS_EXISTING_SYSTEM_OPTIONS,
   HAS_CURRENT_APPLICATION_OPTIONS,
-  CURRENT_APPLICATION_ACCESS_LOCATION_OPTIONS,
   PROCESS_FREQUENCIES,
   BENEFIT_OPTIONS,
   resolveLabel,
-  resolveCurrentApplicationHostingLabel,
 } from "@/shared/constants/project-taxonomy";
-import { formatDate } from "@/shared/utils";
+import { formatCurrency } from "@/shared/utils";
+import { isExistingAutomation } from "@/shared/lib/opportunity-classification";
 import { EXECUTION_STRATEGIES } from "@/src/app/(private)/admin/projetos/[id]/especificacao/_constants/architecture";
 import { useDemoMode } from "@/shared/context/demo-mode-context";
 import { SlidePage } from "./slide/slide-page";
+import { EnvironmentSheetPage } from "./slide/environment-sheet-page";
 import { RatingRadarChart, RATING_AXES, DEFAULT_RATING } from "./slide/rating-radar-chart";
 
 function SectionLabel({ children }: { children: ReactNode }) {
@@ -66,34 +66,6 @@ export function ProjectExecutiveSlide({ project }: { project: Project }) {
       value: resolveLabel(project.hasCurrentApplication, HAS_CURRENT_APPLICATION_OPTIONS),
       detail: maskFreeText(project.currentApplicationDetails) ?? undefined,
     },
-    // Ficha de sustentação: linhas sem valor são descartadas por
-    // buildLabeledLinesWithDetail, então um projeto que não é automação
-    // existente não ganha nenhuma linha extra aqui.
-    // "Onde encontrar" (currentApplicationAccessReference) fica de fora de
-    // propósito — é texto livre apontando onde as credenciais moram, e o mesmo
-    // critério já exclui esse campo do deck .pptx.
-    {
-      label: "Onde roda",
-      value: resolveCurrentApplicationHostingLabel(
-        project.currentApplicationHosting,
-        maskFreeText(project.currentApplicationHostingCustom)
-      ),
-    },
-    { label: "Quem desenvolveu", value: maskFreeText(project.currentApplicationAuthor) ?? undefined },
-    { label: "Responsável hoje", value: maskFreeText(project.currentApplicationOwner) ?? undefined },
-    {
-      label: "Onde ficam os acessos",
-      value: resolveLabel(
-        project.currentApplicationAccessLocation,
-        CURRENT_APPLICATION_ACCESS_LOCATION_OPTIONS
-      ),
-    },
-    {
-      label: "Em produção desde",
-      value: project.currentApplicationLiveSince
-        ? formatDate(new Date(project.currentApplicationLiveSince))
-        : undefined,
-    },
     { label: "Público-alvo", value: maskFreeText(project.targetAudience) ?? undefined },
   ]);
 
@@ -114,6 +86,14 @@ export function ProjectExecutiveSlide({ project }: { project: Project }) {
   // perguntou); mostra um rótulo neutro em vez do valor, para ser explicado educadamente
   // ao cliente como algo a confirmar, sem virar um alerta/destaque de atenção no slide.
   const NOT_QUANTIFIED_LABEL = "N/A";
+
+  // Rótulos vindos do enum RobotOperationalStatus — mesma tradução que
+  // build-existing-automations-deck.ts usa no deck.
+  const OPERATIONAL_STATUS_LABEL: Record<string, string> = {
+    ACTIVE: "Ativo",
+    PAUSED: "Pausado",
+    ISSUE: "Com problema",
+  };
 
   const quantitativeLines: { label: string; value: string; isGap?: boolean }[] = [
     ...buildLabeledLines([
@@ -143,6 +123,21 @@ export function ProjectExecutiveSlide({ project }: { project: Project }) {
             : undefined,
       },
     ]),
+    ...buildLabeledLines([
+      {
+        label: "Status operacional",
+        value: project.operationalStatus
+          ? OPERATIONAL_STATUS_LABEL[project.operationalStatus]
+          : undefined,
+      },
+      {
+        label: "Economia acumulada (real)",
+        value:
+          project.accumulatedSavingBRL != null
+            ? formatCurrency(project.accumulatedSavingBRL)
+            : undefined,
+      },
+    ]),
   ];
   const monthlyHoursSavedLabel =
     project.monthlyHoursSaved != null ? `${project.monthlyHoursSaved}h/mês` : undefined;
@@ -153,165 +148,170 @@ export function ProjectExecutiveSlide({ project }: { project: Project }) {
   const ratingAverageLabel = ratingAverage.toFixed(1).replace(".", ",");
 
   return (
-    <SlidePage resetKey={project.id}>
-      <div className="relative flex flex-col p-10 pl-[100px]">
-        <div className="mb-6 flex items-start justify-between">
-          <div>
-            {project.companyName && (
-              <div className="mb-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                {maskCompanyName(project.companyId, project.companyName)}
-              </div>
-            )}
-            <h1 className="max-w-[85%] text-3xl font-extrabold leading-tight tracking-tight">
-              {maskFreeText(project.title)}
-            </h1>
-            {areaEntrevistada && (
-              <p className="mt-1 text-sm font-semibold text-teal-600">{areaEntrevistada}</p>
-            )}
-            {((project.solutionTypes && project.solutionTypes.length > 0) ||
-              project.mainToolCategory) && (
-              <div className="mt-2 flex flex-wrap gap-1.5">
-                {project.solutionTypes?.map((k) => (
-                  <span
-                    key={k.id}
-                    className="inline-block rounded-full bg-teal-50 px-2.5 py-0.5 text-[11px] font-semibold text-teal-700"
-                  >
-                    {k.name}
-                  </span>
-                ))}
-                {project.mainToolCategory && (
-                  <span className="inline-block rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-semibold text-slate-700">
-                    {project.mainTool
-                      ? `${project.mainToolCategory.name} — ${project.mainTool.name}`
-                      : project.mainToolCategory.name}
-                  </span>
-                )}
-              </div>
-            )}
+    // print:gap-0 — 24px de respiro entre as páginas na tela, zero na impressão:
+    // o gap empurraria a segunda página para uma terceira folha no PDF.
+    <div className="flex flex-col items-center gap-6 print:gap-0">
+      <SlidePage resetKey={project.id}>
+        <div className="relative flex flex-col p-10 pl-[100px]">
+          <div className="mb-6 flex items-start justify-between">
+            <div>
+              {project.companyName && (
+                <div className="mb-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  {maskCompanyName(project.companyId, project.companyName)}
+                </div>
+              )}
+              <h1 className="max-w-[85%] text-3xl font-extrabold leading-tight tracking-tight">
+                {maskFreeText(project.title)}
+              </h1>
+              {areaEntrevistada && (
+                <p className="mt-1 text-sm font-semibold text-teal-600">{areaEntrevistada}</p>
+              )}
+              {((project.solutionTypes && project.solutionTypes.length > 0) ||
+                project.mainToolCategory) && (
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {project.solutionTypes?.map((k) => (
+                    <span
+                      key={k.id}
+                      className="inline-block rounded-full bg-teal-50 px-2.5 py-0.5 text-[11px] font-semibold text-teal-700"
+                    >
+                      {k.name}
+                    </span>
+                  ))}
+                  {project.mainToolCategory && (
+                    <span className="inline-block rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-semibold text-slate-700">
+                      {project.mainTool
+                        ? `${project.mainToolCategory.name} — ${project.mainTool.name}`
+                        : project.mainToolCategory.name}
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+            <Image
+              src="/taticca-logo-horizontal.png"
+              alt="TATICCA"
+              width={163}
+              height={64}
+              className="h-16 w-auto flex-shrink-0 object-contain"
+            />
           </div>
-          <Image
-            src="/taticca-logo-horizontal.png"
-            alt="TATICCA"
-            width={163}
-            height={64}
-            className="h-16 w-auto flex-shrink-0 object-contain"
-          />
-        </div>
 
-        <div className="flex gap-10">
-          <div className="flex flex-1 flex-col gap-5">
-            {project.description && (
-              <div>
-                <SectionLabel>O processo hoje</SectionLabel>
-                <p className="mt-1.5 text-sm leading-relaxed text-foreground/90">
-                  {maskFreeText(project.description)}
-                </p>
-              </div>
-            )}
-            {situacaoAtualLines.length > 0 && (
-              <div>
-                <SectionLabel>Situação atual</SectionLabel>
-                <div className="mt-1.5 space-y-2">
-                  {situacaoAtualLines.map((line) => (
-                    <div key={line.label}>
-                      <p className="text-sm leading-relaxed text-foreground/90">
+          <div className="flex gap-10">
+            <div className="flex flex-1 flex-col gap-5">
+              {project.description && (
+                <div>
+                  <SectionLabel>O processo hoje</SectionLabel>
+                  <p className="mt-1.5 text-sm leading-relaxed text-foreground/90">
+                    {maskFreeText(project.description)}
+                  </p>
+                </div>
+              )}
+              {situacaoAtualLines.length > 0 && (
+                <div>
+                  <SectionLabel>Situação atual</SectionLabel>
+                  <div className="mt-1.5 space-y-2">
+                    {situacaoAtualLines.map((line) => (
+                      <div key={line.label}>
+                        <p className="text-sm leading-relaxed text-foreground/90">
+                          <span className="font-medium">{line.label}:</span> {line.value}
+                        </p>
+                        {line.detail && (
+                          <p className="mt-0.5 text-sm leading-relaxed text-muted-foreground">
+                            {line.detail}
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {construcaoLines.length > 0 && (
+                <div>
+                  <SectionLabel>Construção</SectionLabel>
+                  <div className="mt-1.5 space-y-0.5">
+                    {construcaoLines.map((line) => (
+                      <p key={line.label} className="text-sm leading-relaxed text-foreground/90">
                         <span className="font-medium">{line.label}:</span> {line.value}
                       </p>
-                      {line.detail && (
-                        <p className="mt-0.5 text-sm leading-relaxed text-muted-foreground">
-                          {line.detail}
-                        </p>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-            {construcaoLines.length > 0 && (
-              <div>
-                <SectionLabel>Construção</SectionLabel>
-                <div className="mt-1.5 space-y-0.5">
-                  {construcaoLines.map((line) => (
-                    <p key={line.label} className="text-sm leading-relaxed text-foreground/90">
-                      <span className="font-medium">{line.label}:</span> {line.value}
-                    </p>
-                  ))}
-                </div>
-              </div>
-            )}
-            {project.architectNotes && (
-              <div className="rounded-r-md border-l-4 border-teal-500 bg-slate-50 px-4 py-3">
-                <div className="mb-1.5 text-xs font-bold uppercase tracking-wide text-foreground">
-                  Principais ações da automação
-                </div>
-                <p className="text-sm leading-relaxed text-foreground/90">
-                  {maskFreeText(project.architectNotes)}
-                </p>
-              </div>
-            )}
-            {benefitLabels.length > 0 && (
-              <div>
-                <SectionLabel>Benefícios esperados</SectionLabel>
-                <p className="mt-1.5 text-sm leading-relaxed text-foreground/90">
-                  {benefitLabels.join(" · ")}
-                </p>
-              </div>
-            )}
-          </div>
-
-          <div className="flex flex-1 flex-col gap-5">
-            {(quantitativeLines.length > 0 || monthlyHoursSavedLabel) && (
-              <div>
-                <SectionLabel>Avaliação Quantitativa</SectionLabel>
-                <table className="mt-1.5 w-full border-collapse text-sm">
-                  <tbody>
-                    {quantitativeLines.map((line) => (
-                      <tr key={line.label} className="border-b border-slate-100 last:border-b-0">
-                        <td className="bg-teal-50 px-3 py-2 font-medium text-teal-700">
-                          {line.label}
-                        </td>
-                        <td
-                          className={
-                            line.isGap
-                              ? "px-3 py-2 italic text-muted-foreground"
-                              : "px-3 py-2 text-foreground/90"
-                          }
-                        >
-                          {line.value}
-                        </td>
-                      </tr>
                     ))}
-                    {monthlyHoursSavedLabel && (
-                      <tr>
-                        <td className="bg-teal-50 px-3 py-2 font-medium text-teal-700">
-                          Economia estimada
-                        </td>
-                        <td className="px-3 py-2 font-semibold text-emerald-600">
-                          {monthlyHoursSavedLabel}
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            )}
-            <div className="flex flex-1 flex-col">
-              <div className="mb-2 flex items-baseline justify-between">
-                <SectionLabel>Avaliação Qualitativa</SectionLabel>
-                <div className="text-lg font-extrabold text-teal-600">
-                  {ratingPercent}%{" "}
-                  <span className="text-sm font-semibold text-muted-foreground">
-                    ({ratingAverageLabel})
-                  </span>
+                  </div>
                 </div>
-              </div>
-              <div className="flex flex-1 items-center justify-center">
-                <RatingRadarChart project={project} />
+              )}
+              {project.architectNotes && (
+                <div className="rounded-r-md border-l-4 border-teal-500 bg-slate-50 px-4 py-3">
+                  <div className="mb-1.5 text-xs font-bold uppercase tracking-wide text-foreground">
+                    Principais ações da automação
+                  </div>
+                  <p className="text-sm leading-relaxed text-foreground/90">
+                    {maskFreeText(project.architectNotes)}
+                  </p>
+                </div>
+              )}
+              {benefitLabels.length > 0 && (
+                <div>
+                  <SectionLabel>Benefícios esperados</SectionLabel>
+                  <p className="mt-1.5 text-sm leading-relaxed text-foreground/90">
+                    {benefitLabels.join(" · ")}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <div className="flex flex-1 flex-col gap-5">
+              {(quantitativeLines.length > 0 || monthlyHoursSavedLabel) && (
+                <div>
+                  <SectionLabel>Avaliação Quantitativa</SectionLabel>
+                  <table className="mt-1.5 w-full border-collapse text-sm">
+                    <tbody>
+                      {quantitativeLines.map((line) => (
+                        <tr key={line.label} className="border-b border-slate-100 last:border-b-0">
+                          <td className="bg-teal-50 px-3 py-2 font-medium text-teal-700">
+                            {line.label}
+                          </td>
+                          <td
+                            className={
+                              line.isGap
+                                ? "px-3 py-2 italic text-muted-foreground"
+                                : "px-3 py-2 text-foreground/90"
+                            }
+                          >
+                            {line.value}
+                          </td>
+                        </tr>
+                      ))}
+                      {monthlyHoursSavedLabel && (
+                        <tr>
+                          <td className="bg-teal-50 px-3 py-2 font-medium text-teal-700">
+                            Economia estimada
+                          </td>
+                          <td className="px-3 py-2 font-semibold text-emerald-600">
+                            {monthlyHoursSavedLabel}
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              <div className="flex flex-1 flex-col">
+                <div className="mb-2 flex items-baseline justify-between">
+                  <SectionLabel>Avaliação Qualitativa</SectionLabel>
+                  <div className="text-lg font-extrabold text-teal-600">
+                    {ratingPercent}%{" "}
+                    <span className="text-sm font-semibold text-muted-foreground">
+                      ({ratingAverageLabel})
+                    </span>
+                  </div>
+                </div>
+                <div className="flex flex-1 items-center justify-center">
+                  <RatingRadarChart project={project} />
+                </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
-    </SlidePage>
+      </SlidePage>
+      {isExistingAutomation(project) && <EnvironmentSheetPage project={project} />}
+    </div>
   );
 }
