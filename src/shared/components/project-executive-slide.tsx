@@ -2,7 +2,7 @@
 
 import { type ReactNode } from "react";
 import Image from "next/image";
-import type { Project } from "@/shared/types";
+import type { Project, RobotOperationalStatus } from "@/shared/types";
 import {
   HAS_EXISTING_SYSTEM_OPTIONS,
   HAS_CURRENT_APPLICATION_OPTIONS,
@@ -88,8 +88,12 @@ export function ProjectExecutiveSlide({ project }: { project: Project }) {
   const NOT_QUANTIFIED_LABEL = "N/A";
 
   // Rótulos vindos do enum RobotOperationalStatus — mesma tradução que
-  // build-existing-automations-deck.ts usa no deck.
-  const OPERATIONAL_STATUS_LABEL: Record<string, string> = {
+  // build-existing-automations-deck.ts usa no deck. Diferente de `status`,
+  // este campo NÃO passa por toFrontendStatus: chega com o caixa alta cru do
+  // Prisma. Tipado pela união (e não Record<string, string>) para que um
+  // quarto membro do enum vire erro de compilação em vez de um "undefined"
+  // silencioso na tabela.
+  const OPERATIONAL_STATUS_LABEL: Record<RobotOperationalStatus, string> = {
     ACTIVE: "Ativo",
     PAUSED: "Pausado",
     ISSUE: "Com problema",
