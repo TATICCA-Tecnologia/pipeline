@@ -147,11 +147,14 @@ function liveSinceLabel(p: ExistingAutomationProject): string {
 
 // Um projeto sem nenhum campo de ficha preenchido não entra no slide de
 // inventário — uma tabela só de traços não informa nada.
-// Checa seis campos, não sete: `currentApplicationAccessReference` é de
-// propósito o único que nunca sai no deck (é texto livre apontando onde as
-// credenciais moram), então não faz sentido usá-lo como critério de entrada
-// numa tabela que não vai exibi-lo. É por isso que este predicado difere do
-// homônimo em project-detail-sections.tsx, que inclui o sétimo campo.
+// Checa seis campos, não sete: `currentApplicationAccessReference` não é
+// exibido NESTA tabela, então não faz sentido usá-lo como critério de entrada
+// nela. É por isso que este predicado difere do homônimo em
+// project-detail-sections.tsx, que inclui o sétimo campo.
+// (O campo em si já sai no deck desde a spec de 2026-08-14 — aparece na ficha
+// de ambiente, no bloco de acessos. O que valia antes, e não vale mais, era a
+// justificativa de que ele nunca saía em lugar nenhum; ver hasFichaTecnicaData
+// logo abaixo, que passou a incluí-lo.)
 function hasSustentacaoData(p: ExistingAutomationProject): boolean {
   return Boolean(
     p.currentApplicationHosting ||
@@ -523,7 +526,8 @@ const FICHA_FLOW_H = 1.0;
 const FICHA_BOTTOM_Y = 6.85;
 
 // Corpo das tabelas por tier de densidade. Nenhum item é descartado: quando o
-// volume cresce, a fonte desce e a lista quebra em duas colunas
+// volume cresce, a fonte desce e a lista quebra em sub-colunas — duas, ou três
+// no tier compacto
 // (splitIntoColumns) — ver "Como tudo cabe" na spec.
 const FICHA_TIER_FONT: Record<DensityTier, number> = {
   comfortable: 9,
@@ -677,9 +681,14 @@ function addTextBlock(
 }
 
 /**
- * Desenha uma lista como uma ou duas tabelas lado a lado e devolve o Y abaixo.
- * A quebra em duas colunas (splitIntoColumns) é o que permite listar TUDO sem
- * descartar item nem estourar o rodapé.
+ * Desenha uma lista como até três tabelas lado a lado e devolve o Y abaixo.
+ * A quebra em sub-colunas (splitIntoColumns — duas, ou três no tier compacto)
+ * é o que permite listar TUDO sem descartar item nem estourar o rodapé.
+ *
+ * Não tem teto inferior: até cerca de 30 sistemas + 18 contas o bloco fecha
+ * dentro da régua de rodapé; acima disso ele vaza (o arquivo continua válido,
+ * porque o piso de altura vive em addTextBlock). Ver "Limite conhecido" na spec
+ * de 2026-08-14.
  */
 function addListBlock<T>(
   slide: Slide,

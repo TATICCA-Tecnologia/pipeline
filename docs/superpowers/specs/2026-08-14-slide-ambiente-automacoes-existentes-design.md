@@ -171,6 +171,37 @@ níveis 1 e 2 são a solução completa, e o `fichaTruncate` por célula continu
 ele garante uma linha por célula, que é o que impede um `accessPoint` longo de empurrar
 o bloco de baixo. O que sai é o descarte de linhas inteiras com aviso "+N adicionais".
 
+### O que a implementação acrescentou
+
+Quatro ajustes que só apareceram ao **medir** o arquivo gerado — descompactando o `.pptx` e
+lendo as coordenadas do XML, em vez de confiar nas alturas estimadas. Todos no lado `.pptx`:
+
+1. **Terceira sub-coluna no tier compacto.** Duas colunas não bastavam: com 20 sistemas e
+   12 contas o cursor da coluna direita chegava a 6,60" e o bloco de sigilo recebia altura
+   **negativa**, que o pptxgenjs grava como `<a:ext cy="-64008"/>` — inválido pelo
+   `ST_PositiveCoordinate` do ECMA-376, ou seja, um arquivo que o PowerPoint pode recusar
+   abrir. `splitIntoColumns` ganhou o parâmetro `maxColumns`; o deck passa 3 no tier
+   compacto e o React fica em 2 (lá o auto-shrink ainda pega o resto, e a área é estreita).
+2. **O bloco de sigilo não tem coluna fixa** — vai para a que tiver o cursor mais raso.
+   Prendê-lo à direita era o que produzia a altura negativa.
+3. **Piso na altura do bloco de texto**, para que altura negativa seja estruturalmente
+   impossível independentemente do que o cursor faça.
+4. **Orçamento de truncamento por tier.** `FICHA_TABLE_CHARS_PER_INCH` era constante única
+   calibrada para 9-10pt e não acompanhava a queda para 7pt do tier compacto: 11 dos 20
+   sistemas saíam como `"Sistema 1…"`, indistinguíveis — informando tão pouco quanto o
+   "+N adicionais" que esta feature removeu. A divisão de largura da célula também passou
+   de 45/55 para 55/45: a segunda célula é URL, que trunca em qualquer largura; a primeira
+   é a identidade da linha, e num inventário duas linhas indistinguíveis são pior que uma
+   URL cortada.
+
+**Limite conhecido.** `addListBlock` não tem teto inferior. Até **30 sistemas + 18 contas**
+o layout fecha em 6,850", dentro da régua de rodapé (6,92"); o vazamento começa entre
+30+18 e 40+24 (medido: 40+24 → 7,02"; 60+36 → 8,10").
+O arquivo continua estruturalmente válido — o piso do item 3 garante isso — mas vaza
+visualmente. Uma automação com 60 sistemas não é forma real, então não gastamos uma quinta
+alavanca nisso. Se vier a ser preciso, o caminho é derivar um teto de linhas em
+`addListBlock` a partir de `FICHA_BOTTOM_Y - y`, forçando uma quarta coluna em vez de vazar.
+
 ## Origem dos dados na tela
 
 Nenhuma mudança de servidor é necessária do lado React: `project.byId` — a query que o
