@@ -61,17 +61,23 @@ const ROBOT_OPERATIONAL_STATUS_LABEL: Record<RobotOperationalStatus, string> = {
 
 // Formato cru devolvido pelo `select` de targetSystems/automationAccounts
 // abaixo — deliberadamente mais enxuto que TargetSystemRow/AutomationAccountRow
-// de project.router.ts (sem id/order/accessNotes: o slide não precisa de
-// chave React nem exibe "como acessar", só "onde é acessado").
+// de project.router.ts (sem id/order: o slide não precisa de chave React e a
+// ordem já vem aplicada pelo `orderBy` do próprio select).
 export type FichaTargetSystemRow = {
   customName: string | null;
   accessPoint: string | null;
+  // Entra na ficha a partir da spec de 2026-08-14: o público do deck de
+  // automações existentes é o TI de segurança, e "como chegar no acesso" é
+  // parte do que ele precisa auditar. Continua sendo ponteiro, nunca credencial.
+  accessNotes: string | null;
   targetSystem: { name: string; category: { name: string } | null } | null;
 };
 
 export type FichaAutomationAccountRow = {
   username: string;
   accountType: string | null;
+  ownerName: string | null;
+  notes: string | null;
   projectTargetSystem: {
     customName: string | null;
     targetSystem: { name: string } | null;
@@ -87,10 +93,15 @@ export type ExistingAutomationProject = {
   currentApplicationAuthor: string | null;
   currentApplicationOwner: string | null;
   currentApplicationAccessLocation: string | null;
+  currentApplicationAccessReference: string | null;
   currentApplicationLiveSince: Date | null;
   currentApplicationAssetId: string | null;
   currentApplicationOwnerRole: string | null;
+  robotSchedule: string | null;
   ownerArea: { name: string } | null;
+  // Join table ProjectPersonOfInterest — o `select` devolve o vínculo, não a
+  // pessoa direto.
+  peopleOfInterest: { person: { name: string; role: string | null } }[];
   currentApplicationDataInput: string | null;
   currentApplicationDataInputDetails: string | null;
   currentApplicationDataOutput: string | null;
@@ -144,12 +155,13 @@ function hasSustentacaoData(p: ExistingAutomationProject): boolean {
   );
 }
 
-// Guard do slide de ficha técnica (Passo 13). Checa só os campos NOVOS desta
-// task + as duas listas — de propósito NÃO repete os campos de
-// hasSustentacaoData (hosting/author/owner/accessLocation/liveSince): esses já
-// aparecem no slide de processo (extraLines) e no inventário, então um projeto
-// que só tem ESSES preenchidos não ganha ficha técnica própria, que seria
-// majoritariamente "Não informado".
+// Guard do slide de ficha de ambiente. Checa os campos que SÓ aparecem nesta
+// página — de propósito NÃO repete hosting/author/owner/accessLocation/
+// liveSince, que já aparecem no slide de processo, para que um projeto com
+// apenas esses não ganhe uma ficha quase inteira de blocos omitidos.
+// `currentApplicationAccessReference` entra na lista desde a spec de
+// 2026-08-14, que passou a exibi-lo — antes ele era o único campo que nunca
+// saía no deck, e por isso não servia como critério de entrada.
 // Exportada (junto com `addFichaTecnicaSlide` mais abaixo) para
 // scripts/preview-ficha-tecnica-slide.ts poder gerar o slide com dados fixos
 // sem duplicar esta regra.
@@ -158,6 +170,8 @@ export function hasFichaTecnicaData(p: ExistingAutomationProject): boolean {
     p.currentApplicationAssetId ||
       p.currentApplicationOwnerRole ||
       p.ownerArea?.name ||
+      p.currentApplicationAccessReference ||
+      p.robotSchedule ||
       p.currentApplicationDataInput ||
       p.currentApplicationDataInputDetails ||
       p.currentApplicationDataOutput ||
@@ -170,7 +184,8 @@ export function hasFichaTecnicaData(p: ExistingAutomationProject): boolean {
       (Array.isArray(p.sensitiveDataCategories) && p.sensitiveDataCategories.length > 0) ||
       p.sensitiveDataDetails ||
       p.targetSystems.length > 0 ||
-      p.automationAccounts.length > 0
+      p.automationAccounts.length > 0 ||
+      p.peopleOfInterest.length > 0
   );
 }
 
@@ -210,6 +225,10 @@ export async function buildExistingAutomationsDeck(
       db.project.findMany({
         where: {
           companyId,
+          // Mesma população que `isExistingAutomation` em
+          // src/shared/lib/opportunity-classification.ts decide no cliente — as
+          // duas precisam mudar juntas. Aqui o status é o enum cru do Prisma
+          // ("DONE"); lá é o já mapeado por toFrontendStatus ("completed").
           OR: [{ hasCurrentApplication: "sim" }, { status: "DONE" }],
         },
         orderBy: [{ createdAt: "asc" }, { id: "asc" }],
@@ -239,11 +258,13 @@ export async function buildExistingAutomationsDeck(
           currentApplicationAuthor: true,
           currentApplicationOwner: true,
           currentApplicationAccessLocation: true,
+          currentApplicationAccessReference: true,
           currentApplicationLiveSince: true,
           // Campos novos da ficha técnica (Passo 13).
           currentApplicationAssetId: true,
           currentApplicationOwnerRole: true,
           ownerArea: { select: { name: true } },
+          peopleOfInterest: { select: { person: { select: { name: true, role: true } } } },
           currentApplicationDataInput: true,
           currentApplicationDataInputDetails: true,
           currentApplicationDataOutput: true,
@@ -261,6 +282,7 @@ export async function buildExistingAutomationsDeck(
             select: {
               customName: true,
               accessPoint: true,
+              accessNotes: true,
               targetSystem: { select: { name: true, category: { select: { name: true } } } },
             },
           },
@@ -269,6 +291,8 @@ export async function buildExistingAutomationsDeck(
             select: {
               username: true,
               accountType: true,
+              ownerName: true,
+              notes: true,
               projectTargetSystem: {
                 select: { customName: true, targetSystem: { select: { name: true } } },
               },
