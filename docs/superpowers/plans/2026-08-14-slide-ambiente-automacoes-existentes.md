@@ -1451,7 +1451,17 @@ por:
   }
 ```
 
-- [ ] **Step 2: Verificar**
+- [ ] **Step 2: Corrigir a referência obsoleta no comentário do `@page`**
+
+O comentário do bloco `@page`, logo acima, diz "ver SLIDE_WIDTH/SLIDE_HEIGHT em
+project-executive-slide.tsx". A Task 4 moveu essas constantes. Trocar essa parte por
+"ver SLIDE_WIDTH/SLIDE_HEIGHT em src/shared/components/slide/slide-page.tsx", que é
+também onde vive a marcação que `.executive-slide-print-root` seleciona.
+
+(Este arquivo já tinha uma alteração não commitada anterior a esta feature — o
+`size: 11in 6.1875in` do `@page`. Ela é legítima e deve ser commitada junto.)
+
+- [ ] **Step 3: Verificar**
 
 Run: `pnpm dev`, abrir o slide de uma automação existente com ficha preenchida, clicar em "Imprimir / Exportar PDF".
 Expected: pré-visualização com 2 páginas, cada uma 16:9 inteira, sem corte e sem folha em branco entre elas.
@@ -1459,7 +1469,7 @@ Expected: pré-visualização com 2 páginas, cada uma 16:9 inteira, sem corte e
 Abrir o slide de um projeto de oportunidade e imprimir.
 Expected: 1 página, idêntica ao comportamento anterior.
 
-- [ ] **Step 3: Commit**
+- [ ] **Step 4: Commit**
 
 ```bash
 git add src/app/globals.css
@@ -2093,8 +2103,10 @@ Expected: sem nenhum erro.
 Run: `pnpm verify:ambiente`
 Expected: todas as linhas `OK:`.
 
-Run: `pnpm lint`
-Expected: sem erros novos.
+Não rodar `pnpm lint`: o script existe no `package.json` mas o ESLint não está instalado e
+não há `eslint.config.*` nem `.eslintrc*` no repositório — ele falha em qualquer branch,
+inclusive na `main`. Descoberto durante a Task 4. Consertar isso é trabalho separado, fora
+do escopo desta feature.
 
 Run: `pnpm build`
 Expected: build completo.
