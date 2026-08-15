@@ -5,6 +5,8 @@ import {
   splitIntoColumns,
   type EnvironmentSheetSource,
 } from "../src/shared/lib/existing-automation";
+import { projectToEnvironmentSource } from "../src/shared/components/slide/project-to-environment-source";
+import type { Project } from "../src/shared/types";
 
 /**
  * Verificação da lógica pura da Ficha de ambiente. Não toca no banco e não
@@ -238,6 +240,51 @@ function checkColumnSplit(): void {
   console.log("OK: reflow de colunas");
 }
 
+function checkMasking(): void {
+  const project = {
+    id: "p1",
+    currentApplicationAssetId: "SRV-RPA-02",
+    currentApplicationOwner: "Ana Souza",
+    currentApplicationAccessReference: "KeePass \\ TI \\ RPA",
+    targetSystems: [
+      {
+        id: "s1",
+        targetSystemId: null,
+        name: "SAP",
+        categoryName: "ERP",
+        accessPoint: "https://sap.empresa.com.br",
+        accessNotes: "Chamado para o time de Basis",
+        order: 0,
+      },
+    ],
+    automationAccounts: [
+      {
+        id: "a1",
+        username: "svc_rpa_fin",
+        projectTargetSystemId: "s1",
+        systemName: "SAP",
+        accountType: "servico",
+        ownerName: "TI",
+        notes: null,
+        order: 0,
+      },
+    ],
+  } as unknown as Project;
+
+  const masked = projectToEnvironmentSource(project, () => "•••");
+  assertEqual(masked.assetId, "•••", "hostname é mascarado");
+  assertEqual(masked.owner, "•••", "nome do responsável é mascarado");
+  assertEqual(masked.accessReference, "•••", "referência de acesso é mascarada");
+  assertEqual(masked.systems[0].accessPoint, "•••", "ponto de acesso do sistema é mascarado");
+  assertEqual(masked.systems[0].accessNotes, "•••", "como acessar é mascarado");
+  assertEqual(masked.accounts[0].username, "•••", "login é mascarado");
+
+  const plain = projectToEnvironmentSource(project, (v) => v ?? null);
+  assertEqual(plain.assetId, "SRV-RPA-02", "sem máscara o hostname passa inteiro");
+  assertEqual(plain.accounts[0].type, "servico", "slug do tipo de conta chega cru ao builder");
+  console.log("OK: adaptador aplica a máscara nos campos sensíveis");
+}
+
 function main(): void {
   checkPredicate();
   checkEmptyIsNull();
@@ -246,6 +293,7 @@ function main(): void {
   checkCollections();
   checkDensity();
   checkColumnSplit();
+  checkMasking();
   console.log("\nTodas as verificações da Ficha de ambiente passaram.");
 }
 
