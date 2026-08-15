@@ -555,22 +555,35 @@ function fichaTableBorder(): [
   ];
 }
 
-// Chars por polegada de coluna, no corpo de tabela (9-10pt Segoe UI) — mesma
-// ordem de grandeza conservadora que `CHARS_PER_LINE_AT_10PT` usa em
-// build-diagnostic-deck.ts (34 chars numa coluna de 3.2", ≈10,6/pol).
-// Por que isto existe: pptxgenjs grava toda linha de tabela como `<a:tr h="0">`
-// — a altura real é recalculada pelo PowerPoint ao abrir o arquivo, a partir
-// do texto de cada célula, e NÃO do valor fixo que este módulo reserva pro
-// bloco. Um `accessPoint`/detalhe de texto livre longo o bastante pra quebrar
-// linha faz a linha crescer além do espaço reservado e sobrepor o bloco
-// abaixo, sem erro nenhum. Truncar aqui garante 1 linha por célula, então a
-// altura da tabela nunca passa do estimado — é o que sustenta o cursor Y desta
-// ficha (reticência = truncou). Note que isto corta DENTRO da célula: nenhuma
-// linha inteira é descartada, ao contrário da versão anterior desta ficha.
-const FICHA_TABLE_CHARS_PER_INCH = 10;
+// Por que truncar existe: pptxgenjs grava toda linha de tabela como
+// `<a:tr h="0">` — a altura real é recalculada pelo PowerPoint ao abrir o
+// arquivo, a partir do texto de cada célula, e NÃO do valor fixo que este
+// módulo reserva pro bloco. Um `accessPoint`/detalhe de texto livre longo o
+// bastante pra quebrar linha faz a linha crescer além do espaço reservado e
+// sobrepor o bloco abaixo, sem erro nenhum. Truncar aqui garante 1 linha por
+// célula, então a altura da tabela nunca passa do estimado — é o que sustenta
+// o cursor Y desta ficha (reticência = truncou). Note que isto corta DENTRO da
+// célula: nenhuma linha inteira é descartada, ao contrário da versão anterior
+// desta ficha.
+//
+// Chars por polegada de coluna, por tier. A constante única anterior estava
+// calibrada para o corpo de 9-10pt e não acompanhava FICHA_TIER_FONT: no tier
+// compacto o texto cai para 7pt, onde cabe quase o dobro de caracteres por
+// polegada, mas o orçamento continuava em 10 — o suficiente para 11 de 20
+// sistemas saírem como "Sistema 1…", indistinguíveis entre si.
+//
+// Os valores são deliberadamente conservadores (abaixo do que a fonte
+// comporta). Errar para menos só encurta o texto; errar para mais faz a célula
+// quebrar em duas linhas, e aí a altura real da linha passa do que o módulo
+// reservou e o bloco de baixo é sobreposto — sem erro nenhum.
+const FICHA_TIER_CHARS_PER_INCH: Record<DensityTier, number> = {
+  comfortable: 10,
+  dense: 11,
+  compact: 12,
+};
 
-function fichaTruncate(text: string, colWidthIn: number): string {
-  const maxChars = Math.max(8, Math.floor(colWidthIn * FICHA_TABLE_CHARS_PER_INCH));
+function fichaTruncate(text: string, colWidthIn: number, tier: DensityTier): string {
+  const maxChars = Math.max(8, Math.floor(colWidthIn * FICHA_TIER_CHARS_PER_INCH[tier]));
   if (text.length <= maxChars) return text;
   return `${text.slice(0, maxChars - 1).trimEnd()}…`;
 }
@@ -686,12 +699,16 @@ function addListBlock<T>(
 
   columns.forEach((column, index) => {
     const colX = x + index * (columnW + 0.15);
-    const colW: [number, number] = [columnW * 0.45, columnW * 0.55];
+    // 55/45 e não 45/55: a segunda célula é URL/observação, que vai truncar em
+    // qualquer largura, enquanto a primeira é o que identifica a linha — num
+    // deck de inventário, dois sistemas indistinguíveis são pior que uma URL
+    // cortada.
+    const colW: [number, number] = [columnW * 0.55, columnW * 0.45];
     const rows: TableRow[] = column.map((item) => {
       const [first, second] = rowsOf(item);
       return [
-        { text: fichaTruncate(first, colW[0]) },
-        { text: fichaTruncate(second, colW[1]) },
+        { text: fichaTruncate(first, colW[0], tier) },
+        { text: fichaTruncate(second, colW[1], tier) },
       ];
     });
     slide.addTable(rows, {
