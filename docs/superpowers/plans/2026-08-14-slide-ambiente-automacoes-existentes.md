@@ -16,7 +16,7 @@
 
 | Arquivo | Responsabilidade | Task |
 |---|---|---|
-| `src/shared/lib/existing-automation.ts` | **Criar.** Predicado, tipo `EnvironmentSheetSource`, `buildEnvironmentSheet`, `densityTierFor`, `splitIntoColumns`. Sem JSX, sem Prisma, sem React. | 1–3 |
+| `src/shared/lib/existing-automation.ts` | **Criar.** Tipo `EnvironmentSheetSource`, `buildEnvironmentSheet`, `densityTierFor`, `splitIntoColumns`. Sem JSX, sem Prisma, sem React. O predicado **não** mora aqui: já existe em `src/shared/lib/opportunity-classification.ts` e é reusado. | 2–3 |
 | `scripts/verify-environment-sheet.ts` | **Criar.** Verificação da lógica pura acima. Sem banco. | 1–3 |
 | `src/shared/components/slide/slide-page.tsx` | **Criar.** Primitiva da página 16:9 (tarjas, `useFitToSlide` com piso parametrizável). Extraída do componente atual. | 4 |
 | `src/shared/components/slide/rating-radar-chart.tsx` | **Criar.** Radar, hoje inline no componente atual. | 4 |
@@ -30,10 +30,18 @@
 
 ---
 
-### Task 1: Predicado de automação existente
+### Task 1: Travar a semântica do predicado existente
+
+> **Correção aplicada durante a execução.** A primeira versão desta task mandava criar
+> `isExistingAutomation` em `existing-automation.ts` comparando com `"DONE"`. Isso estava
+> errado duas vezes: a função **já existe** em
+> `src/shared/lib/opportunity-classification.ts:7`, e o valor de status que chega ao
+> componente é `"completed"` (mapeado por `toFrontendStatus`), nunca `"DONE"`. As duas
+> comparam `string` contra `string`, então o TypeScript não pegaria o erro — uma automação
+> entregue sem `hasCurrentApplication = "sim"` deixaria de ganhar a página técnica, em
+> silêncio. Esta task passa a apenas travar a semântica da função que existe.
 
 **Files:**
-- Create: `src/shared/lib/existing-automation.ts`
 - Create: `scripts/verify-environment-sheet.ts`
 - Modify: `package.json` (bloco `scripts`)
 
@@ -50,12 +58,11 @@ Em `package.json`, dentro de `"scripts"`, logo abaixo da linha `"verify:inventor
 Criar `scripts/verify-environment-sheet.ts`:
 
 ```ts
-import { isExistingAutomation } from "../src/shared/lib/existing-automation";
+import { isExistingAutomation } from "../src/shared/lib/opportunity-classification";
 
 /**
- * Verificação da lógica pura da Ficha de ambiente
- * (src/shared/lib/existing-automation.ts). Não toca no banco e não importa
- * nada de React nem de pptxgenjs — roda em milissegundos com:
+ * Verificação da lógica pura da Ficha de ambiente. Não toca no banco e não
+ * importa nada de React nem de pptxgenjs — roda em milissegundos com:
  *   pnpm verify:ambiente
  *
  * Existe porque o repositório não tem test runner: o idioma estabelecido para
@@ -69,26 +76,36 @@ function assertEqual<T>(actual: T, expected: T, label: string): void {
   if (a !== e) throw new Error(`${label}: esperado ${e}, recebido ${a}`);
 }
 
+/**
+ * A Ficha de ambiente reusa o predicado que já classifica oportunidade vs.
+ * automação existente no badge do Kanban e no filtro da tela de Projetos. O que
+ * esta verificação trava é o valor de status: `"completed"`, o que
+ * `toFrontendStatus` (src/server/trpc/mappers.ts) entrega ao cliente — NUNCA
+ * `"DONE"`, que é o enum cru do Prisma e só vale dentro do `where` do deck.
+ * Trocar um pelo outro compila sem erro (os dois são `string`) e faz toda
+ * automação entregue sem `hasCurrentApplication = "sim"` perder a página
+ * técnica, em silêncio.
+ */
 function checkPredicate(): void {
   assertEqual(
-    isExistingAutomation({ hasCurrentApplication: "sim", status: "IN_PROGRESS" }),
+    isExistingAutomation({ hasCurrentApplication: "sim", status: "in-progress" }),
     true,
     "hasCurrentApplication=sim é automação existente"
   );
   assertEqual(
-    isExistingAutomation({ hasCurrentApplication: "nao", status: "DONE" }),
+    isExistingAutomation({ hasCurrentApplication: "nao", status: "completed" }),
     true,
-    "status=DONE é automação existente mesmo sem hasCurrentApplication"
+    "status=completed é automação existente mesmo sem hasCurrentApplication"
   );
   assertEqual(
-    isExistingAutomation({ hasCurrentApplication: "nao", status: "IN_PROGRESS" }),
+    isExistingAutomation({ hasCurrentApplication: "nao", status: "DONE" }),
+    false,
+    "DONE é o enum do Prisma e não chega ao cliente — não pode classificar sozinho"
+  );
+  assertEqual(
+    isExistingAutomation({ hasCurrentApplication: "nao", status: "in-progress" }),
     false,
     "oportunidade em andamento não é automação existente"
-  );
-  assertEqual(
-    isExistingAutomation({}),
-    false,
-    "projeto sem nenhum dos dois campos não é automação existente"
   );
   console.log("OK: predicado isExistingAutomation");
 }
@@ -106,52 +123,21 @@ try {
 }
 ```
 
-- [ ] **Step 3: Rodar para confirmar que falha**
-
-Run: `pnpm verify:ambiente`
-Expected: FALHA de resolução de módulo — `Cannot find module '../src/shared/lib/existing-automation'`.
-
-- [ ] **Step 4: Implementar o predicado**
-
-Criar `src/shared/lib/existing-automation.ts`:
-
-```ts
-/**
- * Regras da Ficha de ambiente — a página técnica do slide de automações que
- * já rodam em produção. Módulo puro de propósito: sem React, sem Prisma, sem
- * pptxgenjs. As duas superfícies que desenham a ficha (o componente React em
- * src/shared/components/slide/environment-sheet-page.tsx e o slide .pptx em
- * src/server/deck/build-existing-automations-deck.ts) mapeiam sua própria
- * fonte para `EnvironmentSheetSource` e consomem o mesmo resultado — é isso
- * que impede as duas de divergirem na regra de omissão.
- *
- * Ver docs/superpowers/specs/2026-08-14-slide-ambiente-automacoes-existentes-design.md
- */
-
-/**
- * Uma automação "existente" é a que já roda: ou o levantamento disse que há
- * aplicação hoje, ou o projeto foi entregue. Mesmo critério que o
- * `where` de buildExistingAutomationsDeck usa — daí morar aqui e não estar
- * duplicado nos dois lugares.
- */
-export function isExistingAutomation(project: {
-  hasCurrentApplication?: string | null;
-  status?: string | null;
-}): boolean {
-  return project.hasCurrentApplication === "sim" || project.status === "DONE";
-}
-```
-
-- [ ] **Step 5: Rodar para confirmar que passa**
+- [ ] **Step 3: Rodar e confirmar que passa**
 
 Run: `pnpm verify:ambiente`
 Expected: `OK: predicado isExistingAutomation` e `Todas as verificações da Ficha de ambiente passaram.`
 
-- [ ] **Step 6: Commit**
+Não há passo de "rodar para falhar" aqui: o predicado já existe e está correto. O que esta
+task acrescenta é a trava contra a regressão descrita no aviso acima. Para confirmar que a
+verificação tem dente, trocar temporariamente `"completed"` por `"DONE"` na segunda
+asserção, rodar e ver falhar, e desfazer.
+
+- [ ] **Step 4: Commit**
 
 ```bash
-git add package.json scripts/verify-environment-sheet.ts src/shared/lib/existing-automation.ts
-git commit -m "feat: predicado unico de automacao existente"
+git add package.json scripts/verify-environment-sheet.ts
+git commit -m "test: trava a semantica do predicado de automacao existente"
 ```
 
 ---
@@ -159,16 +145,16 @@ git commit -m "feat: predicado unico de automacao existente"
 ### Task 2: Montagem da ficha com omissão de vazios
 
 **Files:**
-- Modify: `src/shared/lib/existing-automation.ts`
+- Create: `src/shared/lib/existing-automation.ts`
 - Modify: `scripts/verify-environment-sheet.ts`
 
 - [ ] **Step 1: Escrever a verificação que falha**
 
-Em `scripts/verify-environment-sheet.ts`, trocar o `import` do topo por:
+Em `scripts/verify-environment-sheet.ts`, acrescentar um segundo `import` abaixo do que já
+existe (o de `opportunity-classification`, que continua como está):
 
 ```ts
 import {
-  isExistingAutomation,
   buildEnvironmentSheet,
   type EnvironmentSheetSource,
 } from "../src/shared/lib/existing-automation";
@@ -315,9 +301,25 @@ Expected: FALHA de tipo/execução — `buildEnvironmentSheet` não é exportado
 
 - [ ] **Step 3: Implementar `buildEnvironmentSheet`**
 
-Acrescentar em `src/shared/lib/existing-automation.ts`, depois de `isExistingAutomation`:
+Criar `src/shared/lib/existing-automation.ts` com o cabeçalho abaixo seguido de todo o
+conteúdo deste passo:
 
 ```ts
+/**
+ * Regras da Ficha de ambiente — a página técnica do slide de automações que
+ * já rodam em produção. Módulo puro de propósito: sem React, sem Prisma, sem
+ * pptxgenjs. As duas superfícies que desenham a ficha (o componente React em
+ * src/shared/components/slide/environment-sheet-page.tsx e o slide .pptx em
+ * src/server/deck/build-existing-automations-deck.ts) mapeiam sua própria
+ * fonte para `EnvironmentSheetSource` e consomem o mesmo resultado — é isso
+ * que impede as duas de divergirem na regra de omissão.
+ *
+ * Quem decide SE a ficha existe é `isExistingAutomation`, em
+ * src/shared/lib/opportunity-classification.ts — este módulo só monta o
+ * conteúdo dela.
+ *
+ * Ver docs/superpowers/specs/2026-08-14-slide-ambiente-automacoes-existentes-design.md
+ */
 import {
   CURRENT_APPLICATION_ACCESS_LOCATION_OPTIONS,
   CURRENT_APPLICATION_CONTINGENCY_OPTIONS,
@@ -568,13 +570,15 @@ No `import` do topo de `scripts/verify-environment-sheet.ts`, acrescentar `densi
 
 ```ts
 import {
-  isExistingAutomation,
   buildEnvironmentSheet,
   densityTierFor,
   splitIntoColumns,
   type EnvironmentSheetSource,
 } from "../src/shared/lib/existing-automation";
 ```
+
+(o `import` de `isExistingAutomation`, que vem de `opportunity-classification`, fica
+inalterado no topo do arquivo)
 
 Acrescentar antes de `function main()`:
 
@@ -1313,9 +1317,13 @@ Importar `formatCurrency` de `@/shared/utils`.
 Importar no topo:
 
 ```tsx
-import { isExistingAutomation } from "@/shared/lib/existing-automation";
+import { isExistingAutomation } from "@/shared/lib/opportunity-classification";
 import { EnvironmentSheetPage } from "./slide/environment-sheet-page";
 ```
+
+O predicado vem de `opportunity-classification`, e **não** de `existing-automation`: ele já
+existe lá e compara com `"completed"` — o status que `toFrontendStatus` entrega ao
+componente. Ver o aviso no topo da Task 1.
 
 Envolver o `return` do componente: a `<SlidePage>` da Task 4 vira o primeiro filho de um fragmento com as duas páginas empilhadas.
 

@@ -44,10 +44,21 @@ interesse.
 
 ## Critério de "automação existente"
 
-`hasCurrentApplication === "sim" || status === "DONE"` — o mesmo predicado que
-`buildExistingAutomationsDeck` já usa no `where` do `findMany`. Passa a existir como
-função única em `src/shared/lib/existing-automation.ts`, importada pelo componente React
-e pelo builder do deck, em vez de repetida nos dois lugares.
+O predicado já existe: `isExistingAutomation` em
+`src/shared/lib/opportunity-classification.ts`, hoje usado pelo badge do card do Kanban e
+pelo filtro da tela de Projetos. A página técnica reusa essa função — não cria uma segunda.
+
+Atenção ao valor de status, que é a armadilha aqui: o predicado compara com
+`"completed"`, e **não** com `"DONE"`. `DONE` é o valor cru do enum do Prisma; tudo que sai
+do router passa por `toFrontendStatus` (`src/server/trpc/mappers.ts:51`) e chega ao
+componente já como `"completed"`. Um predicado que comparasse com `"DONE"` compilaria sem
+erro — as duas são `string` — e classificaria errado toda automação entregue que não tenha
+`hasCurrentApplication = "sim"`, em silêncio.
+
+No deck `.pptx` o critério continua sendo a cláusula `where` declarativa do `findMany`
+(`OR: [{ hasCurrentApplication: "sim" }, { status: "DONE" }]`), que roda contra o enum do
+Prisma e por isso usa `"DONE"` corretamente. As duas expressões precisam mudar juntas; um
+comentário no `where` amarra uma à outra.
 
 Projeto que não satisfaz o predicado renderiza exatamente o slide de hoje, sem nenhuma
 alteração de comportamento.
