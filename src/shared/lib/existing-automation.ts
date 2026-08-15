@@ -34,10 +34,26 @@ export type EnvironmentSystem = {
   accessNotes: string | null;
 };
 
-/** Conta já normalizada. `type` é slug de AUTOMATION_ACCOUNT_TYPE_OPTIONS. */
+/**
+ * Conta como ela CHEGA — `type` é slug de AUTOMATION_ACCOUNT_TYPE_OPTIONS.
+ * A saída é `SheetAccount`, com o label já resolvido: os dois formatos têm
+ * nomes de tipo e de campo diferentes de propósito. Reusar o mesmo tipo nos
+ * dois lados deixaria `type` significando slug na entrada e label na saída, e
+ * quem resolvesse de novo no consumidor não veria erro nenhum —
+ * `resolveLabel` devolve o próprio valor quando não acha a opção.
+ */
 export type EnvironmentAccount = {
   username: string;
   type: string | null;
+  system: string | null;
+  owner: string | null;
+  notes: string | null;
+};
+
+/** Conta pronta para desenhar: `typeLabel` já é texto de exibição. */
+export type SheetAccount = {
+  username: string;
+  typeLabel: string | null;
   system: string | null;
   owner: string | null;
   notes: string | null;
@@ -87,7 +103,7 @@ export type EnvironmentSheet = {
   peopleOfInterest: EnvironmentPerson[];
   access: SheetLine[];
   systems: EnvironmentSystem[];
-  accounts: EnvironmentAccount[];
+  accounts: SheetAccount[];
   sensitive: SheetLine[];
   /** systems + accounts + peopleOfInterest — entrada do tier de densidade. */
   itemCount: number;
@@ -188,11 +204,11 @@ export function buildEnvironmentSheet(source: EnvironmentSheetSource): Environme
 
   // Conta com username vazio é dado inconsistente (o formulário não permite) —
   // descartada aqui em vez de renderizar uma linha em branco.
-  const accounts = source.accounts
+  const accounts: SheetAccount[] = source.accounts
     .filter((a) => clean(a.username) !== null)
     .map((a) => ({
       username: a.username.trim(),
-      type: resolveAccountTypeLabel(a.type) ?? null,
+      typeLabel: resolveAccountTypeLabel(a.type) ?? null,
       system: clean(a.system),
       owner: clean(a.owner),
       notes: clean(a.notes),

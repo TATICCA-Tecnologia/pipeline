@@ -172,11 +172,48 @@ function checkLabelsAndFlow(): void {
   console.log("OK: labels de taxonomia e faixa de fluxo");
 }
 
+/**
+ * As três coleções são o único caminho até `itemCount`, que decide o tier de
+ * densidade (Task 3) e é uma das condições de `isEmpty`. Sem esta verificação,
+ * uma regressão em qualquer um dos dois passaria batida.
+ */
+function checkCollections(): void {
+  const sheet = buildEnvironmentSheet({
+    ...emptySource(),
+    systems: [
+      { name: "SAP", category: "ERP", accessPoint: "https://sap.exemplo", accessNotes: null },
+      // Nome vazio é dado inconsistente — tem que ser descartado, não desenhado.
+      { name: "   ", category: null, accessPoint: null, accessNotes: null },
+    ],
+    accounts: [
+      { username: "svc_rpa", type: "servico", system: "SAP", owner: "TI", notes: null },
+      { username: "", type: "email", system: null, owner: null, notes: null },
+    ],
+    peopleOfInterest: [
+      { name: "Carla Menezes", role: "Gerente" },
+      { name: "", role: "Sem nome" },
+    ],
+  });
+  if (!sheet) throw new Error("coleções: ficha com sistemas/contas/pessoas não pode ser null");
+
+  assertEqual(sheet.systems.length, 1, "sistema sem nome é descartado");
+  assertEqual(sheet.accounts.length, 1, "conta sem login é descartada");
+  assertEqual(sheet.peopleOfInterest.length, 1, "pessoa sem nome é descartada");
+  assertEqual(sheet.itemCount, 3, "itemCount soma sistemas + contas + pessoas válidos");
+  assertEqual(
+    sheet.accounts[0].typeLabel,
+    "Usuário de serviço",
+    "a saída carrega o label resolvido, nunca o slug"
+  );
+  console.log("OK: coleções alimentam itemCount e descartam entradas inconsistentes");
+}
+
 function main(): void {
   checkPredicate();
   checkEmptyIsNull();
   checkOmission();
   checkLabelsAndFlow();
+  checkCollections();
   console.log("\nTodas as verificações da Ficha de ambiente passaram.");
 }
 
