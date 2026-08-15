@@ -266,16 +266,33 @@ export function densityTierFor(itemCount: number): DensityTier {
   return "compact";
 }
 
-/** Acima deste número de itens a lista passa a ocupar duas sub-colunas. */
+/** Acima deste número de itens a lista passa a ocupar mais de uma sub-coluna. */
 export const COLUMN_SPLIT_THRESHOLD = 6;
 
 /**
  * Devolve sempre pelo menos uma coluna (mesmo vazia), para quem desenha poder
- * iterar sem checar tamanho. A primeira coluna fica com a sobra em lista
- * ímpar — ler de cima para baixo, esquerda para direita, exige isso.
+ * iterar sem checar tamanho. A sobra fica nas primeiras colunas — ler de cima
+ * para baixo, esquerda para direita, exige isso.
+ *
+ * `maxColumns` existe porque as duas superfícies têm redes diferentes: no React
+ * o auto-shrink da página ainda pega o que sobrar, então duas colunas bastam; no
+ * .pptx não existe shrink nenhum, e no tier compacto (25+ itens) a terceira
+ * coluna é o que evita a lista empurrar o bloco seguinte para cima do rodapé.
  */
-export function splitIntoColumns<T>(items: T[], threshold = COLUMN_SPLIT_THRESHOLD): T[][] {
-  if (items.length <= threshold) return [items];
-  const half = Math.ceil(items.length / 2);
-  return [items.slice(0, half), items.slice(half)];
+export function splitIntoColumns<T>(
+  items: T[],
+  threshold = COLUMN_SPLIT_THRESHOLD,
+  maxColumns = 2
+): T[][] {
+  const columnCount = Math.max(1, Math.min(maxColumns, Math.ceil(items.length / threshold)));
+  if (columnCount === 1) return [items];
+
+  const columns: T[][] = [];
+  let start = 0;
+  for (let i = 0; i < columnCount; i += 1) {
+    const size = Math.ceil((items.length - start) / (columnCount - i));
+    columns.push(items.slice(start, start + size));
+    start += size;
+  }
+  return columns;
 }

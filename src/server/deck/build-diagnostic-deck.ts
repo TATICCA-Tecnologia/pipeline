@@ -1155,10 +1155,12 @@ const SLIDE_CONTENT_BOTTOM_Y = 7.3; // LAYOUT_WIDE tem 7.5" de altura; margem de
 // coluna direita usa — por isso o teto aqui é a borda física do slide (7.5")
 // menos uma folga mínima de segurança.
 const LEFT_COLUMN_HARD_BOTTOM_Y = 7.4;
-// Corte da lista de "Sistemas envolvidos" (Task 14) — mesmo espírito de
-// FICHA_MAX_SYSTEMS_SHOWN em build-existing-automations-deck.ts: a caixa é
-// uma linha de texto de altura fixa, então o número de sistemas do projeto
-// não pode ser o que determina se ela cabe no slide.
+// Corte da lista de "Sistemas envolvidos" (Task 14): a caixa é uma linha de
+// texto de altura fixa, então o número de sistemas do projeto não pode ser o
+// que determina se ela cabe no slide. A ficha de ambiente em
+// build-existing-automations-deck.ts resolve o mesmo problema pelo caminho
+// oposto (nada é descartado; a lista quebra em sub-colunas e a fonte desce),
+// porque lá o bloco pode crescer e aqui não.
 const PROCESS_SLIDE_MAX_SYSTEMS_SHOWN = 5;
 
 function estimateWrappedLines(text: string, charsPerLine: number): number {

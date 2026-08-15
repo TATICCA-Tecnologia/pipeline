@@ -261,6 +261,36 @@ function checkColumnSplit(): void {
     "7 itens quebram em duas colunas, sobra na primeira"
   );
   assertEqual(splitIntoColumns([]), [[]], "lista vazia devolve uma coluna vazia");
+  assertEqual(
+    splitIntoColumns([1, 2, 3, 4, 5, 6, 7], 6, 3),
+    [
+      [1, 2, 3, 4],
+      [5, 6, 7],
+    ],
+    "maxColumns=3 não força 3 colunas quando 2 bastam"
+  );
+  assertEqual(
+    splitIntoColumns([1, 2, 3, 4, 5, 6, 7, 8, 9, 10], 6, 3),
+    [
+      [1, 2, 3, 4, 5],
+      [6, 7, 8, 9, 10],
+    ],
+    "o número de colunas é ceil(itens/threshold): 10 itens ainda cabem em 2"
+  );
+  assertEqual(
+    splitIntoColumns([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13], 6, 3),
+    [
+      [1, 2, 3, 4, 5],
+      [6, 7, 8, 9],
+      [10, 11, 12, 13],
+    ],
+    "maxColumns=3 distribui a sobra nas primeiras colunas"
+  );
+  assertEqual(
+    splitIntoColumns([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]).length,
+    2,
+    "sem maxColumns explícito o padrão continua sendo 2 colunas (o React depende disso)"
+  );
   console.log("OK: reflow de colunas");
 }
 

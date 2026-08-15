@@ -41,6 +41,7 @@ import {
   buildEnvironmentSheet,
   densityTierFor,
   splitIntoColumns,
+  COLUMN_SPLIT_THRESHOLD,
   type DensityTier,
   type EnvironmentSheet,
   type EnvironmentSheetSource,
@@ -636,7 +637,17 @@ function addTextBlock(
   fontSize: number
 ): number {
   addFichaBlockLabel(slide, label, x, y, w);
-  const h = Math.min(entries.length * 0.26 + 0.1, FICHA_BOTTOM_Y - y - FICHA_LABEL_H);
+  // O piso não é estética: quando o cursor já passou de FICHA_BOTTOM_Y -
+  // FICHA_LABEL_H (6.53"), o `Math.min` sozinho devolve altura NEGATIVA, e o
+  // pptxgenjs grava isso direto como `<a:ext cy="-64008"/>`. Coordenada
+  // negativa viola ST_PositiveCoordinate no ECMA-376, ou seja: não é um bloco
+  // torto, é um arquivo que o PowerPoint pode recusar a abrir. Medido
+  // descompactando o .pptx gerado com 20 sistemas + 12 contas, onde o bloco de
+  // sigilo caía em y=6.92 com h=-0.07.
+  const h = Math.max(
+    FICHA_LABEL_H,
+    Math.min(entries.length * 0.26 + 0.1, FICHA_BOTTOM_Y - y - FICHA_LABEL_H)
+  );
   slide.addText(
     entries.map((entry, index) => ({
       text: `${entry.label}: ${entry.value}`,
@@ -668,7 +679,8 @@ function addListBlock<T>(
   tier: DensityTier
 ): number {
   addFichaBlockLabel(slide, label, x, y, w);
-  const columns = splitIntoColumns(items);
+  // Terceira coluna só no tier compacto — ver splitIntoColumns.
+  const columns = splitIntoColumns(items, COLUMN_SPLIT_THRESHOLD, tier === "compact" ? 3 : 2);
   const columnW = (w - (columns.length - 1) * 0.15) / columns.length;
   const tallest = Math.max(...columns.map((c) => c.length));
 
@@ -836,14 +848,18 @@ export function addFichaTecnicaSlide(pres: PptxGenJS, project: ExistingAutomatio
       tier
     );
   }
+  // O bloco de sigilo não tem coluna fixa: vai para a que sobrou mais espaço.
+  // Com 20 sistemas e 12 contas a coluna direita chega perto do rodapé, e
+  // prender o sigilo nela era o que produzia altura negativa.
   if (sheet.sensitive.length > 0) {
+    const useLeft = leftY <= rightY;
     addTextBlock(
       slide,
       "Dados sigilosos",
       sheet.sensitive,
-      FICHA_RIGHT_X,
-      rightY,
-      FICHA_RIGHT_W,
+      useLeft ? FICHA_LEFT_X : FICHA_RIGHT_X,
+      Math.min(leftY, rightY),
+      useLeft ? FICHA_LEFT_W : FICHA_RIGHT_W,
       fontSize
     );
   }
