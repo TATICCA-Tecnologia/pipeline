@@ -95,7 +95,8 @@ const COLOR_HIGHLIGHT_BG = "F8FAFC"; // slate-50 (caixa do architectNotes)
 const COLOR_SAVING = "059669"; // emerald-600 (economia estimada)
 
 // Eixos e fallback da avaliação qualitativa — MESMA config e MESMA regra do
-// componente React `project-executive-slide.tsx` (RATING_AXES / DEFAULT_RATING).
+// componente React `src/shared/components/slide/rating-radar-chart.tsx`
+// (RATING_AXES / DEFAULT_RATING).
 // Uma nota null usa 3 como fallback, e o percentual é média/5*100 arredondado.
 type RatingKey =
   | "ratingErrorReduction"
@@ -1054,7 +1055,8 @@ export function addInterviewsSlide(pres: PptxGenJS, interviews: Interviews): voi
 
 // ---------------------------------------------------------------------------
 // Slide por processo (Passo 8b) — "tradução" do card React
-// `src/shared/components/project-executive-slide.tsx` para as primitivas
+// `src/shared/components/project-executive-slide.tsx` (radar em
+// `src/shared/components/slide/rating-radar-chart.tsx`) para as primitivas
 // nativas do pptxgenjs (texto + tabela + radar chart), reutilizando EXATAMENTE
 // os mesmos campos, rótulos e fórmulas do componente de referência. Nenhum
 // texto novo é gerado: só os campos já preenchidos são reaproveitados.

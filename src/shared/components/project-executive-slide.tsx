@@ -1,6 +1,6 @@
 "use client";
 
-import { type ReactNode, useLayoutEffect, useRef, useState } from "react";
+import { type ReactNode } from "react";
 import Image from "next/image";
 import type { Project } from "@/shared/types";
 import {
@@ -15,173 +15,8 @@ import {
 import { formatDate } from "@/shared/utils";
 import { EXECUTION_STRATEGIES } from "@/src/app/(private)/admin/projetos/[id]/especificacao/_constants/architecture";
 import { useDemoMode } from "@/shared/context/demo-mode-context";
-
-// Página de tamanho fixo (16:9, mesma proporção de um slide de verdade) — o conteúdo
-// NUNCA muda o tamanho da página; em vez disso, encolhe (useFitToSlide abaixo) até caber.
-const SLIDE_WIDTH = 1100;
-const SLIDE_HEIGHT = Math.round((SLIDE_WIDTH * 9) / 16);
-const MIN_SLIDE_SCALE = 0.5;
-
-// O conteúdo é medido SEMPRE na largura fixa SLIDE_WIDTH (nunca varia) — isso evita um
-// problema real de uma versão anterior desta função, que recalculava a largura junto com
-// a escala (pra não sobrar espaço lateral) e podia oscilar sem nunca convergir num valor
-// que realmente coubesse, resultando em conteúdo cortado silenciosamente pelo
-// overflow:hidden da página. Aqui a conta é direta e sempre garantida: mede a altura
-// natural (scrollHeight, que ignora o transform) numa largura fixa, e a escala final é
-// sempre >= à necessária pra essa altura caber em SLIDE_HEIGHT — nunca corta conteúdo.
-// Um ResizeObserver reage a mudanças tardias de altura (fonte/imagem carregando depois).
-function useFitToSlide(
-  contentRef: React.RefObject<HTMLDivElement | null>,
-  resetKey: string
-): number {
-  const [scale, setScale] = useState(1);
-
-  useLayoutEffect(() => {
-    setScale(1);
-  }, [resetKey]);
-
-  useLayoutEffect(() => {
-    const el = contentRef.current;
-    if (!el) return;
-
-    const measure = () => {
-      const naturalHeight = el.scrollHeight;
-      const next =
-        naturalHeight > SLIDE_HEIGHT
-          ? Math.max(MIN_SLIDE_SCALE, SLIDE_HEIGHT / naturalHeight)
-          : 1;
-      setScale((current) => (Math.abs(next - current) > 0.002 ? next : current));
-    };
-
-    measure();
-    const observer = new ResizeObserver(measure);
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [contentRef, resetKey]);
-
-  return scale;
-}
-
-type RatingKey =
-  | "ratingErrorReduction"
-  | "ratingProcessCriticality"
-  | "ratingInternalImpact"
-  | "ratingExternalImpact"
-  | "ratingCompliance";
-
-const RATING_AXES: { key: RatingKey; label: string }[] = [
-  { key: "ratingErrorReduction", label: "Redução de erros" },
-  { key: "ratingProcessCriticality", label: "Criticidade" },
-  { key: "ratingInternalImpact", label: "Impacto interno" },
-  { key: "ratingExternalImpact", label: "Impacto externo" },
-  { key: "ratingCompliance", label: "Políticas" },
-];
-
-const DEFAULT_RATING = 3;
-const RADAR_CENTER = { x: 230, y: 150 };
-const RADAR_UNIT = 20; // pixels per rating point (1-5 scale => 20-100px radius from center)
-
-function pointAt(radius: number, axisIndex: number): { x: number; y: number } {
-  const angle = ((-90 + 72 * axisIndex) * Math.PI) / 180;
-  return {
-    x: RADAR_CENTER.x + radius * Math.cos(angle),
-    y: RADAR_CENTER.y + radius * Math.sin(angle),
-  };
-}
-
-const CATEGORY_LABEL_POS: {
-  x: number;
-  y: number;
-  anchor: "start" | "middle" | "end";
-}[] = [
-  { x: 230, y: 18, anchor: "middle" },
-  { x: 368, y: 109, anchor: "start" },
-  { x: 315, y: 271, anchor: "middle" },
-  { x: 145, y: 271, anchor: "middle" },
-  { x: 92, y: 109, anchor: "end" },
-];
-
-function RatingRadarChart({ project }: { project: Project }) {
-  const values = RATING_AXES.map((axis) => ({
-    ...axis,
-    value: project[axis.key] ?? DEFAULT_RATING,
-  }));
-
-  const gridRings = [1, 2, 3, 4, 5].map((ring) =>
-    RATING_AXES.map((_, i) => {
-      const p = pointAt(ring * RADAR_UNIT, i);
-      return `${p.x},${p.y}`;
-    }).join(" ")
-  );
-
-  const dataPolygonPoints = values
-    .map((v, i) => {
-      const p = pointAt(v.value * RADAR_UNIT, i);
-      return `${p.x},${p.y}`;
-    })
-    .join(" ");
-
-  return (
-    <div className="flex flex-col items-center">
-      <svg viewBox="0 0 460 300" className="w-full max-w-[360px]">
-        {gridRings.map((points, i) => (
-          <polygon key={i} points={points} fill="none" stroke="#e5e5ef" strokeWidth={1} />
-        ))}
-        {RATING_AXES.map((_, i) => {
-          const outer = pointAt(5 * RADAR_UNIT, i);
-          return (
-            <line
-              key={i}
-              x1={RADAR_CENTER.x}
-              y1={RADAR_CENTER.y}
-              x2={outer.x}
-              y2={outer.y}
-              stroke="#d8d8e5"
-            />
-          );
-        })}
-        <polygon
-          points={dataPolygonPoints}
-          fill="#6366f1"
-          fillOpacity={0.32}
-          stroke="#4f46e5"
-          strokeWidth={2.5}
-        />
-        {values.map((v, i) => (
-          <text
-            key={`label-${i}`}
-            x={CATEGORY_LABEL_POS[i].x}
-            y={CATEGORY_LABEL_POS[i].y}
-            fontSize={13}
-            fontWeight={600}
-            fill="#4b4b5e"
-            textAnchor={CATEGORY_LABEL_POS[i].anchor}
-          >
-            {v.label}
-          </text>
-        ))}
-        {values.map((v, i) => {
-          const p = pointAt(v.value * RADAR_UNIT, i);
-          return (
-            <g key={`badge-${i}`}>
-              <circle cx={p.x} cy={p.y} r={14} fill="#ffffff" stroke="#4f46e5" strokeWidth={2} />
-              <text
-                x={p.x}
-                y={p.y + 5}
-                fontSize={14}
-                fontWeight={800}
-                fill="#4f46e5"
-                textAnchor="middle"
-              >
-                {v.value}
-              </text>
-            </g>
-          );
-        })}
-      </svg>
-    </div>
-  );
-}
+import { SlidePage } from "./slide/slide-page";
+import { RatingRadarChart, RATING_AXES, DEFAULT_RATING } from "./slide/rating-radar-chart";
 
 function SectionLabel({ children }: { children: ReactNode }) {
   return (
@@ -216,8 +51,6 @@ function buildLabeledLinesWithDetail(
 }
 
 export function ProjectExecutiveSlide({ project }: { project: Project }) {
-  const contentRef = useRef<HTMLDivElement>(null);
-  const scale = useFitToSlide(contentRef, project.id);
   const { maskFreeText, maskCompanyName } = useDemoMode();
 
   const areaEntrevistada = project.projectType.split(" · Plataforma")[0];
@@ -320,37 +153,8 @@ export function ProjectExecutiveSlide({ project }: { project: Project }) {
   const ratingAverageLabel = ratingAverage.toFixed(1).replace(".", ",");
 
   return (
-    <div
-      className="executive-slide-print-root relative mx-auto overflow-hidden bg-white shadow-md"
-      style={{ width: SLIDE_WIDTH, height: SLIDE_HEIGHT }}
-    >
-      {/*
-        Página de tamanho FIXO (16:9) — nunca cresce. Se o conteúdo não couber,
-        useFitToSlide encolhe o conteúdo (fonte/espaçamento, via transform: scale)
-        até caber, em vez de truncar texto ou mudar o tamanho da página.
-      */}
-      <div
-        ref={contentRef}
-        className="relative text-[#1a1a2e]"
-        style={{
-          width: SLIDE_WIDTH,
-          transform: `scale(${scale})`,
-          transformOrigin: "top left",
-          // transform não muda a posição de layout do elemento, só o visual — centraliza
-          // manualmente o espaço que sobra na largura quando scale < 1 (encolheu).
-          marginLeft: (SLIDE_WIDTH * (1 - scale)) / 2,
-        }}
-      >
-        <div
-          className="absolute inset-y-0 left-0 w-16"
-          style={{ background: "#1a2b4a", clipPath: "polygon(0 0, 100% 0, 40% 100%, 0 100%)" }}
-        />
-        <div
-          className="absolute inset-y-0 left-[18px] w-[46px]"
-          style={{ background: "#14b8a6", clipPath: "polygon(0 0, 100% 0, 40% 100%, 0 100%)" }}
-        />
-
-        <div className="relative flex flex-col p-10 pl-[100px]">
+    <SlidePage resetKey={project.id}>
+      <div className="relative flex flex-col p-10 pl-[100px]">
         <div className="mb-6 flex items-start justify-between">
           <div>
             {project.companyName && (
@@ -508,7 +312,6 @@ export function ProjectExecutiveSlide({ project }: { project: Project }) {
           </div>
         </div>
       </div>
-      </div>
-    </div>
+    </SlidePage>
   );
 }

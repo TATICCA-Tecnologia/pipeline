@@ -8,7 +8,7 @@ import type { Project } from "@prisma/client";
  * uma tarefa futura do blueprint de diagnóstico de robotização.
  */
 
-/** Valor usado quando um rating individual é `null` (mesma convenção de project-executive-slide.tsx). */
+/** Valor usado quando um rating individual é `null` (mesma convenção de slide/rating-radar-chart.tsx). */
 export const DEFAULT_RATING = 3;
 
 /** Nota máxima possível para um rating individual (escala 1-5). */
