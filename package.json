@@ -16,6 +16,7 @@
     "deck:preview-ficha": "tsx scripts/preview-ficha-tecnica-slide.ts",
     "deck:preview-processo": "tsx scripts/preview-processo-slide.ts",
     "verify:inventory": "tsx scripts/verify-automation-inventory.ts",
+    "verify:ambiente": "tsx scripts/verify-environment-sheet.ts",
     "verify:xml": "tsx scripts/verify-xml-roundtrip.ts",
     "verify:solicitacao-xml": "tsx scripts/verify-solicitacao-xml.ts",
     "verify:nullable-fk": "tsx scripts/verify-nullable-fk.ts"
